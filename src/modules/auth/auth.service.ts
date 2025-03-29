@@ -14,7 +14,7 @@ export class AuthService {
     const {emails } = profile;
     const email = emails?.[0]?.value;
 
-    const user = await this.prisma.user.findUnique({ where: { email } });
+    const user = await this.prisma.getClient().user.findUnique({ where: { email } });
     if (!user) {
       throw new UnauthorizedException('Acceso no autorizado. Contacta al administrador.');
     }

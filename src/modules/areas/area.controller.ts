@@ -19,12 +19,16 @@ import {
   Authorization,
   Role,
 } from '@modules/auth/decorators/authorization.decorator';
+import { Unauthenticated } from '@modules/auth/decorators/unauthenticated.decorator';
+import { SchemaInterceptor } from 'prisma/interceptors/schema.interceptor';
 //import { ApiCreatedResponse } from '@nestjs/swagger';
 //import { ApiResponse } from '@nestjs/swagger';
 
+@Unauthenticated()
 @Controller('areas')
 @ApiTags('Areas')
 @UseInterceptors(PrismaExceptionInterceptor)
+@UseInterceptors(SchemaInterceptor)
 export class AreaController {
   constructor(private readonly areaService: AreaService) {}
 

@@ -1,4 +1,3 @@
-import { AdmissionsService } from '@modules/admissions/admissions.service';
 import {
   Injectable,
   Logger,
@@ -7,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import NodeCache from 'node-cache';
+import { SchemaManagerService } from 'schema-manager/schema-manger.service';
 
 export interface IPrismaClient {
   name: string;
@@ -19,19 +19,38 @@ export class PrismaClientFactory implements OnModuleInit, OnModuleDestroy {
   private mainClient: IPrismaClient;
   private readonly cache: NodeCache;
 
-  constructor(private readonly admctx: AdmissionsService) {
+  constructor(private readonly schemaManager: SchemaManagerService) {
     this.cache = new NodeCache({ stdTTL: 3600, checkperiod: 600 }); // 1 hour cache with 10 minute check period
+
+    // Configurar el evento para manejar la expiración de clientes en la caché
+    this.cache.on('expired', (key, client: PrismaClient) => {
+      this.logger.debug(
+        `Prisma: client for schema ${key} expired from cache, disconnecting...`,
+      );
+      client
+        .$disconnect()
+        .then(() => {
+          this.logger.debug(
+            `Prisma: disconnected expired client for schema: ${key}`,
+          );
+        })
+        .catch((error) => {
+          this.logger.error(
+            `Prisma: Error disconnecting expired client for schema ${key}: ${error}`,
+          );
+        });
+    });
   }
 
   async onModuleInit() {
     try {
-      const { name } = await this.admctx.getCurrent();
+      const { name } = await this.schemaManager.getCurrent();
       this.mainClient = { name, client: this.createClient(name) };
-      this.logger.debug(`
-        Prisma: connected successfully for schema: ${this.mainClient.name}`);
+      this.logger.debug(
+        `Prisma: connected successfully for schema: ${this.mainClient.name}`,
+      );
     } catch (error) {
-      this.logger.error(`
-        Prisma: Failed to connect to the database: ${error}`);
+      this.logger.error(`Prisma: Failed to connect to the database: ${error}`);
     }
   }
 
@@ -41,8 +60,7 @@ export class PrismaClientFactory implements OnModuleInit, OnModuleDestroy {
     let client = this.cache.get(schema) as PrismaClient;
 
     if (!client) {
-      this.logger.debug(`
-        Prisma: creating client for schema: ${schema}`);
+      this.logger.debug(`Prisma: creating client for schema: ${schema}`);
       client = this.createClient(schema);
       this.cache.set(schema, client);
     }
@@ -50,11 +68,20 @@ export class PrismaClientFactory implements OnModuleInit, OnModuleDestroy {
     return client;
   }
 
+  async setMainClient(schema: string) {
+    await this.mainClient.client.$disconnect();
+    this.mainClient = {
+      name: schema,
+      client: this.createClient(schema),
+    };
+    return this.mainClient.client;
+  }
+
   private createClient(schema: string): PrismaClient {
     return new PrismaClient({
       datasources: {
         db: {
-          url: `${process.env.DATABASE_URL}&schema=${schema}`,
+          url: `${process.env.DATABASE_URL}?schema=${schema}`,
         },
       },
     });
@@ -66,8 +93,9 @@ export class PrismaClientFactory implements OnModuleInit, OnModuleDestroy {
     // Cerrar cliente principal
     if (this.mainClient?.client) {
       await this.mainClient.client.$disconnect();
-      this.logger.debug(`
-        Prisma: disconnected main schema: ${this.mainClient.name}`);
+      this.logger.debug(
+        `Prisma: disconnected main schema: ${this.mainClient.name}`,
+      );
     }
 
     // Cerrar clientes en caché

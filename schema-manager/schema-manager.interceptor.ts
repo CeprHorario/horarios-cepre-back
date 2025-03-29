@@ -7,9 +7,9 @@ import {
 } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { AsyncLocalStorage } from 'async_hooks';
-import { SchemaManagerService } from 'schema-manager/schema-manger.service';
+import { SchemaManagerService } from './schema-manger.service';
 @Injectable()
-export class SchemaInterceptor implements NestInterceptor {
+export class SchemaManagerInterceptor implements NestInterceptor {
   constructor(
     private readonly schemaManager: SchemaManagerService,
     private readonly als: AsyncLocalStorage<{ schema: string }>,

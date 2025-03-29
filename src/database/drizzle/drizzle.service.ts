@@ -21,9 +21,9 @@ export class DrizzleService implements OnModuleInit, OnModuleDestroy {
 
     this.pool = new Pool({
       connectionString,
-      ssl: {
-        rejectUnauthorized: false, // Ignora verificación de certificado (opcional según el proveedor)
-      },
+      //ssl: {
+      //  rejectUnauthorized: false, // Ignora verificación de certificado (opcional según el proveedor)
+      //},
       max: 20,
       idleTimeoutMillis: 2000000,
       connectionTimeoutMillis: 2000,

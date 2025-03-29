@@ -13,8 +13,10 @@ import {
 import { ApiTags, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
 import { CourseService } from './course.service';
 import { CreateCourseDto, UpdateCourseDto } from './dto';
+import { Unauthenticated } from '@modules/auth/decorators/unauthenticated.decorator';
 
 @ApiTags('Courses')
+@Unauthenticated()
 @Controller('courses')
 export class CourseController {
   constructor(private readonly courseService: CourseService) {}
