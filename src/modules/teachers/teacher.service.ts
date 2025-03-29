@@ -63,8 +63,22 @@ export class TeacherService {
 
   async createTeachersFromJson(data: ImportTeacherDto[]) {
     if (data.length === 0) return { message: 'No hay datos para procesar' };
-
+  
     return this.prisma.getClient().$transaction(async (tx) => {
+      const courseNames = [...new Set(data.map((t) => t.courseName))]; // Eliminar nombres duplicados
+      const courses = await tx.course.findMany({
+        where: { name: { in: courseNames } },
+        select: { id: true, name: true },
+      });
+  
+      const courseMap = new Map(courses.map((c) => [c.name, c.id]));
+  
+      const missingCourses = courseNames.filter((name) => !courseMap.has(name));
+      if (missingCourses.length > 0) {
+        throw new Error(`Los siguientes cursos no existen: ${missingCourses.join(', ')}`);
+      }
+  
+      // Crear los usuarios
       await tx.user.createMany({
         data: data.map((t) => ({
           email: t.email,
@@ -72,15 +86,19 @@ export class TeacherService {
           isActive: true,
         })),
       });
-
+  
+      // Obtener los nuevos usuarios creados
       const newUsers = await tx.user.findMany({
         where: {
           email: { in: data.map((t) => t.email) },
         },
         select: { id: true, email: true },
       });
+
+      // Mapear emails a IDs de usuario
       const userMap = new Map(newUsers.map((u) => [u.email, u.id]));
 
+      // Crear los perfiles de usuario
       await tx.userProfile.createMany({
         data: data.map((t) => ({
           userId: userMap.get(t.email)!,
@@ -89,16 +107,16 @@ export class TeacherService {
           lastName: t.lastName,
           phone: t.phone,
           phonesAdditional: t.phonesAdditional || [],
-          address: t.address,
           personalEmail: t.personalEmail,
         })),
       });
 
+      // Crear los profesores con el `jobStatus` y `courseId`
       await tx.teacher.createMany({
         data: data.map((t) => ({
           userId: userMap.get(t.email)!,
-          courseId: 1,
-          jobShiftType: 'FullTime',
+          courseId: courseMap.get(t.courseName)!, // Obtener el ID del curso
+          jobStatus: t.jobStatus,
         })),
       });
 
@@ -108,6 +126,7 @@ export class TeacherService {
       };
     });
   }
+  
   //async getTeacherSchedules(teacherId: string) {
   //  return Promise.resolve(undefined);
   //}

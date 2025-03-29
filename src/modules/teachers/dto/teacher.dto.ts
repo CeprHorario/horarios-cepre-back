@@ -9,7 +9,7 @@ import {
   IsBoolean,
   IsEnum,
 } from 'class-validator';
-import { User, JobShiftType } from '@prisma/client';
+import { User, JobStatus } from '@prisma/client';
 import { ApiProperty } from '@nestjs/swagger';
 import { CourseDto } from '@modules/courses/dto';
 
@@ -48,6 +48,11 @@ export class TeacherDto {
   @ApiProperty({ example: 30 })
   scheduledHours: number;
 
+  @IsNotEmpty()
+  @IsBoolean()
+  @ApiProperty({ example: true })
+  isCoordinator: boolean;
+
   @ApiProperty({
     description: 'Fecha de creación del teacher',
     example: '2023-10-01T12:00:00Z',
@@ -83,7 +88,7 @@ export class TeacherDto {
   @IsOptional()
   @IsString()
   @IsNotEmpty()
-  @IsEnum(JobShiftType)
+  @IsEnum(JobStatus)
   @ApiProperty({ example: 'FullTime' })
-  jobShiftType!: JobShiftType;
+  jobStatus!: JobStatus;
 }

@@ -18,8 +18,11 @@ export class AuthController {
   @Unauthenticated() // Evita que se aplique el guard de autorización
   @Get('google/redirect')
   @UseGuards(AuthGuard('google'))
-  googleAuthRedirect(@Req() req, @Res() res) {
-    res.redirect(process.env.REDIRECT_FRONT + '/login?token=' + req.user.token);
+  async googleAuthRedirect(@Req() req, @Res() res) {
+    if (!req.user || !req.user.token) {
+      return res.redirect(`${process.env.REDIRECT_FRONT}/login?error=authentication_failed`);
+    }
+    res.redirect(`${process.env.REDIRECT_FRONT}/login?token=${req.user.token}`);
   }
 
   @Unauthenticated() // Evita que se aplique el guard de autorización

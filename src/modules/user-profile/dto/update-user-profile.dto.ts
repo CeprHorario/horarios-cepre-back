@@ -34,12 +34,6 @@ export class UpdateUserProfileDto extends PartialType(CreateUserProfileDto) {
   phonesAdditional?: string[];
 
   @ApiPropertyOptional({
-    description: 'Dirección del usuario',
-    example: 'Calle Falsa 123'
-  })
-  address?: string;
-
-  @ApiPropertyOptional({
     description: 'Correo electrónico personal del usuario',
     example: 'personal@ejemplo.com'
   })

@@ -34,7 +34,6 @@ model UserProfile {
   lastName         String   @map("last_name") @db.VarChar(128)
   phone            String?  @db.VarChar(15)
   phonesAdditional String[] @map("phones_additional") @db.VarChar(15)
-  address          String?  @db.VarChar(255)
   personalEmail    String?  @unique @map("personal_email") @db.VarChar(48)
   isActive         Boolean  @default(true) @map("is_active")
   createdAt        DateTime @default(now()) @map("created_at")
@@ -45,18 +44,19 @@ model UserProfile {
 }
 
 model Teacher {
-  id             String       @id @default(uuid()) @db.Uuid
-  userId         String       @unique @map("user_id") @db.Uuid
-  courseId       Int          @map("course_id") @db.SmallInt
-  maxHours       Int?         @map("max_hours") @db.SmallInt
-  scheduledHours Int?         @map("scheduled_hours") @db.SmallInt
-  createdAt      DateTime     @default(now()) @map("created_at")
-  updatedAt      DateTime     @default(now()) @updatedAt @map("updated_at")
-  isActive       Boolean      @default(true) @map("is_active")
-  jobShiftType   JobShiftType @map("job_shift_type")
+  id             String     @id @default(uuid()) @db.Uuid
+  userId         String     @unique @map("user_id") @db.Uuid
+  courseId       Int        @map("course_id") @db.SmallInt
+  maxHours       Int?       @map("max_hours") @db.SmallInt
+  scheduledHours Int        @default(0) @map("scheduled_hours") @db.SmallInt
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @default(now()) @updatedAt @map("updated_at")
+  isCoordinator  Boolean    @default(false) @map("is_coordinator")
+  isActive       Boolean    @default(true) @map("is_active")
+  jobStatus      JobStatus  @map("job_status")
   schedules      Schedule[]
-  courses        Course       @relation(fields: [courseId], references: [id])
-  user           User         @relation(fields: [userId], references: [id])
+  courses        Course     @relation(fields: [courseId], references: [id])
+  user           User       @relation(fields: [userId], references: [id])
 
   @@map("teachers")
 }
@@ -188,11 +188,12 @@ model Schedule {
   @@map("schedules")
 }
 
-enum JobShiftType {
+enum JobStatus {
   FullTime @map("FULL_TIME")
   PartTime @map("PART_TIME")
+  FreeTime @map("FREE_TIME")
 
-  @@map("job_shift_types")
+  @@map("job_statuses")
 }
 
 enum Weekday {

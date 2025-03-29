@@ -1,7 +1,7 @@
 import { Client } from 'pg';
 import * as dotenv from 'dotenv';
-import { readFileSync, existsSync } from 'fs';
-import { join } from 'path';
+//import { readFileSync, existsSync } from 'fs';
+//import { join } from 'path';
 import { execSync } from 'child_process';
 
 dotenv.config();
@@ -22,9 +22,9 @@ const runMigrations = async () => {
     console.log('Migrations applied successfully.\n');
 
     // Ejecutar el archivo SQL después de la primera migración
-    const sqlFilePath = join(
+    /*const sqlFilePath = join(
       __dirname,
-      'stored-procedures/trigger_create_process_admission.sql', // Ruta al archivo SQL
+      'sql/trigger_create_process_admission.sql', // Ruta al archivo SQL
     );
     if (existsSync(sqlFilePath)) {
       const sql = readFileSync(sqlFilePath, 'utf8');
@@ -32,7 +32,7 @@ const runMigrations = async () => {
       console.log('\nStored procedures executed successfully.');
     } else {
       console.error('Error: No se encontró el archivo SQL en', sqlFilePath);
-    }
+    }*/
   } catch (err) {
     console.error('Error during migration:', err);
   } finally {

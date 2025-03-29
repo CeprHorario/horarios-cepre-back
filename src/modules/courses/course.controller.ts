@@ -14,6 +14,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
 import { CourseService } from './course.service';
 import { CreateCourseDto, UpdateCourseDto } from './dto';
 import { Authorization } from '@modules/auth/decorators/authorization.decorator';
+import {Unauthenticated} from "@modules/auth/decorators/unauthenticated.decorator";
 
 @ApiTags('Courses')
 @Controller('courses')
@@ -42,10 +43,7 @@ export class CourseController {
   }
 
   @Get()
-  @Authorization({
-    permission: 'courses.list',
-    description: 'Listar un nuevo curso',
-  })
+  @Unauthenticated()
   @ApiOperation({ summary: 'Obtener todos los cursos' })
   @ApiResponse({
     status: 200,

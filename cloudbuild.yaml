@@ -1,0 +1,48 @@
+steps:
+  # Install dependencies
+  - name: 'gcr.io/cloud-builders/npm'
+    args: ['ci', '--prefer-offline', '--no-audit']
+
+  # Generate Prisma client
+  - name: 'gcr.io/cloud-builders/npm'
+    args: ['exec', 'prisma', 'generate']
+
+  # Build the application
+  - name: 'gcr.io/cloud-builders/npm'
+    args: ['run', 'build']
+
+  # Build Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: [
+      'build', 
+      '-t', 'us-central1-docker.pkg.dev/$PROJECT_ID/horarios-repo/horarios-cepre-back:$COMMIT_SHA', 
+      '-t', 'us-central1-docker.pkg.dev/$PROJECT_ID/horarios-repo/horarios-cepre-back:latest', 
+      '.'
+    ]
+
+  # Push Docker image to Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: [
+      'push', 
+      'us-central1-docker.pkg.dev/$PROJECT_ID/horarios-repo/horarios-cepre-back', 
+      '--all-tags'
+    ]
+
+  # Deploy to Cloud Run using Secret Manager references
+  - name: 'gcr.io/cloud-builders/gcloud'
+    args: [
+      'run', 'deploy', 'horarios-cepre-back',
+      '--image', 'us-central1-docker.pkg.dev/$PROJECT_ID/horarios-repo/horarios-cepre-back:$COMMIT_SHA',
+      '--region', 'us-central1',
+      '--platform', 'managed',
+      '--allow-unauthenticated',
+      '--set-secrets', 
+      'DATABASE_URL=DATABASE_URL:latest,DB_HOST=DB_HOST:latest,DB_PORT=DB_PORT:latest,DB_USER=DB_USER:latest,DB_DATABASE=DB_DATABASE:latest,DB_PASSWORD=DB_PASSWORD:latest,GOOGLE_CLIENT_ID=GOOGLE_CLIENT_ID:latest,GOOGLE_CLIENT_SECRET=GOOGLE_CLIENT_SECRET:latest,GOOGLE_REDIRECT_URI=GOOGLE_REDIRECT_URI:latest,JWT_SECRET=JWT_SECRET:latest,JWT_EXPIRES_IN=JWT_EXPIRES_IN:latest,REDIRECT_FRONT=REDIRECT_FRONT:latest'
+    ]
+
+images:
+  - 'us-central1-docker.pkg.dev/$PROJECT_ID/horarios-repo/horarios-cepre-back'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  substitution_option: ALLOW_LOOSE

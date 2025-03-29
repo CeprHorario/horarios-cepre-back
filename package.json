@@ -6,12 +6,13 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
+    "prebuild": "prisma generate",
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
-    "start:prod": "node dist/main",
+    "start:prod": "node dist/src/main.js",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",
     "test:watch": "jest --watch",
@@ -20,6 +21,9 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "drizzle-migrate": "ts-node src/database/drizzle/migrate.ts",
     "prisma-generate": "ts-node src/database/prisma/scripts/generate.ts"
+  },
+  "prisma": {
+    "schema": "src/database/prisma/schema.prisma"
   },
   "dependencies": {
     "@nestjs/cache-manager": "^3.0.0",
