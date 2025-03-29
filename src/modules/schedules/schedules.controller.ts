@@ -31,7 +31,7 @@ export class ScheduleController {
     permission: 'schedule.loadWithCourses',
     description: 'Cargar horarios con cursos',
   })
-  loadWithCourses(data: LoadScheduleDto) {
+  loadWithCourses(@Body() data: LoadScheduleDto) {
     return this.scheduleService.loadWithCourses(data);
   }
 

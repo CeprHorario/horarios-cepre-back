@@ -5,15 +5,20 @@ import {
   IsOptional,
   ValidateNested,
   IsArray,
+  IsEnum,
+  IsNumber,
+  IsPositive,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
+import { Weekday } from '@prisma/client';
 
 export class DayScheduleDto {
   @IsNotEmpty()
-  @IsString()
-  @ApiProperty({ example: '1,2' })
-  bloque!: string;
+  @IsNumber()
+  @IsPositive()
+  @ApiProperty({ example: 1 })
+  bloque!: number;
 
   @IsNotEmpty()
   @IsString()
@@ -29,8 +34,8 @@ export class DayScheduleDto {
 export class DayDto {
   @IsNotEmpty()
   @IsString()
-  @ApiProperty({ example: 'Lunes' })
-  dia!: string;
+  @IsEnum(Weekday)
+  dia!: Weekday;
 
   @IsArray()
   @ValidateNested({ each: true })
@@ -38,12 +43,12 @@ export class DayDto {
   @ApiProperty({
     example: [
       {
-        bloque: '1,2',
+        bloque: 1,
         curso: 'Historia',
         docente: 'juan.perez@cepr.unsa.pe',
       },
       {
-        bloque: '3',
+        bloque: 2,
         curso: 'Filosofía',
         docente: 'maria.lopez@cepr.unsa.pe',
       },
@@ -55,27 +60,27 @@ export class DayDto {
 export class ScheduleWeekDto {
   @IsNotEmpty()
   @IsString()
-  @ApiProperty({ example: '101I-Ingenierías' })
-  name!: string;
+  @ApiProperty({ example: 'S-101' })
+  salon!: string;
 
   @IsNotEmpty()
   @IsString()
-  @ApiProperty({ example: 'sociales' })
+  @ApiProperty({ example: 'Sociales' })
   area!: string;
 
   @IsNotEmpty()
   @IsString()
-  @ApiProperty({ example: 'turno 1' })
+  @ApiProperty({ example: '1' })
   turno!: string;
 
   @IsNotEmpty()
   @IsEmail()
-  @ApiProperty({ example: 'i101@cepr.unsa.pe' })
+  @ApiProperty({ example: 's101@cepr.unsa.pe' })
   monitor!: string;
 
   @IsNotEmpty()
   @IsString()
-  @ApiProperty({ example: 'cede central' })
+  @ApiProperty({ example: 'Sede Virtual' })
   sede!: string;
 
   @IsArray()
@@ -87,12 +92,12 @@ export class ScheduleWeekDto {
         dia: 'Lunes',
         clases: [
           {
-            bloque: '1,2',
+            bloque: 1,
             curso: 'Historia',
             docente: 'juan.perez@cepr.unsa.pe',
           },
           {
-            bloque: '3',
+            bloque: 3,
             curso: 'Filosofía',
             docente: 'maria.lopez@cepr.unsa.pe',
           },
@@ -102,12 +107,12 @@ export class ScheduleWeekDto {
         dia: 'Martes',
         clases: [
           {
-            bloque: '1',
+            bloque: 1,
             curso: 'Cívica',
             docente: 'carlos.ramos@cepr.unsa.pe',
           },
           {
-            bloque: '2,3',
+            bloque: 2,
             curso: 'Psicología',
             docente: 'lucia.salas@cepr.unsa.pe',
           },

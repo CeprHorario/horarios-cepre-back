@@ -3,40 +3,65 @@ import { PrismaService } from '@database/prisma/prisma.service';
 import { ScheduleBaseDto, CreateScheduleDto, UpdateScheduleDto } from './dto';
 import { plainToInstance } from 'class-transformer';
 import { LoadScheduleDto } from './dto';
-import { CourseDto } from '../courses/dto/course.dto';
-import { AreaDto } from '../areas/dto/area.dto';
-import { TeacherDto } from '../monitors/dto/teacher.dto';
 
 @Injectable()
 export class ScheduleService {
   constructor(private prisma: PrismaService) {}
 
   async loadWithCourses(data: LoadScheduleDto) {
+    const { salon, courses, shift } = await this.getData(
+      data.salon,
+      data.turno,
+    );
+    if (!salon) {
+      throw new NotFoundException(`Salon ${data.salon} no encontrado`);
+    }
+    if (!shift) {
+      throw new NotFoundException(`Turno ${data.turno} no encontrado`);
+    }
+    const bloques = shift.hourSessions;
+
+    const schedules: CreateScheduleDto[] = [];
+
+    data.horarios.map((horario) => {
+      horario.clases.map((clase) => {
+        const bloque = bloques.find((bloque) => bloque.period === clase.bloque);
+        if (!bloque) {
+          throw new NotFoundException(`Bloque ${clase.bloque} no encontrado`);
+        }
+        const course = courses.find((course) => course.name === clase.curso);
+        if (!course) {
+          throw new NotFoundException(`Curso ${clase.curso} no encontrado`);
+        }
+        schedules.push({
+          classId: salon[0].id,
+          courseId: course.id,
+          hourSessionId: bloque.id,
+          weekday: horario.dia, // Assuming `clase.weekday` exists and provides the required value
+        });
+      });
+    });
+
+    return this.prisma.getClient().schedule.createMany({
+      data: schedules,
+      skipDuplicates: true,
+    });
+  }
+
+  private async getData(nameClass: string, turno: string) {
     const client = this.prisma.getClient();
-    const courses = await client.course.findMany({ select: { id: true, name: true } });
-    const hourSessions = await client.hourSession.findMany({ select: { id: true, period: true } });
-
-    const rawData = await client.$queryRaw<{
-      courses: CourseDto[];
-      areas: AreaDto[];
-      teachers: TeacherDto[];
-    }>`
-      SELECT 
-        (SELECT json_agg(t1)::json FROM courses t1) AS courses,
-        (SELECT json_agg(t2)::json FROM areas t2) AS areas,
-        (SELECT json_agg(t3)::json FROM teachers t3) AS teachers
-    `;
-
-    console.log(rawData.courses);
-    console.log(rawData.areas);
-    console.log(rawData.teachers);
-
-    const result = {
-      courses,
-      hourSessions,
-    };
-    console.log(result);
-    return data;
+    const [salon, courses, shift] = await client.$transaction([
+      client.class.findMany({
+        select: { id: true, name: true },
+        where: { name: nameClass },
+      }),
+      client.course.findMany({ select: { id: true, name: true } }),
+      client.shift.findFirst({
+        include: { hourSessions: { select: { id: true, period: true } } },
+        where: { name: { contains: turno } },
+      }),
+    ]);
+    return { salon, courses, shift };
   }
 
   // ─────── CRUD ───────
