@@ -1,3 +1,6 @@
+# yaml only main
+cloudbuild.yaml
+
 # compiled output
 /dist
 /node_modules
