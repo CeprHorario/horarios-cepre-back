@@ -15,14 +15,27 @@ export class AuthController {
     // Redirige al usuario a la pantalla de autenticación de Google
   }
 
-  @Unauthenticated() // Evita que se aplique el guard de autorización
+  @Unauthenticated()
   @Get('google/redirect')
   @UseGuards(AuthGuard('google'))
   async googleAuthRedirect(@Req() req, @Res() res) {
-    if (!req.user || !req.user.token) {
-      return res.redirect(`${process.env.REDIRECT_FRONT}/login?error=authentication_failed`);
+    try {
+      if (!req.user || !req.user.token) {
+        return res.status(401).json({ error: 'authentication_failed' });
+      }
+
+      // ✅ Devolver el token como JSON
+      res.send(`
+        <script>
+          window.opener.postMessage(${JSON.stringify({
+            token: req.user.token,
+          })}, "*");
+          window.close();
+        </script>
+      `);
+    } catch (error) {
+      res.status(500).json({ error: 'internal_error' });
     }
-    res.redirect(`${process.env.REDIRECT_FRONT}/login?token=${req.user.token}`);
   }
 
   @Unauthenticated() // Evita que se aplique el guard de autorización
