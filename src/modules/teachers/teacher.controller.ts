@@ -19,7 +19,7 @@ import { ImportTeacherDto } from './dto/import-teacher.dto';
 //import { ApiOperation, ApiParam, ApiResponse } from '@nestjs/swagger';
 import csvParser from 'csv-parser';
 import { Unauthenticated } from '@modules/auth/decorators/unauthenticated.decorator';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 @ApiTags('Teachers')
 @Controller('teachers')
@@ -80,6 +80,7 @@ export class TeacherController {
   @ApiOperation({
     summary: 'Crear profesores desde un archivo JSON',
   })
+  @ApiBody({ type: [ImportTeacherDto] })
   async createTeachersFromJson(@Body() importTeacherDto: ImportTeacherDto[]) {
     return this.teacherService.createTeachersFromJson(importTeacherDto);
   }
