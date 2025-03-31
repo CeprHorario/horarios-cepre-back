@@ -18,5 +18,5 @@ export class GoogleAuthDto {
 }
 
 export class AuthResponseDto {
-  token: string;
+  token?: string;
 }

@@ -20,21 +20,23 @@ export class AuthController {
   @UseGuards(AuthGuard('google'))
   async googleAuthRedirect(@Req() req, @Res() res) {
     try {
-      if (!req.user || !req.user.token) {
-        return res.status(401).json({ error: 'authentication_failed' });
-      }
+      const token = req.user?.token || (() => { throw new Error(); })();
 
-      // ✅ Devolver el token como JSON
+      res.send(`
+        <script>
+          window.opener.postMessage(${JSON.stringify({ token })}, "*");
+          window.close();
+        </script>
+      `);
+    } catch {
       res.send(`
         <script>
           window.opener.postMessage(${JSON.stringify({
-            token: req.user.token,
+            error: 'error_authenticating'
           })}, "*");
           window.close();
         </script>
       `);
-    } catch (error) {
-      res.status(500).json({ error: 'internal_error' });
     }
   }
 

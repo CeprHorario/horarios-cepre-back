@@ -1,7 +1,8 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@database/prisma/prisma.service';
 import { AuthResponseDto } from '@modules/auth/dto/auth-google.dto';
 import { JwtService } from '@nestjs/jwt';
+//import e from 'express';
 
 @Injectable()
 export class AuthService {
@@ -17,11 +18,11 @@ export class AuthService {
     const user = await this.prisma
       .getClient()
       .user.findUnique({ where: { email } });
+
     if (!user) {
-      throw new UnauthorizedException(
-        'Acceso no autorizado. Contacta al administrador.',
-      );
+      return {};
     }
+
     const payload = { email: user.email, id: user.id, role: user.role };
     const token = this.jwtService.sign(payload);
     return {
