@@ -7,7 +7,7 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   app.enableCors({
-    origin: [process.env.REDIRECT_FRONT], // O la URL del frontend en producción
+    origin: [process.env.REDIRECT_FRONT, 'https://storage.googleapis.com'], // O la URL del frontend en producción
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
