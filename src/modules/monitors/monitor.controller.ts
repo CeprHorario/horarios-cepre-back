@@ -7,6 +7,7 @@ import {
   Put,
   Delete,
   Req,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { MonitorService } from './monitor.service';
 import { CreateMonitorDto, UpdateMonitorDto } from './dto';
@@ -85,6 +86,19 @@ export class MonitorController {
   async getTeachersByMonitor(@Req() req): Promise<TeacherResponseDto[]> {
     console.log('Usuario autenticado:', req.user);
     const userId = req.user?.userId; 
+    return this.monitorService.getTeachersByMonitor(userId);
+  }
+
+  @Get('/datos/teachers/:userId')
+  @Authorization({
+    roles: [Role.MONITOR, Role.SUPERVISOR, Role.ADMIN],
+    permission: 'monitor.listTeachersByMonitor',
+    description: 'Cargar los docentes de un monitor',
+  })
+  async getTeachersByMonitorParam(@Param('userId') userId: string): Promise<TeacherResponseDto[]>{
+    if (!userId) {
+      throw new UnauthorizedException('No se pudo obtener el ID del usuario');
+    }
     return this.monitorService.getTeachersByMonitor(userId);
   }
 }
