@@ -10,28 +10,28 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 export class CreateUserProfileDto {
   @ApiProperty({
     description: 'DNI del usuario',
-    example: '12345678'
+    example: '12345678',
   })
   @IsString()
   dni: string;
 
   @ApiProperty({
     description: 'Nombre del usuario',
-    example: 'Juan'
+    example: 'Juan',
   })
   @IsString()
   firstName: string;
 
   @ApiProperty({
     description: 'Apellido del usuario',
-    example: 'Pérez'
+    example: 'Pérez',
   })
   @IsString()
   lastName: string;
 
   @ApiPropertyOptional({
     description: 'Teléfono del usuario',
-    example: '987654321'
+    example: '987654321',
   })
   @IsOptional()
   @IsString()
@@ -39,7 +39,7 @@ export class CreateUserProfileDto {
 
   @ApiProperty({
     description: 'Teléfonos adicionales del usuario',
-    example: ['987654321', '123456789']
+    example: ['987654321', '123456789'],
   })
   @IsArray()
   @IsString({ each: true })
@@ -47,7 +47,7 @@ export class CreateUserProfileDto {
 
   @ApiPropertyOptional({
     description: 'Correo electrónico personal del usuario',
-    example: 'personal@ejemplo.com'
+    example: 'personal@ejemplo.com',
   })
   @IsOptional()
   @IsEmail()
@@ -55,7 +55,7 @@ export class CreateUserProfileDto {
 
   @ApiProperty({
     description: 'Estado activo del usuario',
-    example: true
+    example: true,
   })
   @IsBoolean()
   isActive: boolean;
