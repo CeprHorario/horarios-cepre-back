@@ -11,7 +11,7 @@ export class MonitorForSupervisorDto {
   @Transform(({ value }: { value: UserProfileForTeacherDto }) =>
     value ? { firstName: value.firstName, lastName: value.lastName } : null,
   )
-  user: { firstName: string; lastName: string } | null;
+  user: { id: string; firstName: string; lastName: string } | null;
 
   @Expose()
   @IsOptional()
