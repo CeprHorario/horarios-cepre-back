@@ -9,6 +9,8 @@ import {
   UseGuards,
   Req,
   BadRequestException,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { SupervisorService } from './supervisor.service';
 import { CreateSupervisorDto, UpdateSupervisorDto, UpdateSupervisorWithProfileDto } from './dto';
@@ -68,6 +70,7 @@ export class SupervisorController {
   }
 
   @Post(':id/updateProfile')
+  @HttpCode(HttpStatus.OK)
   @Authorization({
     permission: 'supervisor.updateProfile',
     description: 'Actualizar el perfil de un supervisor',
