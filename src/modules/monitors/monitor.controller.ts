@@ -29,7 +29,7 @@ export class MonitorController {
   })
   @HttpCode(HttpStatus.OK)
   getInformation(@Req() req): Promise<MonitorInformationDto> {
-    if (!req.user || req.user.role !== Role.MONITOR) {
+    if (!req.user || req?.user.role !== Role.MONITOR) {
       throw new UnauthorizedException('No eres moni');
     }
     return this.monitorService.getInformationByMonitor(req.user.userId);
