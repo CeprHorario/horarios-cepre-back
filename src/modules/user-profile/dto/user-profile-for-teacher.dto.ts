@@ -6,7 +6,7 @@ export class UserProfileForTeacherDto {
   @Expose()
   @ApiProperty({
     description: 'Nombre del profesor',
-    example: 'Juan'
+    example: 'Juan',
   })
   @IsString()
   firstName: string;
@@ -14,7 +14,7 @@ export class UserProfileForTeacherDto {
   @Expose()
   @ApiProperty({
     description: 'Apellido del profesor',
-    example: 'Pérez'
+    example: 'Pérez',
   })
   @IsString()
   lastName: string;
