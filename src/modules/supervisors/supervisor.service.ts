@@ -76,7 +76,7 @@ export class SupervisorService {
     const monitors = await this.prisma.getClient().monitor.findMany({
       where: { supervisorId: supervisor.id }, // Asocia los monitores al supervisor
       include: {
-        user: { include: { userProfile: true } }, // Incluye el perfil del usuario
+        user: { select: { id: true }, include: { userProfile: true } }, // Incluye el perfil del usuario
         classes: true, // Incluye las clases asociadas al monitor
       },
     });
@@ -90,7 +90,7 @@ export class SupervisorService {
 
     return monitors.map((monitor) =>
       plainToInstance(MonitorForSupervisorDto, {
-        id: monitor.id,
+        user_id: monitor.user.id,
         profile: monitor.user?.userProfile
           ? {
               firstName: monitor.user.userProfile.firstName,

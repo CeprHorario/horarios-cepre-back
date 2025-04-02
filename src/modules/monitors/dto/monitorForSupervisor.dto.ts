@@ -8,7 +8,7 @@ import { ClassForSupervisorDto } from '@modules/classes/dto/classForSupervisor.d
 export class MonitorForSupervisorDto {
   @IsUUID()
   @IsOptional()
-  id: string;
+  user_id: string;
 
   @Expose()
   @IsOptional()
