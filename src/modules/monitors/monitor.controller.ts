@@ -75,7 +75,19 @@ export class MonitorController {
     const userId = req.user?.userId; 
     return this.monitorService.getSchedule(userId);
   }
-  
+
+  @Get('/:userId/horario')
+  @Authorization({
+    roles: [Role.MONITOR, Role.SUPERVISOR, Role.ADMIN],
+    permission: 'monitor.listTeachersByMonitor',
+    description: 'Cargar los docentes de un monitor',
+  })
+  getScheduleByParam(@Param('userId') userId: string): Promise<ScheduleDto[]> {
+    if (!userId) {
+      throw new UnauthorizedException('No se pudo obtener el ID del usuario');
+    }
+    return this.monitorService.getSchedule(userId);
+  }
   
   @Get('/datos/teachers')
   @Authorization({
