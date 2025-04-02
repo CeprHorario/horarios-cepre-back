@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@database/prisma/prisma.service';
-import { CreateMonitorDto, UpdateMonitorDto, MonitorBaseDto } from './dto';
+import { CreateMonitorDto, UpdateMonitorDto, MonitorBaseDto, MonitorInformationDto } from './dto';
 import { plainToInstance } from 'class-transformer';
 import { ScheduleDto, Weekday } from './dto/schedule.dto';
 import { TeacherResponseDto } from './dto/teacher-response.dto';
@@ -151,6 +151,31 @@ export class MonitorService {
     );
 
     return schedules;
+  }
+
+  async getInformationByMonitor(id: string): Promise<MonitorInformationDto> {
+    const obj = await this.prisma.getClient().user.findUnique({
+      where: { id },
+      include: {
+        userProfile: { select: { firstName: true, lastName: true } },
+        monitor: {
+          include: {
+            classes: { select: { id: true, name: true, urlMeet: true } },
+          },
+        },
+      },
+    });
+
+    if (!obj) throw new NotFoundException('Monitor no encontrado');
+
+    return plainToInstance(MonitorInformationDto, {
+      monitorId: obj.monitor?.id,
+      nombres: obj.userProfile?.firstName,
+      apellidos: obj.userProfile?.lastName,
+      salon: obj.monitor?.classes?.name,
+      salon_id: obj.monitor?.classes?.id,
+      urlMeet: obj.monitor?.classes?.urlMeet,
+    });
   }
 
   // ─────── Métodos auxiliares ───────
