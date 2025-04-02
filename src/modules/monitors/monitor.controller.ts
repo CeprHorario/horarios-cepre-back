@@ -11,9 +11,8 @@ import {
 import { MonitorService } from './monitor.service';
 import { CreateMonitorDto, UpdateMonitorDto } from './dto';
 import { ScheduleDto } from './dto/schedule.dto';
-import { Authorization } from '@modules/auth/decorators/authorization.decorator';
+import { Authorization, Role } from '@modules/auth/decorators/authorization.decorator';
 import { TeacherResponseDto } from './dto/teacher-response.dto';
-import { Unauthenticated } from '@modules/auth/decorators/unauthenticated.decorator';
 
 @Controller('monitors')
 export class MonitorController {
@@ -76,6 +75,7 @@ export class MonitorController {
   }
   
   @Authorization({
+    roles: [Role.MONITOR],
     permission: 'monitor.listTeachersByMonitor',
     description: 'Cargar los docentes de un monitor',
   })
