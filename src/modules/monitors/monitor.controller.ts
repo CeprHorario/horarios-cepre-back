@@ -7,11 +7,13 @@ import {
   Put,
   Delete,
   Req,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { MonitorService } from './monitor.service';
 import { CreateMonitorDto, UpdateMonitorDto } from './dto';
 import { ScheduleDto } from './dto/schedule.dto';
-import { Authorization } from '@modules/auth/decorators/authorization.decorator';
+import { Authorization, Role } from '@modules/auth/decorators/authorization.decorator';
+import { TeacherResponseDto } from './dto/teacher-response.dto';
 
 @Controller('monitors')
 export class MonitorController {
@@ -64,12 +66,39 @@ export class MonitorController {
 
   @Get('/cargar/horario')
   @Authorization({
+    roles: [Role.MONITOR, Role.ADMIN],
     permission: 'monitor.loadSchedule',
     description: 'Cargar el horario de un monitor',
   })
   getSchedule(@Req() req): Promise<ScheduleDto[]> {
     console.log('Usuario autenticado:', req.user);
-    const userId = req.user?.userId; // Obtenemos el ID del usuario desde el token
+    const userId = req.user?.userId; 
     return this.monitorService.getSchedule(userId);
+  }
+  
+  
+  @Get('/datos/teachers')
+  @Authorization({
+    roles: [Role.MONITOR, Role.ADMIN],
+    permission: 'monitor.listTeachersByMonitor',
+    description: 'Cargar los docentes de un monitor',
+  })
+  async getTeachersByMonitor(@Req() req): Promise<TeacherResponseDto[]> {
+    console.log('Usuario autenticado:', req.user);
+    const userId = req.user?.userId; 
+    return this.monitorService.getTeachersByMonitor(userId);
+  }
+
+  @Get('/datos/teachers/:userId')
+  @Authorization({
+    roles: [Role.MONITOR, Role.SUPERVISOR, Role.ADMIN],
+    permission: 'monitor.listTeachersByMonitor',
+    description: 'Cargar los docentes de un monitor',
+  })
+  async getTeachersByMonitorParam(@Param('userId') userId: string): Promise<TeacherResponseDto[]>{
+    if (!userId) {
+      throw new UnauthorizedException('No se pudo obtener el ID del usuario');
+    }
+    return this.monitorService.getTeachersByMonitor(userId);
   }
 }
