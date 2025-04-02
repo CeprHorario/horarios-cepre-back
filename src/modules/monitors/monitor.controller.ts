@@ -12,6 +12,8 @@ import { MonitorService } from './monitor.service';
 import { CreateMonitorDto, UpdateMonitorDto } from './dto';
 import { ScheduleDto } from './dto/schedule.dto';
 import { Authorization } from '@modules/auth/decorators/authorization.decorator';
+import { TeacherResponseDto } from './dto/teacher-response.dto';
+import { Unauthenticated } from '@modules/auth/decorators/unauthenticated.decorator';
 
 @Controller('monitors')
 export class MonitorController {
@@ -69,7 +71,17 @@ export class MonitorController {
   })
   getSchedule(@Req() req): Promise<ScheduleDto[]> {
     console.log('Usuario autenticado:', req.user);
-    const userId = req.user?.userId; // Obtenemos el ID del usuario desde el token
+    const userId = req.user?.userId; 
     return this.monitorService.getSchedule(userId);
+  }
+  
+  @Authorization({
+    permission: 'monitor.listTeachersByMonitor',
+    description: 'Cargar los docentes de un monitor',
+  })
+  @Get('teachers')
+  async getTeachersByMonitor(@Req() req): Promise<TeacherResponseDto[]> {
+    const userId = req.user?.id; // Obtener el userId del token
+    return this.monitorService.getTeachersByMonitor(userId);
   }
 }
