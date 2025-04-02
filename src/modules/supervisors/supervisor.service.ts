@@ -17,12 +17,18 @@ export class SupervisorService {
   async create(
     createSupervisorDto: CreateSupervisorDto,
   ): Promise<SupervisorBaseDto> {
+    const currentDate = new Date().toISOString();
     const supervisor = await this.prisma.getClient().supervisor.create({
-      data: createSupervisorDto,
-      include: { users: true }, // Incluye la relación con el usuario
+      data: {
+        ...createSupervisorDto,
+        createdAt: currentDate,
+        updatedAt: currentDate
+      },
+      include: { users: true },
     });
     return this.mapToSupervisorDto(supervisor);
   }
+
 
   async findAll(): Promise<SupervisorBaseDto[]> {
     const supervisors = await this.prisma.getClient().supervisor.findMany({
@@ -48,8 +54,11 @@ export class SupervisorService {
   ): Promise<SupervisorBaseDto> {
     const supervisor = await this.prisma.getClient().supervisor.update({
       where: { id },
-      data: updateSupervisorDto,
-      include: { users: true }, // Incluye la relación con el usuario
+      data: {
+        ...updateSupervisorDto,
+        updatedAt: new Date().toISOString() // Actualizar fecha de modificación
+      },
+      include: { users: true },
     });
     return this.mapToSupervisorDto(supervisor);
   }
