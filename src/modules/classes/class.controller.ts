@@ -22,7 +22,7 @@ import {
   ClassForTeacherDto,
 } from './dto';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { Authorization } from '@modules/auth/decorators/authorization.decorator';
+import { Authorization, Role } from '@modules/auth/decorators/authorization.decorator';
 import { JwtAuthGuard } from '@modules/auth/guards/jwt-auth.guard';
 
 @Controller('classes')
@@ -63,6 +63,7 @@ export class ClassController {
   @Get('getClassOfTeacher')
   @HttpCode(HttpStatus.OK)
   @Authorization({
+    roles: [Role.TEACHER],
     permission: 'class.listByTeacher',
     description: 'Obtener todas las clases del docente',
   })

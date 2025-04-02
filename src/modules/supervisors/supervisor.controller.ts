@@ -13,7 +13,7 @@ import {
 import { SupervisorService } from './supervisor.service';
 import { CreateSupervisorDto, UpdateSupervisorDto } from './dto';
 import { ApiOperation, ApiResponse } from '@nestjs/swagger';
-import { Authorization } from '@modules/auth/decorators/authorization.decorator';
+import { Authorization, Role } from '@modules/auth/decorators/authorization.decorator';
 import { JwtAuthGuard } from '@modules/auth/guards/jwt-auth.guard';
 
 @Controller('supervisors')
@@ -41,6 +41,7 @@ export class SupervisorController {
 
   @Get('getMonitors')
   @Authorization({
+    roles: [Role.SUPERVISOR],
     permission: 'supervisor.getMonitors',
     description: 'Obtiene los monitores de este supervisor',
   })
