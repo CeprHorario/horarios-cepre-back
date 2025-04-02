@@ -20,7 +20,6 @@ export class AuthController {
   @UseGuards(AuthGuard('google'))
   async googleAuthRedirect(@Req() req, @Res() res) {
     try {
-      console.log('Google Auth Redirect:', req.user.token); // Debugging
       const token = req.user?.token || (() => { throw new Error(); })();
 
       res.send(`
