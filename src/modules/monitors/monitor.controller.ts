@@ -8,9 +8,11 @@ import {
   Delete,
   Req,
   UnauthorizedException,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { MonitorService } from './monitor.service';
-import { CreateMonitorDto, UpdateMonitorDto } from './dto';
+import { CreateMonitorDto, UpdateMonitorDto, MonitorInformationDto } from './dto';
 import { ScheduleDto } from './dto/schedule.dto';
 import { Authorization, Role } from '@modules/auth/decorators/authorization.decorator';
 import { TeacherResponseDto } from './dto/teacher-response.dto';
@@ -18,6 +20,20 @@ import { TeacherResponseDto } from './dto/teacher-response.dto';
 @Controller('monitors')
 export class MonitorController {
   constructor(private readonly monitorService: MonitorService) {}
+
+  @Get('information')
+  @Authorization({
+    roles: [Role.MONITOR],
+    permission: 'monitor.getInformation',
+    description: 'Obtener información del monitor autenticado',
+  })
+  @HttpCode(HttpStatus.OK)
+  getInformation(@Req() req): Promise<MonitorInformationDto> {
+    if (!req.user || req?.user.role !== Role.MONITOR) {
+      throw new UnauthorizedException('No eres moni');
+    }
+    return this.monitorService.getInformationByMonitor(req.user.userId);
+  }
 
   @Post()
   @Authorization({

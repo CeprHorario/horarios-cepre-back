@@ -1,8 +1,9 @@
 import {  OmitType, PartialType } from '@nestjs/swagger';
 import { MonitorDto } from './monitor.dto';
+import { MonitorInformationDto } from './monitor-information.dto';
 
 // Exportar el DTO principal
-export { MonitorDto };
+export { MonitorDto, MonitorInformationDto };
 
 export class MonitorBaseDto extends OmitType(MonitorDto, [
   'userId',
