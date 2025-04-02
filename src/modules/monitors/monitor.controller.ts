@@ -89,7 +89,7 @@ export class MonitorController {
     return this.monitorService.getTeachersByMonitor(userId);
   }
 
-  @Get('/datos/teachers/:userId')
+  @Get('/:userId/teachers')
   @Authorization({
     roles: [Role.MONITOR, Role.SUPERVISOR, Role.ADMIN],
     permission: 'monitor.listTeachersByMonitor',
