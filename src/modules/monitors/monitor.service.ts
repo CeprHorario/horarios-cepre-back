@@ -57,18 +57,21 @@ export class MonitorService {
   }
 
   async getTeachersByMonitor(userId: string): Promise<TeacherResponseDto[]> {
-    // Obtener las clases asignadas al monitor
-    const classes = await this.prisma.getClient().class.findMany({
-      where: { monitorId: userId },
+    const monitor = await this.prisma.getClient().monitor.findUnique({
+      where: { userId },
       include: {
-        schedules: {
+        classes: {
           include: {
-            teacher: {
+            schedules: {
               include: {
-                user: {
-                  include: { userProfile: true },
+                teacher: {
+                  include: {
+                    user: {
+                      include: { userProfile: true },
+                    },
+                    courses: true,
+                  },
                 },
-                courses: true,
               },
             },
           },
@@ -76,28 +79,26 @@ export class MonitorService {
       },
     });
 
-    if (!classes.length) {
+    if (!monitor || !monitor.classes) {
       throw new NotFoundException('No se encontraron clases asignadas al monitor');
     }
 
     // Extraer los docentes únicos de los horarios
     const teachersMap = new Map();
-    classes.forEach((c) => {
-      c.schedules.forEach((s) => {
-        if (s.teacher) {
-          teachersMap.set(s.teacher.id, {
-            teacherId: s.teacher.id,
-            firstName: s.teacher.user.userProfile?.firstName || 'N/A',
-            lastName: s.teacher.user.userProfile?.lastName || 'N/A',
-            email: s.teacher.user.email,
-            courseName: s.teacher.courses.name,
-          });
-        }
-      });
+    monitor.classes.schedules.forEach((s) => {
+      if (s.teacher) {
+        teachersMap.set(s.teacher.id, {
+          teacherId: s.teacher.id,
+          firstName: s.teacher.user.userProfile?.firstName || 'N/A',
+          lastName: s.teacher.user.userProfile?.lastName || 'N/A',
+          email: s.teacher.user.email,
+          courseName: s.teacher.courses.name,
+        });
+      }
     });
 
     return Array.from(teachersMap.values());
-}
+  }
 
   
   async getSchedule(userId: string): Promise<ScheduleDto[]> {
