@@ -4,6 +4,9 @@ import { CreateMonitorDto, UpdateMonitorDto, MonitorBaseDto } from './dto';
 import { plainToInstance } from 'class-transformer';
 import { ScheduleDto, Weekday } from './dto/schedule.dto';
 import { TeacherResponseDto } from './dto/teacher-response.dto';
+import { UpdateMonitorAsAdminDto } from './dto/updateMonitorAsAdmin.dto';
+import { MonitorDto } from './dto/monitor.dto';
+import { MonitorBasicInfoDto } from './dto/monitor-basic-info.dto';
 
 @Injectable()
 export class MonitorService {
@@ -23,6 +26,26 @@ export class MonitorService {
       include: { user: true, supervisors: true }, // Incluye la relación con el usuario
     });
     return monitors.map((monitor) => this.mapToMonitorDto(monitor));
+  }
+
+  async findAllBasicInfo(): Promise<MonitorBasicInfoDto[]> {
+    const monitors = await this.prisma.getClient().monitor.findMany({
+      include: {
+        user: {
+          include: {
+            userProfile: true,
+          },
+        },
+      },
+    });
+
+    return monitors.map((monitor) => ({
+      id: monitor.id,
+      firstName: monitor.user.userProfile?.firstName || '',
+      lastName: monitor.user.userProfile?.lastName || '',
+      personalEmail: monitor.user.userProfile?.personalEmail || '',
+      phone: monitor.user.userProfile?.phone || '',
+    }));
   }
 
   async findOne(id: string): Promise<MonitorBaseDto> {
@@ -46,6 +69,31 @@ export class MonitorService {
       include: { user: true, supervisors: true }, // Incluye la relación con el usuario
     });
     return this.mapToMonitorDto(monitor);
+  }
+
+  async updateMonitorAsAdmin(
+    monitorId: string,
+    updateMonitorDto: UpdateMonitorAsAdminDto,
+  ): Promise<MonitorDto> {
+    const monitor = await this.prisma.getClient().monitor.update({
+      where: { id: monitorId },
+      data: {
+        user: {
+          update: {
+            userProfile: {
+              update: {
+                firstName: updateMonitorDto.firstName,
+                lastName: updateMonitorDto.lastName,
+                personalEmail: updateMonitorDto.personalEmail,
+                phone: updateMonitorDto.phone,
+              },
+            },
+          },
+        },
+      },
+      include: { user: false, supervisors: false },
+    });
+    return plainToInstance(MonitorDto, monitor);
   }
 
   async delete(id: string): Promise<MonitorBaseDto> {

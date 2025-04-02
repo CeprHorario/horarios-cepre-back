@@ -1,24 +1,13 @@
-import {
-  IsString,
-  IsOptional,
-  IsBoolean,
-  IsArray,
-  IsEmail,
-} from 'class-validator';
+import { IsString, IsOptional, IsEmail } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Expose } from 'class-transformer';
 
-export class CreateUserProfileDto {
-  @ApiProperty({
-    description: 'DNI del usuario',
-    example: '12345678',
-  })
-  @IsString()
-  dni: string;
-
+export class UserProfileEditDto {
   @ApiProperty({
     description: 'Nombre del usuario',
     example: 'Juan',
   })
+  @Expose()
   @IsString()
   firstName: string;
 
@@ -27,6 +16,7 @@ export class CreateUserProfileDto {
     example: 'Pérez',
   })
   @IsString()
+  @Expose()
   lastName: string;
 
   @ApiPropertyOptional({
@@ -35,15 +25,8 @@ export class CreateUserProfileDto {
   })
   @IsOptional()
   @IsString()
+  @Expose()
   phone?: string;
-
-  @ApiProperty({
-    description: 'Teléfonos adicionales del usuario',
-    example: ['987654321', '123456789'],
-  })
-  @IsArray()
-  @IsString({ each: true })
-  phonesAdditional: string[];
 
   @ApiPropertyOptional({
     description: 'Correo electrónico personal del usuario',
@@ -51,12 +34,6 @@ export class CreateUserProfileDto {
   })
   @IsOptional()
   @IsEmail()
+  @Expose()
   personalEmail?: string;
-
-  @ApiProperty({
-    description: 'Estado activo del usuario',
-    example: true,
-  })
-  @IsBoolean()
-  isActive: boolean;
 }

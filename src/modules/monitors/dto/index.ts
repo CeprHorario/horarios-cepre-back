@@ -12,10 +12,9 @@ export class MonitorBaseDto extends OmitType(MonitorDto, [
 export class CreateMonitorDto extends OmitType(MonitorDto, [
   'id',
   'user',
-  'supervisor'
+  'supervisor',
 ] as const) {}
 
-// DTO para actualizar un área
 export class UpdateMonitorDto extends PartialType(
-  OmitType(MonitorDto, ['id', 'user','supervisor'] as const),
+  OmitType(MonitorDto, ['id', 'user', 'supervisor'] as const),
 ) {}
