@@ -94,6 +94,7 @@ export class SupervisorService {
         {
           user: monitor.user?.userProfile
             ? {
+                id: monitor.user.id,
                 firstName: monitor.user.userProfile.firstName,
                 lastName: monitor.user.userProfile.lastName,
               }
