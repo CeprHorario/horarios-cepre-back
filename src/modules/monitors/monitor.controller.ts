@@ -65,6 +65,7 @@ export class MonitorController {
 
   @Get('/cargar/horario')
   @Authorization({
+    roles: [Role.MONITOR, Role.ADMIN],
     permission: 'monitor.loadSchedule',
     description: 'Cargar el horario de un monitor',
   })
@@ -74,14 +75,16 @@ export class MonitorController {
     return this.monitorService.getSchedule(userId);
   }
   
+  
+  @Get('/datos/teachers')
   @Authorization({
-    roles: [Role.MONITOR],
+    roles: [Role.MONITOR, Role.ADMIN],
     permission: 'monitor.listTeachersByMonitor',
     description: 'Cargar los docentes de un monitor',
   })
-  @Get('teachers')
   async getTeachersByMonitor(@Req() req): Promise<TeacherResponseDto[]> {
-    const userId = req.user?.id; // Obtener el userId del token
+    console.log('Usuario autenticado:', req.user);
+    const userId = req.user?.userId; 
     return this.monitorService.getTeachersByMonitor(userId);
   }
 }
