@@ -89,23 +89,20 @@ export class SupervisorService {
     }
 
     return monitors.map((monitor) =>
-      plainToInstance(
-        MonitorForSupervisorDto,
-        {
-          user: monitor.user?.userProfile
-            ? {
-                firstName: monitor.user.userProfile.firstName,
-                lastName: monitor.user.userProfile.lastName,
-              }
-            : null,
-          classes: monitor.classes
-            ? plainToInstance(ClassForSupervisorDto, monitor.classes, {
-                excludeExtraneousValues: true,
-              })
-            : null,
-        },
-        { excludeExtraneousValues: true },
-      ),
+      plainToInstance(MonitorForSupervisorDto, {
+        id: monitor.id,
+        profile: monitor.user?.userProfile
+          ? {
+              firstName: monitor.user.userProfile.firstName,
+              lastName: monitor.user.userProfile.lastName,
+            }
+          : null,
+        classes: monitor.classes
+          ? plainToInstance(ClassForSupervisorDto, monitor.classes, {
+              excludeExtraneousValues: true,
+            })
+          : null,
+      }),
     );
   }
 
