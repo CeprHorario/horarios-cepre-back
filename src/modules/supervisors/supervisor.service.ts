@@ -8,6 +8,7 @@ import {
 import { plainToInstance } from 'class-transformer';
 import { MonitorForSupervisorDto } from '@modules/monitors/dto/monitorForSupervisor.dto';
 import { ClassForSupervisorDto } from '@modules/classes/dto/classForSupervisor.dto';
+import { UpdateSupervisorWithProfileDto } from './dto/update-supervisor-with-profile.dto';
 
 @Injectable()
 export class SupervisorService {
@@ -104,6 +105,30 @@ export class SupervisorService {
           : null,
       }),
     );
+  }
+
+  async updateSupervisorWithProfile(
+    id: string,
+    data: UpdateSupervisorWithProfileDto,
+  ) {
+    const supervisor = await this.prisma.getClient().supervisor.update({
+      where: { id },
+      data: {
+        users: {
+          update: {
+            userProfile: {
+              update: data,
+            },
+          },
+        },
+      },
+      include: { users: true }, // Incluye la relación con el usuario
+    });
+
+    if (!supervisor) {
+      throw new NotFoundException(`Supervisor with ID ${id} not found`);
+    }
+    return supervisor;
   }
 
   // ─────── Métodos auxiliares ───────

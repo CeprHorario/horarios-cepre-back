@@ -1,8 +1,9 @@
 import {  OmitType, PartialType } from '@nestjs/swagger';
 import { SupervisorDto } from './supervisor.dto';
+import { UpdateSupervisorWithProfileDto } from './update-supervisor-with-profile.dto';
 
 // Exportar el DTO principal
-export { SupervisorDto };
+export { SupervisorDto, UpdateSupervisorWithProfileDto };
 
 export class SupervisorBaseDto extends OmitType(SupervisorDto, [
   'userId',

@@ -38,5 +38,5 @@ export class SupervisorDto {
   @IsDateString({}, { message: 'La fecha de actualización debe ser una cadena de fecha válida.' })
   @IsNotEmpty({ message: 'La fecha de actualización no puede estar vacía.' })
   updatedAt: string;  
-  
+
 }
