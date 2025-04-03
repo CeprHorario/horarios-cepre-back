@@ -9,6 +9,7 @@ import { MonitorForSupervisorDto } from '@modules/monitors/dto/monitorForSupervi
 import { ClassForSupervisorDto } from '@modules/classes/dto/classForSupervisor.dto';
 import { CreateSupervisorWithUserDto } from './dto/create-supervisor.dto';
 import { Role } from '@modules/auth/decorators/authorization.decorator';
+import { UpdateSupervisorWithProfileDto } from './dto/update-supervisor-with-profile.dto';
 
 @Injectable()
 export class SupervisorService {
@@ -101,7 +102,7 @@ export class SupervisorService {
     const monitors = await this.prisma.getClient().monitor.findMany({
       where: { supervisorId: supervisor.id }, // Asocia los monitores al supervisor
       include: {
-        user: { include: { userProfile: true } }, // Incluye el perfil del usuario
+        user: { select: { id: true }, include: { userProfile: true } }, // Incluye el perfil del usuario
         classes: true, // Incluye las clases asociadas al monitor
       },
     });
@@ -114,24 +115,45 @@ export class SupervisorService {
     }
 
     return monitors.map((monitor) =>
-      plainToInstance(
-        MonitorForSupervisorDto,
-        {
-          user: monitor.user?.userProfile
-            ? {
-                firstName: monitor.user.userProfile.firstName,
-                lastName: monitor.user.userProfile.lastName,
-              }
-            : null,
-          classes: monitor.classes
-            ? plainToInstance(ClassForSupervisorDto, monitor.classes, {
-                excludeExtraneousValues: true,
-              })
-            : null,
-        },
-        { excludeExtraneousValues: true },
-      ),
+      plainToInstance(MonitorForSupervisorDto, {
+        user_id: monitor.user.id,
+        profile: monitor.user?.userProfile
+          ? {
+              firstName: monitor.user.userProfile.firstName,
+              lastName: monitor.user.userProfile.lastName,
+            }
+          : null,
+        classes: monitor.classes
+          ? plainToInstance(ClassForSupervisorDto, monitor.classes, {
+              excludeExtraneousValues: true,
+            })
+          : null,
+      }),
     );
+  }
+
+  async updateSupervisorWithProfile(
+    id: string,
+    data: UpdateSupervisorWithProfileDto,
+  ) {
+    const supervisor = await this.prisma.getClient().supervisor.update({
+      where: { id },
+      data: {
+        users: {
+          update: {
+            userProfile: {
+              update: data,
+            },
+          },
+        },
+      },
+      include: { users: true }, // Incluye la relación con el usuario
+    });
+
+    if (!supervisor) {
+      throw new NotFoundException(`Supervisor with ID ${id} not found`);
+    }
+    return supervisor;
   }
 
   // ─────── Métodos auxiliares ───────

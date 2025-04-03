@@ -9,11 +9,13 @@ import {
   UseGuards,
   Req,
   BadRequestException,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { SupervisorService } from './supervisor.service';
-import { UpdateSupervisorDto } from './dto';
+import { UpdateSupervisorDto, UpdateSupervisorWithProfileDto } from './dto';
 import { ApiOperation, ApiResponse } from '@nestjs/swagger';
-import { Authorization } from '@modules/auth/decorators/authorization.decorator';
+import { Authorization, Role } from '@modules/auth/decorators/authorization.decorator';
 import { JwtAuthGuard } from '@modules/auth/guards/jwt-auth.guard';
 import { CreateSupervisorWithUserDto } from './dto/create-supervisor.dto';
 
@@ -42,6 +44,7 @@ export class SupervisorController {
 
   @Get('getMonitors')
   @Authorization({
+    roles: [Role.SUPERVISOR],
     permission: 'supervisor.getMonitors',
     description: 'Obtiene los monitores de este supervisor',
   })
@@ -65,6 +68,19 @@ export class SupervisorController {
   })
   findOne(@Param('id') id: string) {
     return this.supervisorService.findOne(id);
+  }
+
+  @Post(':id/updateProfile')
+  @HttpCode(HttpStatus.OK)
+  @Authorization({
+    permission: 'supervisor.updateProfile',
+    description: 'Actualizar el perfil de un supervisor',
+  })
+  updateProfile(
+    @Param('id') id: string,
+    @Body() data: UpdateSupervisorWithProfileDto,
+  ) {
+    return this.supervisorService.updateSupervisorWithProfile(id, data);
   }
 
   @Put(':id')
