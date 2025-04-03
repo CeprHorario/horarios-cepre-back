@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty, IsNumber, IsString, IsEnum, IsArray, IsOptional } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsNumber, IsString, IsEnum, IsArray, IsOptional, IsBoolean } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { JobStatus } from '@prisma/client';
 
@@ -61,6 +61,13 @@ export class CreateTeacherWithUserDto {
     @IsString({ each: true })
     @IsOptional()
     phonesAdditional?: string[];
+
+    @ApiProperty({
+      description: 'Es coordinador',
+      example: false
+    })
+    @IsBoolean()
+    isCoordinator?: boolean;
   
     @ApiProperty({ example: 'personal@ejemplo.com', required: false })
     @IsEmail()
