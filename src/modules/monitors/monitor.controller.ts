@@ -87,7 +87,6 @@ export class MonitorController {
     description: 'Cargar el horario de un monitor',
   })
   getSchedule(@Req() req): Promise<ScheduleDto[]> {
-    console.log('Usuario autenticado:', req.user);
     const userId = req.user?.userId; 
     return this.monitorService.getSchedule(userId);
   }
@@ -112,7 +111,6 @@ export class MonitorController {
     description: 'Cargar los docentes de un monitor',
   })
   async getTeachersByMonitor(@Req() req): Promise<TeacherResponseDto[]> {
-    console.log('Usuario autenticado:', req.user);
     const userId = req.user?.userId; 
     return this.monitorService.getTeachersByMonitor(userId);
   }
