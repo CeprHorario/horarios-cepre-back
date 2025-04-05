@@ -13,10 +13,11 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { SupervisorService } from './supervisor.service';
-import { CreateSupervisorDto, UpdateSupervisorDto, UpdateSupervisorWithProfileDto } from './dto';
+import { UpdateSupervisorDto, UpdateSupervisorWithProfileDto } from './dto';
 import { ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { Authorization, Role } from '@modules/auth/decorators/authorization.decorator';
 import { JwtAuthGuard } from '@modules/auth/guards/jwt-auth.guard';
+import { CreateSupervisorWithUserDto } from './dto/create-supervisor.dto';
 
 @Controller('supervisors')
 @UseGuards(JwtAuthGuard)
@@ -28,8 +29,8 @@ export class SupervisorController {
     permission: 'supervisor.create',
     description: 'Crear un nuevo supervisor',
   })
-  create(@Body() createSupervisorDto: CreateSupervisorDto) {
-    return this.supervisorService.create(createSupervisorDto);
+  async create(@Body() createSupervisorrDto: CreateSupervisorWithUserDto) {
+      return this.supervisorService.createSupervisor(createSupervisorrDto);
   }
 
   @Get()

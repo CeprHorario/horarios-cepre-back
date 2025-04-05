@@ -1,20 +1,66 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@database/prisma/prisma.service';
-import { CreateTeacherDto, UpdateTeacherDto, TeacherBaseDto } from './dto';
+import { UpdateTeacherDto, TeacherBaseDto } from './dto';
 import { plainToInstance } from 'class-transformer';
 import { ImportTeacherDto } from './dto/import-teacher.dto';
+import { CreateTeacherWithUserDto } from './dto/create-teacher.dto';
+import { Role } from '@modules/auth/decorators/authorization.decorator';
 
 @Injectable()
 export class TeacherService {
   constructor(private prisma: PrismaService) {}
 
   // ─────── CRUD ───────
-  async create(createTeacherDto: CreateTeacherDto): Promise<TeacherBaseDto> {
-    const teacher = await this.prisma.getClient().teacher.create({
-      data: createTeacherDto,
-      include: { user: true, courses: true }, // Incluye la relación con el usuario
+  async createTeacher(createDto: CreateTeacherWithUserDto): Promise<TeacherBaseDto> {
+    return this.prisma.getClient().$transaction(async (tx) => {
+      // Verificar que el curso existe
+      const courseExists = await tx.course.findUnique({
+        where: { id: createDto.courseId }
+      });
+
+      if (!courseExists) {
+        throw new NotFoundException(`Course with ID ${createDto.courseId} not found`);
+      }
+
+      // Crear usuario, perfil y profesor
+      const user = await tx.user.create({
+        data: {
+          email: createDto.email,
+          role: Role.TEACHER,
+          isActive: true,
+          userProfile: {
+            create: {
+              dni: createDto.dni,
+              firstName: createDto.firstName,
+              lastName: createDto.lastName,
+              phone: createDto.phone,
+              phonesAdditional: createDto.phonesAdditional || [],
+              personalEmail: createDto.personalEmail,
+            },
+          },
+          teacher: {
+            create: {
+              maxHours: createDto.maxHours,
+              scheduledHours: createDto.scheduledHours,
+              jobStatus: createDto.jobStatus,
+              isActive: true,
+              courseId: createDto.courseId,
+              isCoordinator: createDto.isCoordinator || false,
+            },
+          },
+        },
+        include: {
+          userProfile: true,
+          teacher: {
+            include: {
+              courses: true,
+            },
+          },
+        },
+      });
+
+      return this.mapToTeacherDto(user);
     });
-    return this.mapToTeacherDto(teacher);
   }
 
   async findAll(): Promise<TeacherBaseDto[]> {
