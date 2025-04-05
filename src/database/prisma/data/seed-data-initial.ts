@@ -12,7 +12,7 @@ export const initialUsers: GoogleAuthDto[] = [
 ];
 
 export const initalSedes: CreateSedeDto[] = [
-  { name: 'Sede Central', description: 'Sede Calle San Agustín' },
+  { name: 'Sede Virtual', description: 'Sede Virtual de CEPRUNSA' },
 ];
 
 export const initialAreas: CreateAreaDto[] = [
