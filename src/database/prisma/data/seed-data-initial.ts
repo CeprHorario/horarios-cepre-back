@@ -34,7 +34,7 @@ export const initialCourses: CreateCourseDto[] = [
   { name: 'Psicología', color: '#8E24AA', description: 'MORADO INTENSO' },
   { name: 'Química', color: '#F6BF26', description: 'AMARILLO HUEVO' },
   { name: 'Matemática', color: '#33B679', description: 'VERDE ESMERALDA' },
-  { name: 'Raz. Lógico', color: '#7986CB', description: 'LAVANDA' },
-  { name: 'Raz. Matemático', color: '#D50000', description: 'TOMATE' },
-  { name: 'Raz. Verbal', color: '#F4511E', description: 'MANDARINA' },
+  { name: 'Razonamiento Lógico', color: '#7986CB', description: 'LAVANDA' },
+  { name: 'Razonamiento Matemático', color: '#D50000', description: 'TOMATE' },
+  { name: 'Razonamiento Verbal', color: '#F4511E', description: 'MANDARINA' },
 ];
