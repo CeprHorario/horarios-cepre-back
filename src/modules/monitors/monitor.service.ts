@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@database/prisma/prisma.service';
-import { CreateMonitorDto, UpdateMonitorDto, MonitorBaseDto } from './dto';
+import { CreateMonitorDto, UpdateMonitorDto, MonitorBaseDto, MonitorInformationDto } from './dto';
 import { plainToInstance } from 'class-transformer';
 import { ScheduleDto, Weekday } from './dto/schedule.dto';
 import { TeacherResponseDto } from './dto/teacher-response.dto';
@@ -105,100 +105,107 @@ export class MonitorService {
   }
 
   async getTeachersByMonitor(userId: string): Promise<TeacherResponseDto[]> {
-    const monitor = await this.prisma.getClient().monitor.findUnique({
-      where: { userId },
-      include: {
-        classes: {
-          include: {
-            schedules: {
-              include: {
-                teacher: {
-                  include: {
-                    user: {
-                      include: { userProfile: true },
-                    },
-                    courses: true,
-                  },
-                },
-              },
-            },
-          },
-        },
+    const teachers = await this.prisma.getClient().teacher.findMany({
+      where: {
+        schedules: {
+          some: {
+            clas: {
+              monitor: {
+                userId
+              }
+            }
+          }
+        }
       },
+      include: {
+        user: {
+          include: {
+            userProfile: true
+          }
+        },
+        courses: true
+      },
+      distinct: ['id'] // Asegura teachers únicos
     });
-
-    if (!monitor || !monitor.classes) {
-      throw new NotFoundException('No se encontraron clases asignadas al monitor');
+  
+    if (!teachers.length) {
+      throw new NotFoundException('No se encontraron docentes asociados al monitor');
     }
-
-    // Extraer los docentes únicos de los horarios
-    const teachersMap = new Map();
-    monitor.classes.schedules.forEach((s) => {
-      if (s.teacher) {
-        teachersMap.set(s.teacher.id, {
-          teacherId: s.teacher.id,
-          firstName: s.teacher.user.userProfile?.firstName || 'N/A',
-          lastName: s.teacher.user.userProfile?.lastName || 'N/A',
-          email: s.teacher.user.email,
-          courseName: s.teacher.courses.name,
-        });
-      }
-    });
-
-    return Array.from(teachersMap.values());
+  
+    return teachers.map(teacher => ({
+      teacherId: teacher.id,
+      firstName: teacher.user.userProfile?.firstName || 'N/A',
+      lastName: teacher.user.userProfile?.lastName || 'N/A',
+      email: teacher.user.email,
+      courseName: teacher.courses?.name || 'Sin asignar'
+    }));
   }
 
   
   async getSchedule(userId: string): Promise<ScheduleDto[]> {
-    const monitor = await this.prisma.getClient().monitor.findUnique({
-      where: { userId },
+    const schedules = await this.prisma.getClient().schedule.findMany({
+      where: {
+        clas: {
+          monitor: {
+            userId
+          }
+        }
+      },
       select: {
-        classes: {
+        weekday: true,
+        hourSession: {
           select: {
-            schedules: {
+            startTime: true,
+            endTime: true
+          }
+        },
+        teacher: {
+          select: {
+            courses: {
               select: {
-                weekday: true,
-                hourSession: {
-                  select: {
-                    startTime: true,
-                    endTime: true,
-                  },
-                },
-                teacher: {
-                  select: {
-                    courses: {
-                      select: {
-                        name: true,
-                      },
-                    },
-                  },
-                },
-              },
-            },
+                name: true
+              }
+            }
+          }
+        }
+      }
+    });
+  
+    if (!schedules.length) {
+      throw new NotFoundException('No se encontraron horarios para este monitor');
+    }
+  
+    return schedules.map(schedule => ({
+      weekday: schedule.weekday as Weekday,
+      startTime: schedule.hourSession.startTime,
+      endTime: schedule.hourSession.endTime,
+      courseName: schedule.teacher?.courses?.name || 'Sin asignar',
+    }));
+  }
+
+  async getInformationByMonitor(id: string): Promise<MonitorInformationDto> {
+    const obj = await this.prisma.getClient().user.findUnique({
+      where: { id },
+      include: {
+        userProfile: { select: { firstName: true, lastName: true } },
+        monitor: {
+          include: {
+            classes: { select: { id: true, name: true, urlMeet: true } },
           },
         },
       },
     });
 
-    if (!monitor || !monitor.classes) {
-      throw new NotFoundException('Monitor o clases no encontradas');
-    }
+    if (!obj) throw new NotFoundException('Monitor no encontrado');
 
-    // Convertimos el objeto en un array antes de mapear
-    const schedulesArray = Array.isArray(monitor.classes)
-      ? monitor.classes
-      : [monitor.classes];
-
-    const schedules: ScheduleDto[] = schedulesArray.flatMap(clas =>
-      clas.schedules.map(schedule => ({
-        weekday: schedule.weekday as Weekday,
-        startTime: schedule.hourSession.startTime,
-        endTime: schedule.hourSession.endTime,
-        courseName: schedule.teacher?.courses?.name || 'Sin asignar',
-      })),
-    );
-
-    return schedules;
+    return plainToInstance(MonitorInformationDto, {
+      monitorId: obj.monitor?.id,
+      nombres: obj.userProfile?.firstName,
+      apellidos: obj.userProfile?.lastName,
+      salon: obj.monitor?.classes?.name,
+      salon_id: obj.monitor?.classes?.id,
+      urlMeet: obj.monitor?.classes?.urlMeet,
+    });
   }
 
   // ─────── Métodos auxiliares ───────

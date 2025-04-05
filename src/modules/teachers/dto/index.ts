@@ -10,13 +10,17 @@ export class TeacherBaseDto extends OmitType(TeacherDto, [
   'courseId',
 ] as const) {}
 
-// DTO para crear un profesor
+/* DTO para crear un profesor
 export class CreateTeacherDto extends OmitType(TeacherDto, [
   'id',
   'user',
   'course',
+  'updatedAt',
+  'createdAt',
+  'isCoordinator',
+  'isActive',
 ] as const) {}
-
+*/
 // DTO para actualizar un profesor
 export class UpdateTeacherDto extends PartialType(
   OmitType(TeacherDto, ['id', 'user', 'course'] as const),

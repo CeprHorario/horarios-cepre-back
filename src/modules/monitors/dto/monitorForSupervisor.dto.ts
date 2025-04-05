@@ -10,7 +10,7 @@ export class MonitorForSupervisorDto {
   @IsUUID()
   @IsOptional()
   id: string;
- 
+
   @Expose()
   @IsOptional()
   @Transform(({ value }: { value: UserProfileForTeacherDto }) =>

@@ -8,9 +8,11 @@ import {
   Delete,
   Req,
   UnauthorizedException,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { MonitorService } from './monitor.service';
-import { CreateMonitorDto, MonitorDto, UpdateMonitorDto } from './dto';
+import { CreateMonitorDto, UpdateMonitorDto, MonitorInformationDto } from './dto';
 import { ScheduleDto } from './dto/schedule.dto';
 import {
   Authorization,
@@ -23,6 +25,20 @@ import { MonitorBasicInfoDto } from './dto/monitor-basic-info.dto';
 @Controller('monitors')
 export class MonitorController {
   constructor(private readonly monitorService: MonitorService) {}
+
+  @Get('information')
+  @Authorization({
+    roles: [Role.MONITOR],
+    permission: 'monitor.getInformation',
+    description: 'Obtener información del monitor autenticado',
+  })
+  @HttpCode(HttpStatus.OK)
+  getInformation(@Req() req): Promise<MonitorInformationDto> {
+    if (!req.user || req?.user.role !== Role.MONITOR) {
+      throw new UnauthorizedException('No eres moni');
+    }
+    return this.monitorService.getInformationByMonitor(req.user.userId);
+  }
 
   @Post()
   @Authorization({
@@ -97,7 +113,7 @@ export class MonitorController {
   })
   getSchedule(@Req() req): Promise<ScheduleDto[]> {
     console.log('Usuario autenticado:', req.user);
-    const userId = req.user?.userId;
+    const userId = req.user?.userId; 
     return this.monitorService.getSchedule(userId);
   }
 
@@ -122,7 +138,7 @@ export class MonitorController {
   })
   async getTeachersByMonitor(@Req() req): Promise<TeacherResponseDto[]> {
     console.log('Usuario autenticado:', req.user);
-    const userId = req.user?.userId;
+    const userId = req.user?.userId; 
     return this.monitorService.getTeachersByMonitor(userId);
   }
 

@@ -11,7 +11,8 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { TeacherService } from './teacher.service';
-import { CreateTeacherDto, UpdateTeacherDto } from './dto';
+import { CreateTeacherWithUserDto } from './dto/create-teacher.dto';
+import { UpdateTeacherDto } from './dto';
 import { Authorization } from '@modules/auth/decorators/authorization.decorator';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Readable } from 'stream';
@@ -31,10 +32,9 @@ export class TeacherController {
     permission: 'teacher.create',
     description: 'Crear un nuevo profesor',
   })
-  create(@Body() createTeacherDto: CreateTeacherDto) {
-    return this.teacherService.create(createTeacherDto);
+  async create(@Body() createTeacherDto: CreateTeacherWithUserDto) {
+    return this.teacherService.createTeacher(createTeacherDto);
   }
-
   @Get()
   @Authorization({
     permission: 'teacher.list',
