@@ -1,3 +1,4 @@
+
 import { IsOptional, IsUUID } from 'class-validator';
 import { Expose, Transform } from 'class-transformer';
 import { UserProfileForTeacherDto } from '@modules/user-profile/dto/user-profile-for-teacher.dto';
@@ -8,7 +9,7 @@ import { ClassForSupervisorDto } from '@modules/classes/dto/classForSupervisor.d
 export class MonitorForSupervisorDto {
   @IsUUID()
   @IsOptional()
-  user_id: string;
+  id: string;
 
   @Expose()
   @IsOptional()
