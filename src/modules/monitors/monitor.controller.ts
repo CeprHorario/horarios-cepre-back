@@ -12,7 +12,7 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { MonitorService } from './monitor.service';
-import { CreateMonitorDto, UpdateMonitorDto, MonitorInformationDto } from './dto';
+import { CreateMonitorDto, UpdateMonitorDto, MonitorInformationDto, MonitorDto } from './dto';
 import { ScheduleDto } from './dto/schedule.dto';
 import {
   Authorization,
