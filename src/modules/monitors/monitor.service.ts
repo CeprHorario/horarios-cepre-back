@@ -144,6 +144,7 @@ export class MonitorService {
   
   async getSchedule(userId: string): Promise<ScheduleDto[]> {
     const schedules = await this.prisma.getClient().schedule.findMany({
+      relationLoadStrategy: 'join', // or 'query'
       where: {
         clas: {
           monitor: {
