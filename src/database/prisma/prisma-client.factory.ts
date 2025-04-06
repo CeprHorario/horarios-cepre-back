@@ -79,6 +79,7 @@ export class PrismaClientFactory implements OnModuleInit, OnModuleDestroy {
 
   private createClient(schema: string): PrismaClient {
     return new PrismaClient({
+      log: ['query'],
       datasources: {
         db: {
           url: `${process.env.DATABASE_URL}?schema=${schema}`,
