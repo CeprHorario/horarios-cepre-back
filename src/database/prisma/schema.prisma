@@ -29,7 +29,7 @@ model User {
 
 model UserProfile {
   id               String   @id @default(uuid()) @db.Uuid
-  userId           String   @unique @map("user_id") @db.Uuid
+  userId           String?  @unique @map("user_id") @db.Uuid
   dni              String   @unique @db.VarChar(10)
   firstName        String   @map("first_name") @db.VarChar(128)
   lastName         String   @map("last_name") @db.VarChar(128)
@@ -39,7 +39,8 @@ model UserProfile {
   isActive         Boolean  @default(true) @map("is_active")
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @default(now()) @updatedAt @map("updated_at")
-  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("user_profiles")
 }
@@ -59,6 +60,7 @@ model Teacher {
   courses        Course     @relation(fields: [courseId], references: [id])
   user           User       @relation(fields: [userId], references: [id])
 
+  @@index([courseId])
   @@map("teachers")
 }
 
@@ -83,6 +85,7 @@ model Monitor {
   supervisors  Supervisor? @relation(fields: [supervisorId], references: [id], onDelete: Restrict)
   user         User        @relation(fields: [userId], references: [id])
 
+  @@index([supervisorId])
   @@map("monitors")
 }
 
@@ -105,6 +108,8 @@ model AreaCourseHour {
   course     Course @relation(fields: [courseId], references: [id])
 
   @@unique([areaId, courseId])
+  @@index([areaId])
+  @@index([courseId])
   @@map("area_course_hours")
 }
 
@@ -138,6 +143,7 @@ model Shift {
   classes      Class[]
   hourSessions HourSession[]
 
+  @@index([name])
   @@map("shifts")
 }
 
@@ -157,6 +163,9 @@ model Class {
   schedules Schedule[]
 
   @@index([idSede])
+  @@index([areaId])
+  @@index([shiftId])
+  @@index([monitorId])
   @@map("classes")
 }
 
@@ -170,6 +179,9 @@ model HourSession {
   shift           Shift      @relation(fields: [shiftId], references: [id])
   schedules       Schedule[]
 
+  @@unique([shiftId, period])
+  @@index([shiftId])
+  @@index([period])
   @@map("hour_sessions")
 }
 
@@ -186,6 +198,10 @@ model Schedule {
   teacher       Teacher?    @relation(fields: [teacherId], references: [id])
 
   @@unique([courseId, hourSessionId, teacherId, weekday])
+  @@index([classId])
+  @@index([courseId])
+  @@index([hourSessionId])
+  @@index([teacherId])
   @@map("schedules")
 }
 
