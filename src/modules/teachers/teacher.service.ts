@@ -5,21 +5,26 @@ import { plainToInstance } from 'class-transformer';
 import { ImportTeacherDto } from './dto/import-teacher.dto';
 import { CreateTeacherWithUserDto } from './dto/create-teacher.dto';
 import { Role } from '@modules/auth/decorators/authorization.decorator';
+import { TeacherSummaryDto } from './dto/teacher-summary.dto';
 
 @Injectable()
 export class TeacherService {
   constructor(private prisma: PrismaService) {}
 
   // ─────── CRUD ───────
-  async createTeacher(createDto: CreateTeacherWithUserDto): Promise<TeacherBaseDto> {
+  async createTeacher(
+    createDto: CreateTeacherWithUserDto,
+  ): Promise<TeacherBaseDto> {
     return this.prisma.getClient().$transaction(async (tx) => {
       // Verificar que el curso existe
       const courseExists = await tx.course.findUnique({
-        where: { id: createDto.courseId }
+        where: { id: createDto.courseId },
       });
 
       if (!courseExists) {
-        throw new NotFoundException(`Course with ID ${createDto.courseId} not found`);
+        throw new NotFoundException(
+          `Course with ID ${createDto.courseId} not found`,
+        );
       }
 
       // Crear usuario, perfil y profesor
@@ -63,11 +68,58 @@ export class TeacherService {
     });
   }
 
-  async findAll(): Promise<TeacherBaseDto[]> {
-    const teachers = await this.prisma.getClient().teacher.findMany({
-      include: { user: true, courses: true }, // Incluye la relación con el usuario
-    });
-    return teachers.map((teacher) => this.mapToTeacherDto(teacher));
+  async findAll(
+    page: number = 1,
+    limit: number = 20,
+  ): Promise<{
+    data: TeacherSummaryDto[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    const offset = (page - 1) * limit;
+
+    const [teachers, total] = await this.prisma.getClient().$transaction([
+      this.prisma.getClient().teacher.findMany({
+        skip: offset,
+        take: limit,
+        relationLoadStrategy: 'join',
+        select: {
+          jobStatus: true,
+          isCoordinator: true,
+          courses: {
+            select: {
+              name: true,
+            },
+          },
+          user: {
+            select: {
+              userProfile: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                  personalEmail: true,
+                  phone: true,
+                },
+              },
+            },
+          },
+        },
+      }),
+      this.prisma.getClient().teacher.count(),
+    ]);
+
+    const data = teachers.map((teacher) => ({
+      courseName: teacher.courses?.name || '',
+      firstName: teacher.user?.userProfile?.firstName || '',
+      lastName: teacher.user?.userProfile?.lastName || '',
+      personalEmail: teacher.user?.userProfile?.personalEmail || '',
+      phone: teacher.user?.userProfile?.phone || '',
+      jobStatus: teacher.jobStatus || '',
+      isCoordinator: teacher.isCoordinator || false,
+    }));
+
+    return { data, total, page, limit };
   }
 
   async findOne(id: string): Promise<TeacherBaseDto> {
@@ -109,21 +161,23 @@ export class TeacherService {
 
   async createTeachersFromJson(data: ImportTeacherDto[]) {
     if (data.length === 0) return { message: 'No hay datos para procesar' };
-  
+
     return this.prisma.getClient().$transaction(async (tx) => {
       const courseNames = [...new Set(data.map((t) => t.courseName))]; // Eliminar nombres duplicados
       const courses = await tx.course.findMany({
         where: { name: { in: courseNames } },
         select: { id: true, name: true },
       });
-  
+
       const courseMap = new Map(courses.map((c) => [c.name, c.id]));
-  
+
       const missingCourses = courseNames.filter((name) => !courseMap.has(name));
       if (missingCourses.length > 0) {
-        throw new Error(`Los siguientes cursos no existen: ${missingCourses.join(', ')}`);
+        throw new Error(
+          `Los siguientes cursos no existen: ${missingCourses.join(', ')}`,
+        );
       }
-  
+
       // Crear los usuarios
       await tx.user.createMany({
         data: data.map((t) => ({
@@ -132,7 +186,7 @@ export class TeacherService {
           isActive: true,
         })),
       });
-  
+
       // Obtener los nuevos usuarios creados
       const newUsers = await tx.user.findMany({
         where: {
@@ -172,7 +226,7 @@ export class TeacherService {
       };
     });
   }
-  
+
   //async getTeacherSchedules(teacherId: string) {
   //  return Promise.resolve(undefined);
   //}
