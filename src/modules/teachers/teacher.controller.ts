@@ -9,6 +9,7 @@ import {
   UseInterceptors,
   UploadedFile,
   BadRequestException,
+  Query,
 } from '@nestjs/common';
 import { TeacherService } from './teacher.service';
 import { CreateTeacherWithUserDto } from './dto/create-teacher.dto';
@@ -17,7 +18,7 @@ import { Authorization } from '@modules/auth/decorators/authorization.decorator'
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Readable } from 'stream';
 import { ImportTeacherDto } from './dto/import-teacher.dto';
-//import { ApiOperation, ApiParam, ApiResponse } from '@nestjs/swagger';
+import { TeacherSummaryDto } from './dto/teacher-summary.dto';
 import csvParser from 'csv-parser';
 import { Unauthenticated } from '@modules/auth/decorators/unauthenticated.decorator';
 import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -35,13 +36,22 @@ export class TeacherController {
   async create(@Body() createTeacherDto: CreateTeacherWithUserDto) {
     return this.teacherService.createTeacher(createTeacherDto);
   }
+
   @Get()
   @Authorization({
     permission: 'teacher.list',
     description: 'Obtener todos los profesores',
   })
-  findAll() {
-    return this.teacherService.findAll();
+  findAll(
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 20,
+  ): Promise<{
+    data: TeacherSummaryDto[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    return this.teacherService.findAll(Number(page), Number(limit));
   }
 
   @Get(':id')
@@ -103,14 +113,16 @@ export class TeacherController {
     return new Promise((resolve, reject) => {
       Readable.from(file.buffer)
         .pipe(csvParser())
-        .on('data', row => {
+        .on('data', (row) => {
           records.push({
             email: row.email,
             dni: row.dni,
             firstName: row.first_name,
             lastName: row.last_name,
             phone: row.phone || null,
-            phonesAdditional: row.phone_aditional ? row.phone_aditional.split(';') : [],
+            phonesAdditional: row.phone_aditional
+              ? row.phone_aditional.split(';')
+              : [],
             personalEmail: row.personal_email || null,
             isActive: true,
             jobStatus: row.job_status || null,
@@ -119,7 +131,8 @@ export class TeacherController {
         })
         .on('end', async () => {
           try {
-            const result = await this.teacherService.createTeachersFromJson(records);
+            const result =
+              await this.teacherService.createTeachersFromJson(records);
             resolve(result);
           } catch (error) {
             reject(error);
