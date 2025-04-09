@@ -13,12 +13,12 @@ import {
 } from '@nestjs/common';
 import { TeacherService } from './teacher.service';
 import { CreateTeacherWithUserDto } from './dto/create-teacher.dto';
-import { UpdateTeacherDto } from './dto';
 import { Authorization } from '@modules/auth/decorators/authorization.decorator';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Readable } from 'stream';
 import { ImportTeacherDto } from './dto/import-teacher.dto';
-import { TeacherSummaryDto } from './dto/teacher-summary.dto';
+import { TeacherGetSummaryDto } from './dto/teacher-get-summary.dto';
+import { TeacherUpdateDto } from './dto/teacher-update.dto';
 import csvParser from 'csv-parser';
 import { Unauthenticated } from '@modules/auth/decorators/unauthenticated.decorator';
 import {
@@ -29,6 +29,7 @@ import {
   ApiParam,
   ApiResponse,
 } from '@nestjs/swagger';
+import { TeacherDto } from './dto/teacher.dto';
 
 @ApiTags('Teachers')
 @Controller('teachers')
@@ -63,14 +64,14 @@ export class TeacherController {
   @ApiResponse({
     status: 200,
     description: 'Lista de profesores paginada',
-    type: TeacherSummaryDto,
+    type: TeacherGetSummaryDto,
     isArray: true,
   })
   findAll(
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 20,
   ): Promise<{
-    data: TeacherSummaryDto[];
+    data: TeacherGetSummaryDto[];
     total: number;
     page: number;
     limit: number;
@@ -88,29 +89,26 @@ export class TeacherController {
   @ApiResponse({
     status: 200,
     description: 'Detalles de un profesor',
-    type: TeacherSummaryDto,
+    type: TeacherDto,
   })
   findOne(@Param('id') id: string) {
     return this.teacherService.findOne(id);
   }
 
   @Put(':id')
-  @Authorization({
-    permission: 'teacher.update',
-    description: 'Actualizar un profesor por su id',
-  })
+  @Unauthenticated()
   @ApiOperation({ summary: 'Actualizar un profesor por su ID' })
   @ApiParam({ name: 'id', type: String, description: 'ID del profesor' })
   @ApiBody({
     description: 'Datos para actualizar un profesor',
-    type: UpdateTeacherDto,
+    type: TeacherUpdateDto,
   })
   @ApiResponse({
     status: 200,
     description: 'Detalles del profesor actualizado',
-    type: TeacherSummaryDto,
+    type: TeacherGetSummaryDto,
   })
-  update(@Param('id') id: string, @Body() updateTeacherDto: UpdateTeacherDto) {
+  update(@Param('id') id: string, @Body() updateTeacherDto: TeacherUpdateDto) {
     return this.teacherService.update(id, updateTeacherDto);
   }
 
