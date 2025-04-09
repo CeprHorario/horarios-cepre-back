@@ -1,55 +1,59 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Expose } from 'class-transformer';
+import { IsString, IsOptional, IsEnum, IsBoolean } from 'class-validator';
+import { JobStatus } from '@prisma/client';
 
-export class TeacherSummaryDto {
+export class TeacherUpdateDto {
   @ApiProperty({
     description: 'Nombre del curso que enseña el profesor',
-    example: 'Matemáticas',
+    example: 'Literatura',
   })
-  @Expose()
+  @IsString()
   courseName: string;
 
   @ApiProperty({
     description: 'Primer nombre del profesor',
-    example: 'Juan',
+    example: 'Julio',
   })
-  @Expose()
+  @IsString()
   firstName: string;
 
   @ApiProperty({
     description: 'Apellido del profesor',
-    example: 'Pérez',
+    example: 'Velarde',
   })
-  @Expose()
+  @IsString()
   lastName: string;
 
   @ApiProperty({
     description: 'Correo electrónico personal del profesor',
     nullable: true,
-    example: 'juan.perez@gmail.com',
+    example: 'jverde.dev@gmail.com',
   })
-  @Expose()
+  @IsOptional()
+  @IsString()
   personalEmail: string | null;
 
   @ApiProperty({
     description: 'Número de teléfono del profesor',
     nullable: true,
-    example: '+51987654321',
+    example: '912345678',
   })
-  @Expose()
+  @IsOptional()
+  @IsString()
   phone: string | null;
 
   @ApiProperty({
     description: 'Estado laboral del profesor',
-    example: 'Activo',
+    example: 'FullTime',
+    enum: JobStatus,
   })
-  @Expose()
-  jobStatus: string;
+  @IsEnum(JobStatus)
+  jobStatus: JobStatus;
 
   @ApiProperty({
     description: 'Indica si el profesor es coordinador',
     example: true,
   })
-  @Expose()
+  @IsBoolean()
   isCoordinator: boolean;
 }
