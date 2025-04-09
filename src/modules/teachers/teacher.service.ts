@@ -85,6 +85,7 @@ export class TeacherService {
         take: limit,
         relationLoadStrategy: 'join',
         select: {
+          id: true,
           jobStatus: true,
           isCoordinator: true,
           courses: {
@@ -110,6 +111,7 @@ export class TeacherService {
     ]);
 
     const data = teachers.map((teacher) => ({
+      id: teacher.id || '',
       courseName: teacher.courses?.name || '',
       firstName: teacher.user?.userProfile?.firstName || '',
       lastName: teacher.user?.userProfile?.lastName || '',
