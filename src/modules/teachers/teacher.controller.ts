@@ -21,7 +21,14 @@ import { ImportTeacherDto } from './dto/import-teacher.dto';
 import { TeacherSummaryDto } from './dto/teacher-summary.dto';
 import csvParser from 'csv-parser';
 import { Unauthenticated } from '@modules/auth/decorators/unauthenticated.decorator';
-import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBody,
+  ApiOperation,
+  ApiTags,
+  ApiQuery,
+  ApiParam,
+  ApiResponse,
+} from '@nestjs/swagger';
 
 @ApiTags('Teachers')
 @Controller('teachers')
@@ -33,14 +40,31 @@ export class TeacherController {
     permission: 'teacher.create',
     description: 'Crear un nuevo profesor',
   })
+  @ApiOperation({ summary: 'Crear un nuevo profesor' })
   async create(@Body() createTeacherDto: CreateTeacherWithUserDto) {
     return this.teacherService.createTeacher(createTeacherDto);
   }
 
   @Get()
-  @Authorization({
-    permission: 'teacher.list',
-    description: 'Obtener todos los profesores',
+  @Unauthenticated()
+  @ApiOperation({ summary: 'Obtener todos los profesores' })
+  @ApiQuery({
+    name: 'page',
+    type: Number,
+    required: false,
+    description: 'Número de página',
+  })
+  @ApiQuery({
+    name: 'limit',
+    type: Number,
+    required: false,
+    description: 'Cantidad de resultados por página',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de profesores paginada',
+    type: TeacherSummaryDto,
+    isArray: true,
   })
   findAll(
     @Query('page') page: number = 1,
@@ -59,6 +83,13 @@ export class TeacherController {
     permission: 'teacher.getById',
     description: 'Obtener un profesor por su id',
   })
+  @ApiOperation({ summary: 'Obtener un profesor por su ID' })
+  @ApiParam({ name: 'id', type: String, description: 'ID del profesor' })
+  @ApiResponse({
+    status: 200,
+    description: 'Detalles de un profesor',
+    type: TeacherSummaryDto,
+  })
   findOne(@Param('id') id: string) {
     return this.teacherService.findOne(id);
   }
@@ -67,6 +98,17 @@ export class TeacherController {
   @Authorization({
     permission: 'teacher.update',
     description: 'Actualizar un profesor por su id',
+  })
+  @ApiOperation({ summary: 'Actualizar un profesor por su ID' })
+  @ApiParam({ name: 'id', type: String, description: 'ID del profesor' })
+  @ApiBody({
+    description: 'Datos para actualizar un profesor',
+    type: UpdateTeacherDto,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Detalles del profesor actualizado',
+    type: TeacherSummaryDto,
   })
   update(@Param('id') id: string, @Body() updateTeacherDto: UpdateTeacherDto) {
     return this.teacherService.update(id, updateTeacherDto);

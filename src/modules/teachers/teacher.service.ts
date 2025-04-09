@@ -110,16 +110,17 @@ export class TeacherService {
       this.prisma.getClient().teacher.count(),
     ]);
 
-    const data = teachers.map((teacher) => ({
-      id: teacher.id || '',
-      courseName: teacher.courses?.name || '',
-      firstName: teacher.user?.userProfile?.firstName || '',
-      lastName: teacher.user?.userProfile?.lastName || '',
-      personalEmail: teacher.user?.userProfile?.personalEmail || '',
-      phone: teacher.user?.userProfile?.phone || '',
-      jobStatus: teacher.jobStatus || '',
-      isCoordinator: teacher.isCoordinator || false,
-    }));
+    const data = teachers.map((teacher) =>
+      plainToInstance(TeacherSummaryDto, {
+        courseName: teacher.courses?.name || '',
+        firstName: teacher.user?.userProfile?.firstName || '',
+        lastName: teacher.user?.userProfile?.lastName || '',
+        personalEmail: teacher.user?.userProfile?.personalEmail || null,
+        phone: teacher.user?.userProfile?.phone || null,
+        jobStatus: teacher.jobStatus || '',
+        isCoordinator: teacher.isCoordinator || false,
+      }),
+    );
 
     return { data, total, page, limit };
   }
@@ -138,13 +139,40 @@ export class TeacherService {
   async update(
     id: string,
     updateTeacherDto: UpdateTeacherDto,
-  ): Promise<TeacherBaseDto> {
+  ): Promise<TeacherSummaryDto> {
     const teacher = await this.prisma.getClient().teacher.update({
       where: { id },
       data: updateTeacherDto,
-      include: { user: true, courses: true }, // Incluye la relación con el usuario
+      include: {
+        user: {
+          select: {
+            userProfile: {
+              select: {
+                firstName: true,
+                lastName: true,
+                personalEmail: true,
+                phone: true,
+              },
+            },
+          },
+        },
+        courses: {
+          select: {
+            name: true,
+          },
+        },
+      },
     });
-    return this.mapToTeacherDto(teacher);
+
+    return plainToInstance(TeacherSummaryDto, {
+      courseName: teacher.courses?.name || '',
+      firstName: teacher.user?.userProfile?.firstName || '',
+      lastName: teacher.user?.userProfile?.lastName || '',
+      personalEmail: teacher.user?.userProfile?.personalEmail || null,
+      phone: teacher.user?.userProfile?.phone || null,
+      jobStatus: teacher.jobStatus || '',
+      isCoordinator: teacher.isCoordinator || false,
+    });
   }
 
   async delete(id: string): Promise<TeacherBaseDto> {
