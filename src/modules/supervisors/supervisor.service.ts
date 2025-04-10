@@ -91,7 +91,11 @@ export class SupervisorService {
   async getMonitors(userId: string): Promise<MonitorForSupervisorDto[]> {
     // Buscar el ID del supervisor
     const monitors = await this.prisma.getClient().monitor.findMany({
-      where: { supervisorId: userId },
+      where: {
+        supervisors: {
+          userId: userId,
+        },
+      },
       include: {
         user: {
           select: {
@@ -113,7 +117,7 @@ export class SupervisorService {
       },
     });
 
-    if (!monitors.length) {
+    if (!monitors) {
       throw new NotFoundException(
         'No se encontraron monitores asignados a este supervisor',
       );
