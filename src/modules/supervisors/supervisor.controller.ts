@@ -53,12 +53,12 @@ export class SupervisorController {
   @ApiResponse({ status: 404, description: 'Ta sin monitores.' })
   getMonitors(@Req() req) {
     console.log('Usuario autenticado:', req.user); // Debugging
-    const userId = req.user?.userId; // Verifica que exista
+    const user = req?.user; // Verifica que exista
 
-    if (!userId) {
-      throw new BadRequestException('No se encontró el userId en la solicitud');
+    if (user.role !== Role.SUPERVISOR) {
+      throw new BadRequestException('No eres un supervisor');
     }
-    return this.supervisorService.getMonitors(userId);
+    return this.supervisorService.getMonitors(user.userId);
   }
 
   @Get(':id')
