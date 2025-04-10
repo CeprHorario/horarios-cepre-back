@@ -1,11 +1,12 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@database/prisma/prisma.service';
-import { UpdateTeacherDto, TeacherBaseDto } from './dto';
+import { TeacherBaseDto } from './dto';
 import { plainToInstance } from 'class-transformer';
 import { ImportTeacherDto } from './dto/import-teacher.dto';
 import { CreateTeacherWithUserDto } from './dto/create-teacher.dto';
 import { Role } from '@modules/auth/decorators/authorization.decorator';
-import { TeacherSummaryDto } from './dto/teacher-summary.dto';
+import { TeacherGetSummaryDto } from './dto/teacher-get-summary.dto';
+import { TeacherUpdateDto } from './dto/teacher-update.dto';
 
 @Injectable()
 export class TeacherService {
@@ -72,7 +73,7 @@ export class TeacherService {
     page: number = 1,
     limit: number = 20,
   ): Promise<{
-    data: TeacherSummaryDto[];
+    data: TeacherGetSummaryDto[];
     total: number;
     page: number;
     limit: number;
@@ -110,16 +111,18 @@ export class TeacherService {
       this.prisma.getClient().teacher.count(),
     ]);
 
-    const data = teachers.map((teacher) => ({
-      id: teacher.id || '',
-      courseName: teacher.courses?.name || '',
-      firstName: teacher.user?.userProfile?.firstName || '',
-      lastName: teacher.user?.userProfile?.lastName || '',
-      personalEmail: teacher.user?.userProfile?.personalEmail || '',
-      phone: teacher.user?.userProfile?.phone || '',
-      jobStatus: teacher.jobStatus || '',
-      isCoordinator: teacher.isCoordinator || false,
-    }));
+    const data = teachers.map((teacher) =>
+      plainToInstance(TeacherGetSummaryDto, {
+        id: teacher.id, // Incluye el ID en el mapeo
+        courseName: teacher.courses?.name || '',
+        firstName: teacher.user?.userProfile?.firstName || '',
+        lastName: teacher.user?.userProfile?.lastName || '',
+        personalEmail: teacher.user?.userProfile?.personalEmail || null,
+        phone: teacher.user?.userProfile?.phone || null,
+        jobStatus: teacher.jobStatus || '',
+        isCoordinator: teacher.isCoordinator || false,
+      }),
+    );
 
     return { data, total, page, limit };
   }
@@ -137,14 +140,60 @@ export class TeacherService {
 
   async update(
     id: string,
-    updateTeacherDto: UpdateTeacherDto,
-  ): Promise<TeacherBaseDto> {
+    updateTeacherDto: TeacherUpdateDto,
+  ): Promise<TeacherGetSummaryDto> {
     const teacher = await this.prisma.getClient().teacher.update({
       where: { id },
-      data: updateTeacherDto,
-      include: { user: true, courses: true }, // Incluye la relación con el usuario
+      data: {
+        jobStatus: updateTeacherDto.jobStatus,
+        isCoordinator: updateTeacherDto.isCoordinator,
+        user: {
+          update: {
+            userProfile: {
+              update: {
+                firstName: updateTeacherDto.firstName,
+                lastName: updateTeacherDto.lastName,
+                personalEmail: updateTeacherDto.personalEmail,
+                phone: updateTeacherDto.phone,
+              },
+            },
+          },
+        },
+        courses: {
+          connect: { name: updateTeacherDto.courseName },
+        },
+      },
+      include: {
+        user: {
+          select: {
+            userProfile: {
+              select: {
+                firstName: true,
+                lastName: true,
+                personalEmail: true,
+                phone: true,
+              },
+            },
+          },
+        },
+        courses: {
+          select: {
+            name: true,
+          },
+        },
+      },
     });
-    return this.mapToTeacherDto(teacher);
+
+    return plainToInstance(TeacherGetSummaryDto, {
+      id: teacher.id,
+      courseName: teacher.courses?.name || '',
+      firstName: teacher.user?.userProfile?.firstName || '',
+      lastName: teacher.user?.userProfile?.lastName || '',
+      personalEmail: teacher.user?.userProfile?.personalEmail || null,
+      phone: teacher.user?.userProfile?.phone || null,
+      jobStatus: teacher.jobStatus || '',
+      isCoordinator: teacher.isCoordinator || false,
+    });
   }
 
   async delete(id: string): Promise<TeacherBaseDto> {
