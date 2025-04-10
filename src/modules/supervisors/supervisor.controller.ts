@@ -18,6 +18,7 @@ import { ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { Authorization, Role } from '@modules/auth/decorators/authorization.decorator';
 import { JwtAuthGuard } from '@modules/auth/guards/jwt-auth.guard';
 import { CreateSupervisorWithUserDto } from './dto/create-supervisor.dto';
+import { MonitorForSupervisorDto } from '@modules/monitors/dto/monitorForSupervisor.dto';
 
 @Controller('supervisors')
 @UseGuards(JwtAuthGuard)
@@ -49,7 +50,10 @@ export class SupervisorController {
     description: 'Obtiene los monitores de este supervisor',
   })
   @ApiOperation({ summary: 'Obtener los monitores de este supervisor' })
-  @ApiResponse({ status: 200, description: 'Monitores obtenidos.' })
+  @ApiResponse({
+    status: 200, description: 'Monitores obtenidos.',
+    type: [MonitorForSupervisorDto],
+  })
   @ApiResponse({ status: 404, description: 'Ta sin monitores.' })
   getMonitors(@Req() req) {
     console.log('Usuario autenticado:', req.user); // Debugging
