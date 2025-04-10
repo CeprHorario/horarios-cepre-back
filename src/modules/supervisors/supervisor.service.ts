@@ -87,26 +87,31 @@ export class SupervisorService {
     });
     return this.mapToSupervisorDto(supervisor);
   }
+
   async getMonitors(userId: string): Promise<MonitorForSupervisorDto[]> {
     // Buscar el ID del supervisor
-    const supervisor = await this.prisma.getClient().supervisor.findUnique({
-      where: { userId: userId }, // Asegura que `user_id` es el campo correcto en `supervisor`
-      select: { id: true },
-    });
-
-    if (!supervisor) {
-      throw new NotFoundException('Supervisor no encontrado');
-    }
-
-    // Buscar los monitores asignados a este supervisor
     const monitors = await this.prisma.getClient().monitor.findMany({
-      where: { supervisorId: supervisor.id }, // Asocia los monitores al supervisor
+      where: { supervisorId: userId },
       include: {
-        user: { select: { id: true }, include: { userProfile: true } }, // Incluye el perfil del usuario
-        classes: true, // Incluye las clases asociadas al monitor
+        user: {
+          select: {
+            id: true,
+            userProfile: {
+              select: {
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+        },
+        classes: {
+          select: {
+            name: true,
+            urlMeet: true,
+          },
+        },
       },
     });
-    console.log('Monitores obtenidos:', JSON.stringify(monitors, null, 2)); // Debugging
 
     if (!monitors.length) {
       throw new NotFoundException(
