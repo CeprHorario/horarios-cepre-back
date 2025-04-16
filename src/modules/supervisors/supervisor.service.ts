@@ -1,57 +1,97 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@database/prisma/prisma.service';
-import {
-  UpdateSupervisorDto,
-  SupervisorBaseDto,
-} from './dto';
+import { UpdateSupervisorDto, SupervisorBaseDto } from './dto';
 import { plainToInstance } from 'class-transformer';
 import { MonitorForSupervisorDto } from '@modules/monitors/dto/monitorForSupervisor.dto';
 import { ClassForSupervisorDto } from '@modules/classes/dto/classForSupervisor.dto';
 import { CreateSupervisorWithUserDto } from './dto/create-supervisor.dto';
 import { Role } from '@modules/auth/decorators/authorization.decorator';
 import { UpdateSupervisorWithProfileDto } from './dto/update-supervisor-with-profile.dto';
+import { SupervisorGetSummaryDto } from './dto/supervisor-get-summary.dto';
 
 @Injectable()
 export class SupervisorService {
   constructor(private prisma: PrismaService) {}
 
   // ─────── CRUD ───────
-  async createSupervisor(createDto: CreateSupervisorWithUserDto): Promise<SupervisorBaseDto> {
-      return this.prisma.getClient().$transaction(async (tx) => {
-        // Crear usuario, perfil y profesor
-        const user = await tx.user.create({
-          data: {
-            email: createDto.email,
-            role: Role.SUPERVISOR,
-            isActive: true,
-            userProfile: {
-              create: {
-                dni: createDto.dni,
-                firstName: createDto.firstName,
-                lastName: createDto.lastName,
-                phone: createDto.phone,
-                phonesAdditional: createDto.phonesAdditional || [],
-                personalEmail: createDto.personalEmail,
+  async createSupervisor(
+    createDto: CreateSupervisorWithUserDto,
+  ): Promise<SupervisorBaseDto> {
+    return this.prisma.getClient().$transaction(async (tx) => {
+      // Crear usuario, perfil y profesor
+      const user = await tx.user.create({
+        data: {
+          email: createDto.email,
+          role: Role.SUPERVISOR,
+          isActive: true,
+          userProfile: {
+            create: {
+              dni: createDto.dni,
+              firstName: createDto.firstName,
+              lastName: createDto.lastName,
+              phone: createDto.phone,
+              phonesAdditional: createDto.phonesAdditional || [],
+              personalEmail: createDto.personalEmail,
+            },
+          },
+          supervisor: {
+            create: {},
+          },
+        },
+        include: {
+          userProfile: true,
+        },
+      });
+
+      return this.mapToSupervisorDto(user);
+    });
+  }
+
+  async findAll(
+    page: number = 1,
+    limit: number = 20,
+  ): Promise<{
+    data: SupervisorGetSummaryDto[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    const offset = (page - 1) * limit;
+
+    const [supervisors, total] = await this.prisma.getClient().$transaction([
+      this.prisma.getClient().supervisor.findMany({
+        skip: offset,
+        take: limit,
+        select: {
+          id: true,
+          users: {
+            select: {
+              userProfile: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                  personalEmail: true,
+                  phone: true,
+                },
               },
             },
-            supervisor: {
-              create: {},
-            },
           },
-          include: {
-            userProfile: true,
-          },
-        });
-  
-        return this.mapToSupervisorDto(user);
-      });
-    }
+        },
+      }),
+      this.prisma.getClient().supervisor.count(),
+    ]);
 
-  async findAll(): Promise<SupervisorBaseDto[]> {
-    const supervisors = await this.prisma.getClient().supervisor.findMany({
-      include: { users: true }, // Incluye la relación con el usuario
-    });
-    return supervisors.map((supervisor) => this.mapToSupervisorDto(supervisor));
+    const data = supervisors.map((supervisor) =>
+      plainToInstance(SupervisorGetSummaryDto, {
+        id: supervisor.id,
+        firstName: supervisor.users?.userProfile?.firstName || '',
+        lastName: supervisor.users?.userProfile?.lastName || '',
+        personalEmail: supervisor.users?.userProfile?.personalEmail || null,
+        phone: supervisor.users?.userProfile?.phone || null,
+      }),
+    );
+
+    return { data, total, page, limit };
   }
 
   async findOne(id: string): Promise<SupervisorBaseDto> {
@@ -73,7 +113,7 @@ export class SupervisorService {
       where: { id },
       data: {
         ...updateSupervisorDto,
-        updatedAt: new Date().toISOString() // Actualizar fecha de modificación
+        updatedAt: new Date().toISOString(), // Actualizar fecha de modificación
       },
       include: { users: true },
     });

@@ -11,15 +11,19 @@ import {
   BadRequestException,
   HttpCode,
   HttpStatus,
+  Query,
 } from '@nestjs/common';
 import { SupervisorService } from './supervisor.service';
 import { UpdateSupervisorDto, UpdateSupervisorWithProfileDto } from './dto';
 import { ApiOperation, ApiResponse } from '@nestjs/swagger';
-import { Authorization, Role } from '@modules/auth/decorators/authorization.decorator';
+import {
+  Authorization,
+  Role,
+} from '@modules/auth/decorators/authorization.decorator';
 import { JwtAuthGuard } from '@modules/auth/guards/jwt-auth.guard';
 import { CreateSupervisorWithUserDto } from './dto/create-supervisor.dto';
 import { MonitorForSupervisorDto } from '@modules/monitors/dto/monitorForSupervisor.dto';
-
+import { SupervisorGetSummaryDto } from './dto/supervisor-get-summary.dto';
 @Controller('supervisors')
 @UseGuards(JwtAuthGuard)
 export class SupervisorController {
@@ -31,16 +35,30 @@ export class SupervisorController {
     description: 'Crear un nuevo supervisor',
   })
   async create(@Body() createSupervisorrDto: CreateSupervisorWithUserDto) {
-      return this.supervisorService.createSupervisor(createSupervisorrDto);
+    return this.supervisorService.createSupervisor(createSupervisorrDto);
   }
 
   @Get()
-  @Authorization({
-    permission: 'supervisor.list',
-    description: 'Obtener todos los supervisores',
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de supervisores paginada',
+    type: SupervisorGetSummaryDto,
+    isArray: true,
   })
-  findAll() {
-    return this.supervisorService.findAll();
+  @Authorization({
+    permission: 'supervisor.getAll',
+    description: 'Obtiene los monitores de este supervisor',
+  })
+  findAll(
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 20,
+  ): Promise<{
+    data: SupervisorGetSummaryDto[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    return this.supervisorService.findAll(Number(page), Number(limit));
   }
 
   @Get('getMonitors')
@@ -51,7 +69,8 @@ export class SupervisorController {
   })
   @ApiOperation({ summary: 'Obtener los monitores de este supervisor' })
   @ApiResponse({
-    status: 200, description: 'Monitores obtenidos.',
+    status: 200,
+    description: 'Monitores obtenidos.',
     type: [MonitorForSupervisorDto],
   })
   @ApiResponse({ status: 404, description: 'Ta sin monitores.' })
