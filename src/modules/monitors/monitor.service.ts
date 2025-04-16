@@ -1,12 +1,16 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@database/prisma/prisma.service';
-import { CreateMonitorDto, UpdateMonitorDto, MonitorBaseDto, MonitorInformationDto } from './dto';
+import {
+  CreateMonitorDto,
+  UpdateMonitorDto,
+  MonitorBaseDto,
+  MonitorInformationDto,
+} from './dto';
 import { plainToInstance } from 'class-transformer';
 import { ScheduleDto, Weekday } from './dto/schedule.dto';
 import { TeacherResponseDto } from './dto/teacher-response.dto';
 import { UpdateMonitorAsAdminDto } from './dto/updateMonitorAsAdmin.dto';
-import { MonitorDto } from './dto/monitor.dto';
-import { MonitorBasicInfoDto } from './dto/monitor-basic-info.dto';
+import { MonitorGetSummaryDto } from './dto/monitor-get-summary.dto';
 
 @Injectable()
 export class MonitorService {
@@ -28,24 +32,49 @@ export class MonitorService {
     return monitors.map((monitor) => this.mapToMonitorDto(monitor));
   }
 
-  async findAllBasicInfo(): Promise<MonitorBasicInfoDto[]> {
-    const monitors = await this.prisma.getClient().monitor.findMany({
-      include: {
-        user: {
-          include: {
-            userProfile: true,
+  async findAllBasicInfo(
+    page: number = 1,
+    limit: number = 20,
+  ): Promise<{
+    data: MonitorGetSummaryDto[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    const offset = (page - 1) * limit;
+
+    const [monitors, total] = await this.prisma.getClient().$transaction([
+      this.prisma.getClient().monitor.findMany({
+        skip: offset,
+        take: limit,
+        include: {
+          user: {
+            include: {
+              userProfile: true,
+            },
+          },
+          classes: {
+            select: {
+              name: true,
+            },
           },
         },
-      },
-    });
+      }),
+      this.prisma.getClient().monitor.count(),
+    ]);
 
-    return monitors.map((monitor) => ({
-      id: monitor.id,
-      firstName: monitor.user.userProfile?.firstName || '',
-      lastName: monitor.user.userProfile?.lastName || '',
-      personalEmail: monitor.user.userProfile?.personalEmail || '',
-      phone: monitor.user.userProfile?.phone || '',
-    }));
+    const data = monitors.map((monitor) =>
+      plainToInstance(MonitorGetSummaryDto, {
+        id: monitor.id,
+        firstName: monitor.user?.userProfile?.firstName || '',
+        lastName: monitor.user?.userProfile?.lastName || '',
+        personalEmail: monitor.user?.userProfile?.personalEmail || '',
+        phone: monitor.user?.userProfile?.phone || '',
+        className: monitor.classes?.name || 'Sin asignar',
+      }),
+    );
+
+    return { data, total, page, limit };
   }
 
   async findOne(id: string): Promise<MonitorBaseDto> {
@@ -74,7 +103,7 @@ export class MonitorService {
   async updateMonitorAsAdmin(
     monitorId: string,
     updateMonitorDto: UpdateMonitorAsAdminDto,
-  ): Promise<MonitorDto> {
+  ): Promise<MonitorGetSummaryDto> {
     const monitor = await this.prisma.getClient().monitor.update({
       where: { id: monitorId },
       data: {
@@ -90,10 +119,34 @@ export class MonitorService {
             },
           },
         },
+        classes: updateMonitorDto.className
+          ? {
+              connect: { id: updateMonitorDto.classId }, // Cambiado a `id`
+            }
+          : undefined,
       },
-      include: { user: false, supervisors: false },
+      include: {
+        user: {
+          include: {
+            userProfile: true,
+          },
+        },
+        classes: {
+          select: {
+            name: true,
+          },
+        },
+      },
     });
-    return plainToInstance(MonitorDto, monitor);
+
+    return plainToInstance(MonitorGetSummaryDto, {
+      id: monitor.id,
+      firstName: monitor.user.userProfile?.firstName || '',
+      lastName: monitor.user.userProfile?.lastName || '',
+      personalEmail: monitor.user.userProfile?.personalEmail || '',
+      phone: monitor.user.userProfile?.phone || '',
+      className: monitor.classes?.name || '',
+    });
   }
 
   async delete(id: string): Promise<MonitorBaseDto> {
@@ -111,72 +164,75 @@ export class MonitorService {
           some: {
             clas: {
               monitor: {
-                userId
-              }
-            }
-          }
-        }
+                userId,
+              },
+            },
+          },
+        },
       },
       include: {
         user: {
           include: {
-            userProfile: true
-          }
+            userProfile: true,
+          },
         },
-        courses: true
+        courses: true,
       },
-      distinct: ['id'] // Asegura teachers únicos
+      distinct: ['id'], // Asegura teachers únicos
     });
-  
+
     if (!teachers.length) {
-      throw new NotFoundException('No se encontraron docentes asociados al monitor');
+      throw new NotFoundException(
+        'No se encontraron docentes asociados al monitor',
+      );
     }
-  
-    return teachers.map(teacher => ({
+
+    return teachers.map((teacher) => ({
       teacherId: teacher.id,
       firstName: teacher.user.userProfile?.firstName || 'N/A',
       lastName: teacher.user.userProfile?.lastName || 'N/A',
       email: teacher.user.email,
-      courseName: teacher.courses?.name || 'Sin asignar'
+      courseName: teacher.courses?.name || 'Sin asignar',
     }));
   }
 
-  
   async getSchedule(userId: string): Promise<ScheduleDto[]> {
     const schedules = await this.prisma.getClient().schedule.findMany({
       relationLoadStrategy: 'join', // or 'query'
       where: {
         clas: {
           monitor: {
-            userId
-          }
-        }
+            userId,
+          },
+        },
       },
       select: {
         weekday: true,
         hourSession: {
           select: {
             startTime: true,
-            endTime: true
-          }
+            endTime: true,
+          },
         },
         teacher: {
           select: {
             courses: {
               select: {
-                name: true
-              }
-            }
-          }
-        }
-      }
+                name: true,
+              },
+            },
+          },
+        },
+      },
     });
-  
+
     if (!schedules.length) {
-      throw new NotFoundException('No se encontraron horarios para este monitor');
+      throw new NotFoundException(
+        'No se encontraron horarios para este monitor',
+      );
     }
-  
-    return schedules.map(schedule => ({
+
+    return schedules.map((schedule) => ({
       weekday: schedule.weekday as Weekday,
       startTime: schedule.hourSession.startTime,
       endTime: schedule.hourSession.endTime,
