@@ -10,9 +10,14 @@ import {
   UnauthorizedException,
   HttpCode,
   HttpStatus,
+  Query,
 } from '@nestjs/common';
 import { MonitorService } from './monitor.service';
-import { CreateMonitorDto, UpdateMonitorDto, MonitorInformationDto, MonitorDto } from './dto';
+import {
+  CreateMonitorDto,
+  UpdateMonitorDto,
+  MonitorInformationDto,
+} from './dto';
 import { ScheduleDto } from './dto/schedule.dto';
 import {
   Authorization,
@@ -20,8 +25,8 @@ import {
 } from '@modules/auth/decorators/authorization.decorator';
 import { TeacherResponseDto } from './dto/teacher-response.dto';
 import { UpdateMonitorAsAdminDto } from './dto/updateMonitorAsAdmin.dto';
-import { MonitorBasicInfoDto } from './dto/monitor-basic-info.dto';
-
+import { MonitorGetSummaryDto } from './dto/monitor-get-summary.dto';
+import { ApiResponse } from '@nestjs/swagger';
 @Controller('monitors')
 export class MonitorController {
   constructor(private readonly monitorService: MonitorService) {}
@@ -51,12 +56,25 @@ export class MonitorController {
 
   @Get()
   @Authorization({
-    roles: [Role.SUPERVISOR],
-    permission: 'monitor.list',
-    description: 'Listar todos los monitores',
+    permission: 'monitor.getAll',
+    description: 'Obtener un monitor por ID',
   })
-  findAll(): Promise<MonitorBasicInfoDto[]> {
-    return this.monitorService.findAllBasicInfo();
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de monitores paginada',
+    type: MonitorGetSummaryDto,
+    isArray: true,
+  })
+  findAll(
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 20,
+  ): Promise<{
+    data: MonitorGetSummaryDto[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    return this.monitorService.findAllBasicInfo(Number(page), Number(limit));
   }
 
   @Get(':id/')
@@ -83,10 +101,15 @@ export class MonitorController {
     permission: 'monitor.updateAsAdmin',
     description: 'Actualizar datos de un monitor como administrador',
   })
+  @ApiResponse({
+    status: 200,
+    description: 'Monitor actualizado',
+    type: MonitorGetSummaryDto,
+  })
   async updateMonitorAsAdmin(
     @Param('monitorId') monitorId: string,
     @Body() updateMonitorDto: UpdateMonitorAsAdminDto,
-  ): Promise<MonitorDto> {
+  ): Promise<MonitorGetSummaryDto> {
     if (!monitorId) {
       throw new UnauthorizedException('No se pudo obtener el ID del monitor');
     }
@@ -113,7 +136,7 @@ export class MonitorController {
   })
   getSchedule(@Req() req): Promise<ScheduleDto[]> {
     console.log('Usuario autenticado:', req.user);
-    const userId = req.user?.userId; 
+    const userId = req.user?.userId;
     return this.monitorService.getSchedule(userId);
   }
 
@@ -129,7 +152,7 @@ export class MonitorController {
     }
     return this.monitorService.getSchedule(userId);
   }
-  
+
   @Get('/datos/teachers')
   @Authorization({
     roles: [Role.MONITOR, Role.ADMIN],
@@ -138,7 +161,7 @@ export class MonitorController {
   })
   async getTeachersByMonitor(@Req() req): Promise<TeacherResponseDto[]> {
     console.log('Usuario autenticado:', req.user);
-    const userId = req.user?.userId; 
+    const userId = req.user?.userId;
     return this.monitorService.getTeachersByMonitor(userId);
   }
 
