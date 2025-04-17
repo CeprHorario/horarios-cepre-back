@@ -13,11 +13,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { MonitorService } from './monitor.service';
-import {
-  CreateMonitorDto,
-  UpdateMonitorDto,
-  MonitorInformationDto,
-} from './dto';
+import { CreateMonitorDto, MonitorInformationDto } from './dto';
 import { ScheduleDto } from './dto/schedule.dto';
 import {
   Authorization,
@@ -86,37 +82,17 @@ export class MonitorController {
     return this.monitorService.findOne(id);
   }
 
-  @Put(':id')
-  @Authorization({
-    permission: 'monitor.update',
-    description: 'Actualizar un monitor',
-  })
-  update(@Param('id') id: string, @Body() updateMonitorDto: UpdateMonitorDto) {
-    return this.monitorService.update(id, updateMonitorDto);
-  }
-
-  @Put('/editAsAdmin/:monitorId')
+  @Put('/:id')
   @Authorization({
     roles: [Role.MONITOR, Role.SUPERVISOR, Role.ADMIN],
     permission: 'monitor.updateAsAdmin',
     description: 'Actualizar datos de un monitor como administrador',
   })
-  @ApiResponse({
-    status: 200,
-    description: 'Monitor actualizado',
-    type: MonitorGetSummaryDto,
-  })
   async updateMonitorAsAdmin(
-    @Param('monitorId') monitorId: string,
+    @Param('id') id: string,
     @Body() updateMonitorDto: UpdateMonitorAsAdminDto,
-  ): Promise<MonitorGetSummaryDto> {
-    if (!monitorId) {
-      throw new UnauthorizedException('No se pudo obtener el ID del monitor');
-    }
-    return this.monitorService.updateMonitorAsAdmin(
-      monitorId,
-      updateMonitorDto,
-    );
+  ) {
+    return this.monitorService.updateMonitorAsAdmin(id, updateMonitorDto);
   }
 
   @Delete(':id')

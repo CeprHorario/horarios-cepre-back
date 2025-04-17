@@ -5,12 +5,12 @@ export class UpdateSupervisorWithProfileDto {
   @IsString()
   @IsOptional()
   @ApiProperty({ example: 'John' })
-  first_name?: string;
+  firstName?: string;
 
   @IsString()
   @IsOptional()
   @ApiProperty({ example: 'Perez Perez' })
-  last_name?: string;
+  lastName?: string;
 
   @IsEmail()
   @IsOptional()

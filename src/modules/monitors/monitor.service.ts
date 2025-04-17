@@ -1,3 +1,4 @@
+/* eslint-disable prettier/prettier */
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@database/prisma/prisma.service';
 import {
@@ -70,7 +71,7 @@ export class MonitorService {
         lastName: monitor.user?.userProfile?.lastName || '',
         personalEmail: monitor.user?.userProfile?.personalEmail || '',
         phone: monitor.user?.userProfile?.phone || '',
-        className: monitor.classes?.name || 'Sin asignar',
+        className: monitor.classes?.name || '',
       }),
     );
 
@@ -101,11 +102,37 @@ export class MonitorService {
   }
 
   async updateMonitorAsAdmin(
-    monitorId: string,
+    id: string,
     updateMonitorDto: UpdateMonitorAsAdminDto,
-  ): Promise<MonitorGetSummaryDto> {
+  ): Promise<UpdateMonitorAsAdminDto> {
+    const existingMonitor = await this.prisma.getClient().monitor.findUnique({
+      where: { id },
+      include: { user: { include: { userProfile: true } } },
+    });
+
+    console.log('Monitor encontrado antes de la actualización:', existingMonitor);
+
+    if (!existingMonitor) {
+      throw new NotFoundException(`Monitor with ID ${id} not found`);
+    }
+
+    // Verificar si el usuario tiene un perfil, si no, crearlo
+    if (!existingMonitor.user.userProfile) {
+      console.log('El usuario no tiene un perfil, creando uno...');
+      await this.prisma.getClient().userProfile.create({
+        data: {
+          userId: existingMonitor.user.id,
+          firstName: updateMonitorDto.firstName || '',
+          lastName: updateMonitorDto.lastName || '',
+          personalEmail: updateMonitorDto.personalEmail || '',
+          phone: updateMonitorDto.phone || '',
+          dni: updateMonitorDto.dni || null,
+        },
+      });
+    }
+
     const monitor = await this.prisma.getClient().monitor.update({
-      where: { id: monitorId },
+      where: { id },
       data: {
         user: {
           update: {
@@ -121,7 +148,7 @@ export class MonitorService {
         },
         classes: updateMonitorDto.className
           ? {
-              connect: { id: updateMonitorDto.classId }, // Cambiado a `id`
+              connect: { id: updateMonitorDto.classId },
             }
           : undefined,
       },
@@ -139,7 +166,7 @@ export class MonitorService {
       },
     });
 
-    return plainToInstance(MonitorGetSummaryDto, {
+    return plainToInstance(UpdateMonitorAsAdminDto, {
       id: monitor.id,
       firstName: monitor.user.userProfile?.firstName || '',
       lastName: monitor.user.userProfile?.lastName || '',

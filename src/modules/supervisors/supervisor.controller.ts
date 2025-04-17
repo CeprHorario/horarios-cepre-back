@@ -14,7 +14,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { SupervisorService } from './supervisor.service';
-import { UpdateSupervisorDto, UpdateSupervisorWithProfileDto } from './dto';
+import { UpdateSupervisorWithProfileDto } from './dto';
 import { ApiOperation, ApiResponse } from '@nestjs/swagger';
 import {
   Authorization,
@@ -113,7 +113,7 @@ export class SupervisorController {
   })
   update(
     @Param('id') id: string,
-    @Body() updateSupervisorDto: UpdateSupervisorDto,
+    @Body() updateSupervisorDto: UpdateSupervisorWithProfileDto,
   ) {
     return this.supervisorService.update(id, updateSupervisorDto);
   }

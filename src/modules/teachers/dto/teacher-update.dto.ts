@@ -8,6 +8,7 @@ export class TeacherUpdateDto {
     example: 'Literatura',
   })
   @IsString()
+  @IsOptional()
   courseName: string;
 
   @ApiProperty({
@@ -48,6 +49,7 @@ export class TeacherUpdateDto {
     enum: JobStatus,
   })
   @IsEnum(JobStatus)
+  @IsOptional()
   jobStatus: JobStatus;
 
   @ApiProperty({
@@ -55,5 +57,6 @@ export class TeacherUpdateDto {
     example: true,
   })
   @IsBoolean()
+  @IsOptional()
   isCoordinator: boolean;
 }

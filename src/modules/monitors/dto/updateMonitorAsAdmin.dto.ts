@@ -61,4 +61,14 @@ export class UpdateMonitorAsAdminDto {
     example: 'Matemáticas 101',
   })
   className?: string;
+
+  @IsOptional() // Cambiar a opcional
+  @IsString()
+  @Expose()
+  @ApiProperty({
+    description: 'DNI del monitor',
+    nullable: true, // Indicar que es opcional
+    example: '12345678',
+  })
+  dni?: string; // Cambiar a opcional
 }

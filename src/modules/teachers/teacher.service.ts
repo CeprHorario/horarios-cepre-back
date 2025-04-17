@@ -159,9 +159,11 @@ export class TeacherService {
             },
           },
         },
-        courses: {
-          connect: { name: updateTeacherDto.courseName },
-        },
+        ...(updateTeacherDto.courseName && {
+          courses: {
+            connect: { name: updateTeacherDto.courseName },
+          },
+        }),
       },
       include: {
         user: {
