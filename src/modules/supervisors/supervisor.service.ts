@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@database/prisma/prisma.service';
-import { UpdateSupervisorDto, SupervisorBaseDto } from './dto';
+import { SupervisorBaseDto } from './dto';
 import { plainToInstance } from 'class-transformer';
 import { MonitorForSupervisorDto } from '@modules/monitors/dto/monitorForSupervisor.dto';
 import { ClassForSupervisorDto } from '@modules/classes/dto/classForSupervisor.dto';
@@ -107,17 +107,47 @@ export class SupervisorService {
 
   async update(
     id: string,
-    updateSupervisorDto: UpdateSupervisorDto,
-  ): Promise<SupervisorBaseDto> {
+    updateSupervisorDto: UpdateSupervisorWithProfileDto,
+  ): Promise<SupervisorGetSummaryDto> {
     const supervisor = await this.prisma.getClient().supervisor.update({
       where: { id },
       data: {
-        ...updateSupervisorDto,
-        updatedAt: new Date().toISOString(), // Actualizar fecha de modificación
+        users: {
+          update: {
+            userProfile: {
+              update: {
+                firstName: updateSupervisorDto.firstName,
+                lastName: updateSupervisorDto.lastName,
+                personalEmail: updateSupervisorDto.personalEmail,
+                phone: updateSupervisorDto.phone,
+              },
+            },
+          },
+        },
       },
-      include: { users: true },
+      include: {
+        users: {
+          select: {
+            userProfile: {
+              select: {
+                firstName: true,
+                lastName: true,
+                personalEmail: true,
+                phone: true,
+              },
+            },
+          },
+        },
+      },
     });
-    return this.mapToSupervisorDto(supervisor);
+
+    return plainToInstance(SupervisorGetSummaryDto, {
+      id: supervisor.id,
+      firstName: supervisor.users?.userProfile?.firstName || '',
+      lastName: supervisor.users?.userProfile?.lastName || '',
+      personalEmail: supervisor.users?.userProfile?.personalEmail || null,
+      phone: supervisor.users?.userProfile?.phone || null,
+    });
   }
 
   async delete(id: string): Promise<SupervisorBaseDto> {
