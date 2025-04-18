@@ -79,10 +79,6 @@ export class TeacherDto {
   @IsOptional() // Cambiado a Optional ya que será manejado por el servicio
   updatedAt?: string;
 
-  @IsNotEmpty()
-  @IsBoolean()
-  isActive: boolean;
-
   @IsOptional()
   @IsNotEmpty()
   @IsEnum(JobStatus)
