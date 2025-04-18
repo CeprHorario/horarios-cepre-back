@@ -17,4 +17,11 @@ export class ClassForSupervisorDto {
   @MaxLength(48)
   @ApiProperty({ example: 'https://meet.google.com/abc-123-def' })
   urlMeet?: string;
+
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  @ApiProperty({ example: 'https://meet.google.com/abc-123-def-zzz' })
+  urlClassroom?: string;
 }

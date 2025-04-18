@@ -54,7 +54,6 @@ model Teacher {
   createdAt      DateTime   @default(now()) @map("created_at")
   updatedAt      DateTime   @default(now()) @updatedAt @map("updated_at")
   isCoordinator  Boolean    @default(false) @map("is_coordinator")
-  isActive       Boolean    @default(true) @map("is_active")
   jobStatus      JobStatus  @map("job_status")
   schedules      Schedule[]
   courses        Course     @relation(fields: [courseId], references: [id])
@@ -67,10 +66,12 @@ model Teacher {
 model Supervisor {
   id        String    @id @default(uuid()) @db.Uuid
   userId    String    @unique @map("user_id") @db.Uuid
+  shiftId   Int?      @map("shift_id") @db.SmallInt
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
   monitors  Monitor[]
   users     User      @relation(fields: [userId], references: [id])
+  shift     Shift?    @relation(fields: [shiftId], references: [id])
 
   @@map("supervisors")
 }
@@ -142,25 +143,27 @@ model Shift {
   endTime      DateTime?     @map("end_time") @db.Time(6)
   classes      Class[]
   hourSessions HourSession[]
+  supervisors  Supervisor[]
 
   @@index([name])
   @@map("shifts")
 }
 
 model Class {
-  id        String     @id @default(uuid()) @db.Uuid
-  name      String     @db.VarChar(48)
-  idSede    Int        @map("id_sede") @db.SmallInt
-  areaId    Int        @map("area_id") @db.SmallInt
-  shiftId   Int        @map("shift_id") @db.SmallInt
-  monitorId String?    @unique @map("monitor_id") @db.Uuid
-  capacity  Int        @default(100) @db.SmallInt
-  urlMeet   String?    @map("url_meet") @db.VarChar(48)
-  area      Area       @relation(fields: [areaId], references: [id])
-  sede      Sede       @relation(fields: [idSede], references: [id])
-  monitor   Monitor?   @relation(fields: [monitorId], references: [id])
-  shift     Shift      @relation(fields: [shiftId], references: [id])
-  schedules Schedule[]
+  id           String     @id @default(uuid()) @db.Uuid
+  name         String     @db.VarChar(48)
+  idSede       Int        @map("id_sede") @db.SmallInt
+  areaId       Int        @map("area_id") @db.SmallInt
+  shiftId      Int        @map("shift_id") @db.SmallInt
+  monitorId    String?    @unique @map("monitor_id") @db.Uuid
+  capacity     Int        @default(100) @db.SmallInt
+  urlMeet      String?    @map("url_meet") @db.VarChar(48)
+  urlClassroom String?    @map("url_classroom") @db.VarChar(64)
+  area         Area       @relation(fields: [areaId], references: [id])
+  sede         Sede       @relation(fields: [idSede], references: [id])
+  monitor      Monitor?   @relation(fields: [monitorId], references: [id])
+  shift        Shift      @relation(fields: [shiftId], references: [id])
+  schedules    Schedule[]
 
   @@index([idSede])
   @@index([areaId])

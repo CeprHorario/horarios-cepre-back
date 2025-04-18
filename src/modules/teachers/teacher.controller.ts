@@ -165,7 +165,6 @@ export class TeacherController {
               ? row.phone_aditional.split(';')
               : [],
             personalEmail: row.personal_email || null,
-            isActive: true,
             jobStatus: row.job_status || null,
             courseName: row.course_name || null,
           });

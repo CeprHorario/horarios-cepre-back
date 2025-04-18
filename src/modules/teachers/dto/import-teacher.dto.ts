@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty, IsOptional, IsString, IsBoolean, IsArray, IsEnum } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsOptional, IsString, IsArray, IsEnum } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Expose } from 'class-transformer';
 import { JobStatus } from '@prisma/client';
@@ -61,18 +61,11 @@ export class ImportTeacherDto {
   personalEmail?: string;
 
   @ApiProperty({
-    description: 'Estado activo del profesor',
-    example: true
-  })
-  @IsBoolean()
-  isActive?: boolean = true;
-  
-  @ApiProperty({
     description: 'Tipo de turno del profesor',
     example: 'FULL_TIME'
   })
   @IsEnum(JobStatus, { message: 'El tipo de turno debe ser FULL_TIME o PART_TIME' })
-  jobStatus: JobStatus; 
+  jobStatus: JobStatus;
 
   @ApiProperty({
     description: 'Nombre del curso al que pertenece el profesor',
