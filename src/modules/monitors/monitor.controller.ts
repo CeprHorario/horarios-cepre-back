@@ -22,7 +22,7 @@ import {
 import { TeacherResponseDto } from './dto/teacher-response.dto';
 import { UpdateMonitorAsAdminDto } from './dto/updateMonitorAsAdmin.dto';
 import { MonitorGetSummaryDto } from './dto/monitor-get-summary.dto';
-import { ApiResponse } from '@nestjs/swagger';
+import { ApiResponse,ApiOperation } from '@nestjs/swagger';
 @Controller('monitors')
 export class MonitorController {
   constructor(private readonly monitorService: MonitorService) {}
@@ -55,6 +55,7 @@ export class MonitorController {
     permission: 'monitor.getAll',
     description: 'Obtener un monitor por ID',
   })
+  @ApiOperation({ summary: 'Obtener todos los monitores activos' })
   @ApiResponse({
     status: 200,
     description: 'Lista de monitores paginada',

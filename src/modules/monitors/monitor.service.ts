@@ -48,6 +48,11 @@ export class MonitorService {
       this.prisma.getClient().monitor.findMany({
         skip: offset,
         take: limit,
+        where: { 
+          user: {
+            isActive: true,
+         } 
+        },
         include: {
           user: {
             include: {

@@ -85,6 +85,11 @@ export class TeacherService {
         skip: offset,
         take: limit,
         relationLoadStrategy: 'join',
+        where: { 
+          user: {
+            isActive: true,
+         } 
+        },
         select: {
           id: true,
           jobStatus: true,

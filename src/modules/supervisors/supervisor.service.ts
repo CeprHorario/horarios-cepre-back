@@ -62,6 +62,11 @@ export class SupervisorService {
       this.prisma.getClient().supervisor.findMany({
         skip: offset,
         take: limit,
+        where: { 
+          users: {
+            isActive: true,
+         } 
+        },
         select: {
           id: true,
           users: {

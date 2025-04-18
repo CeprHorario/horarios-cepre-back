@@ -48,7 +48,7 @@ export class TeacherController {
 
   @Get()
   @Unauthenticated()
-  @ApiOperation({ summary: 'Obtener todos los profesores' })
+  @ApiOperation({ summary: 'Obtener todos los profesores activos' })
   @ApiQuery({
     name: 'page',
     type: Number,

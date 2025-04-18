@@ -45,6 +45,7 @@ export class SupervisorController {
     type: SupervisorGetSummaryDto,
     isArray: true,
   })
+  @ApiOperation({ summary: 'Obtener todos los supervisores activos' })
   @Authorization({
     permission: 'supervisor.getAll',
     description: 'Obtiene los monitores de este supervisor',
