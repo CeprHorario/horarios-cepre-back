@@ -41,20 +41,26 @@ export class MonitorService {
     total: number;
     page: number;
     limit: number;
+    activeCount: number; // Nuevo campo para el conteo de activos
   }> {
     const offset = (page - 1) * limit;
 
-    const [monitors, total] = await this.prisma.getClient().$transaction([
+    const activeFilter = {
+      user: {
+        isActive: true,
+      },
+    };
+
+    const [monitors, total, activeCount] = await this.prisma.getClient().$transaction([
       this.prisma.getClient().monitor.findMany({
         skip: offset,
         take: limit,
-        where: { 
-          user: {
-            isActive: true,
-         } 
-        },
+        where: activeFilter,
         include: {
           user: {
+            select: {
+              isActive: true, // Añadido para verificación
+            },
             include: {
               userProfile: true,
             },
@@ -67,6 +73,9 @@ export class MonitorService {
         },
       }),
       this.prisma.getClient().monitor.count(),
+      this.prisma.getClient().monitor.count({
+        where: activeFilter,
+      }),
     ]);
 
     const data = monitors.map((monitor) =>
@@ -80,7 +89,7 @@ export class MonitorService {
       }),
     );
 
-    return { data, total, page, limit };
+    return { data, total, page, limit, activeCount };
   }
 
   async findOne(id: string): Promise<MonitorBaseDto> {
@@ -311,6 +320,10 @@ export class MonitorService {
     await this.prisma.getClient().user.update({
       where: { id: monitor.user.id },
       data: { isActive: false }
+    });
+    return this.prisma.getClient().monitor.findUnique({
+      where: { id },
+      include: { user: true }
     });
   }
 

@@ -55,22 +55,27 @@ export class SupervisorService {
     total: number;
     page: number;
     limit: number;
+    activeCount: number; // Nuevo campo para el conteo de activos
   }> {
     const offset = (page - 1) * limit;
-
-    const [supervisors, total] = await this.prisma.getClient().$transaction([
+  
+    // Filtro para supervisores con usuarios activos
+    const activeFilter = {
+      users: {
+        isActive: true,
+      },
+    };
+  
+    const [supervisors, total, activeCount] = await this.prisma.getClient().$transaction([
       this.prisma.getClient().supervisor.findMany({
         skip: offset,
         take: limit,
-        where: { 
-          users: {
-            isActive: true,
-         } 
-        },
+        where: activeFilter,
         select: {
           id: true,
-          users: {
+          users: { 
             select: {
+              isActive: true, 
               userProfile: {
                 select: {
                   firstName: true,
@@ -83,9 +88,12 @@ export class SupervisorService {
           },
         },
       }),
-      this.prisma.getClient().supervisor.count(),
+      this.prisma.getClient().supervisor.count(), // Total general
+      this.prisma.getClient().supervisor.count({ // Conteo de activos
+        where: activeFilter
+      }),
     ]);
-
+  
     const data = supervisors.map((supervisor) =>
       plainToInstance(SupervisorGetSummaryDto, {
         id: supervisor.id,
@@ -95,8 +103,9 @@ export class SupervisorService {
         phone: supervisor.users?.userProfile?.phone || null,
       }),
     );
-
-    return { data, total, page, limit };
+  
+    return { data, total, page, limit, activeCount // Número de supervisores activos
+    };
   }
 
   async findOne(id: string): Promise<SupervisorBaseDto> {
@@ -254,6 +263,10 @@ export class SupervisorService {
     await this.prisma.getClient().user.update({
       where: { id: supervisor.users.id },
       data: { isActive: false }
+    });
+    return this.prisma.getClient().supervisor.findUnique({
+      where: { id },
+      include: { users: true }
     });
   }
 

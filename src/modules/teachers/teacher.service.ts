@@ -77,19 +77,22 @@ export class TeacherService {
     total: number;
     page: number;
     limit: number;
+    activeCount: number; // Nuevo campo para el conteo de activos
   }> {
     const offset = (page - 1) * limit;
 
-    const [teachers, total] = await this.prisma.getClient().$transaction([
+    const activeFilter = {
+      user: {
+        isActive: true,
+      },
+    };
+
+    const [teachers, total, activeCount] = await this.prisma.getClient().$transaction([
       this.prisma.getClient().teacher.findMany({
         skip: offset,
         take: limit,
         relationLoadStrategy: 'join',
-        where: { 
-          user: {
-            isActive: true,
-         } 
-        },
+        where: activeFilter,
         select: {
           id: true,
           jobStatus: true,
@@ -114,6 +117,9 @@ export class TeacherService {
         },
       }),
       this.prisma.getClient().teacher.count(),
+      this.prisma.getClient().teacher.count({
+        where: activeFilter,
+      }), 
     ]);
 
     const data = teachers.map((teacher) =>
@@ -129,7 +135,7 @@ export class TeacherService {
       }),
     );
 
-    return { data, total, page, limit };
+    return { data, total, page, limit, activeCount };
   }
 
   async findOne(id: string): Promise<TeacherBaseDto> {
@@ -300,6 +306,10 @@ export class TeacherService {
     await this.prisma.getClient().user.update({
       where: { id: teacher.user.id },
       data: { isActive: false }
+    });
+    return this.prisma.getClient().teacher.findUnique({
+      where: { id },
+      include: { user: true }
     });
   }
 
