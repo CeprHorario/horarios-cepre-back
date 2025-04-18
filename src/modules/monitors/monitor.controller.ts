@@ -11,6 +11,7 @@ import {
   HttpCode,
   HttpStatus,
   Query,
+  Patch,
 } from '@nestjs/common';
 import { MonitorService } from './monitor.service';
 import { CreateMonitorDto, MonitorInformationDto } from './dto';
@@ -22,7 +23,7 @@ import {
 import { TeacherResponseDto } from './dto/teacher-response.dto';
 import { UpdateMonitorAsAdminDto } from './dto/updateMonitorAsAdmin.dto';
 import { MonitorGetSummaryDto } from './dto/monitor-get-summary.dto';
-import { ApiResponse } from '@nestjs/swagger';
+import { ApiResponse,ApiOperation } from '@nestjs/swagger';
 @Controller('monitors')
 export class MonitorController {
   constructor(private readonly monitorService: MonitorService) {}
@@ -55,6 +56,7 @@ export class MonitorController {
     permission: 'monitor.getAll',
     description: 'Obtener un monitor por ID',
   })
+  @ApiOperation({ summary: 'Obtener todos los monitores activos' })
   @ApiResponse({
     status: 200,
     description: 'Lista de monitores paginada',
@@ -154,5 +156,14 @@ export class MonitorController {
       throw new UnauthorizedException('No se pudo obtener el ID del usuario');
     }
     return this.monitorService.getTeachersByMonitor(userId);
+  }
+
+  @Patch(':id/deactivate')
+  @Authorization({
+    permission: 'monitor.deactivate',
+    description: 'Desactivar un monitor por su id',
+  })
+  async deactivateMonitor(@Param('id') id: string) {
+    return this.monitorService.deactivate(id);
   }
 }

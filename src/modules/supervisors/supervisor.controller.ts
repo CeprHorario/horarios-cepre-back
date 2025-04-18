@@ -12,6 +12,7 @@ import {
   HttpCode,
   HttpStatus,
   Query,
+  Patch
 } from '@nestjs/common';
 import { SupervisorService } from './supervisor.service';
 import { UpdateSupervisorWithProfileDto } from './dto';
@@ -45,6 +46,7 @@ export class SupervisorController {
     type: SupervisorGetSummaryDto,
     isArray: true,
   })
+  @ApiOperation({ summary: 'Obtener todos los supervisores activos' })
   @Authorization({
     permission: 'supervisor.getAll',
     description: 'Obtiene los monitores de este supervisor',
@@ -125,5 +127,14 @@ export class SupervisorController {
   })
   delete(@Param('id') id: string) {
     return this.supervisorService.delete(id);
+  }
+
+  @Patch(':id/deactivate')
+  @Authorization({
+    permission: 'supervisor.deactivate',
+    description: 'Desactivar un supervisor por su id',
+  })
+  async deactivateSupervisor(@Param('id') id: string) {
+    return this.supervisorService.deactivate(id);
   }
 }

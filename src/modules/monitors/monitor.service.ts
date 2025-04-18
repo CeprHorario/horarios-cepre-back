@@ -48,6 +48,11 @@ export class MonitorService {
       this.prisma.getClient().monitor.findMany({
         skip: offset,
         take: limit,
+        where: { 
+          user: {
+            isActive: true,
+         } 
+        },
         include: {
           user: {
             include: {
@@ -289,6 +294,23 @@ export class MonitorService {
       salon: obj.monitor?.classes?.name,
       salon_id: obj.monitor?.classes?.id,
       urlMeet: obj.monitor?.classes?.urlMeet,
+    });
+  }
+
+  async deactivate(id: string) {
+    const monitor = await this.prisma.getClient().monitor.findUnique({ 
+      where: { id },
+      include: { user: true } // Incluir la relación con usuario
+    });
+    if (!monitor) {
+      throw new NotFoundException('Monitor not found');
+    }
+    if (!monitor.user) {
+      throw new NotFoundException('Associated user not found');
+    }
+    await this.prisma.getClient().user.update({
+      where: { id: monitor.user.id },
+      data: { isActive: false }
     });
   }
 

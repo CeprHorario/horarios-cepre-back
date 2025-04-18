@@ -62,6 +62,11 @@ export class SupervisorService {
       this.prisma.getClient().supervisor.findMany({
         skip: offset,
         take: limit,
+        where: { 
+          users: {
+            isActive: true,
+         } 
+        },
         select: {
           id: true,
           users: {
@@ -233,6 +238,23 @@ export class SupervisorService {
       throw new NotFoundException(`Supervisor with ID ${id} not found`);
     }
     return supervisor;
+  }
+
+  async deactivate(id: string) {
+    const supervisor = await this.prisma.getClient().supervisor.findUnique({ 
+      where: { id },
+      include: { users: true } // Incluir la relación con usuario
+    });
+    if (!supervisor) {
+      throw new NotFoundException('Teacher not found');
+    }
+    if (!supervisor.users) {
+      throw new NotFoundException('Associated user not found');
+    }
+    await this.prisma.getClient().user.update({
+      where: { id: supervisor.users.id },
+      data: { isActive: false }
+    });
   }
 
   // ─────── Métodos auxiliares ───────

@@ -10,6 +10,7 @@ import {
   UploadedFile,
   BadRequestException,
   Query,
+  Patch,
 } from '@nestjs/common';
 import { TeacherService } from './teacher.service';
 import { CreateTeacherWithUserDto } from './dto/create-teacher.dto';
@@ -48,7 +49,7 @@ export class TeacherController {
 
   @Get()
   @Unauthenticated()
-  @ApiOperation({ summary: 'Obtener todos los profesores' })
+  @ApiOperation({ summary: 'Obtener todos los profesores activos' })
   @ApiQuery({
     name: 'page',
     type: Number,
@@ -181,6 +182,17 @@ export class TeacherController {
         .on('error', reject);
     });
   }
+
+  @Patch(':id/deactivate')
+  @Unauthenticated()
+  @Authorization({
+    permission: 'teacher.deactivate',
+    description: 'Desactivar un teacher por su id',
+  })
+  async deactivateTeacher(@Param('id') id: string) {
+    return this.teacherService.deactivate(id);
+  }
+
   /*
   @Get(':teacherId/schedules')
   @ApiOperation({

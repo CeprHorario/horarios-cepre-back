@@ -85,6 +85,11 @@ export class TeacherService {
         skip: offset,
         take: limit,
         relationLoadStrategy: 'join',
+        where: { 
+          user: {
+            isActive: true,
+         } 
+        },
         select: {
           id: true,
           jobStatus: true,
@@ -277,6 +282,24 @@ export class TeacherService {
         message: 'Profesores creados correctamente',
         inserted: data.length,
       };
+    });
+  }
+
+  async deactivate(id: string) {
+    const teacher = await this.prisma.getClient().teacher.findUnique({ 
+      where: { id },
+      include: { user: true } // Incluir la relación con usuario
+    });
+    if (!teacher) {
+      throw new NotFoundException('Teacher not found');
+    }
+    if (!teacher.user) {
+      throw new NotFoundException('Associated user not found');
+    }
+    // Actualizar el estado isActive del usuario relacionado
+    await this.prisma.getClient().user.update({
+      where: { id: teacher.user.id },
+      data: { isActive: false }
     });
   }
 
