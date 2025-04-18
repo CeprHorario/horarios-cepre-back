@@ -297,6 +297,23 @@ export class MonitorService {
     });
   }
 
+  async deactivate(id: string) {
+    const monitor = await this.prisma.getClient().monitor.findUnique({ 
+      where: { id },
+      include: { user: true } // Incluir la relación con usuario
+    });
+    if (!monitor) {
+      throw new NotFoundException('Monitor not found');
+    }
+    if (!monitor.user) {
+      throw new NotFoundException('Associated user not found');
+    }
+    await this.prisma.getClient().user.update({
+      where: { id: monitor.user.id },
+      data: { isActive: false }
+    });
+  }
+
   // ─────── Métodos auxiliares ───────
 
   private mapToMonitorDto(obj: any): MonitorBaseDto {

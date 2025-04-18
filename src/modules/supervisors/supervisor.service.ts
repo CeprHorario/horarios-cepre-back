@@ -240,6 +240,23 @@ export class SupervisorService {
     return supervisor;
   }
 
+  async deactivate(id: string) {
+    const supervisor = await this.prisma.getClient().supervisor.findUnique({ 
+      where: { id },
+      include: { users: true } // Incluir la relación con usuario
+    });
+    if (!supervisor) {
+      throw new NotFoundException('Teacher not found');
+    }
+    if (!supervisor.users) {
+      throw new NotFoundException('Associated user not found');
+    }
+    await this.prisma.getClient().user.update({
+      where: { id: supervisor.users.id },
+      data: { isActive: false }
+    });
+  }
+
   // ─────── Métodos auxiliares ───────
 
   private mapToSupervisorDto(obj: any): SupervisorBaseDto {

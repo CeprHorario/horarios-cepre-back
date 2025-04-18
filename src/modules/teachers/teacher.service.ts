@@ -285,6 +285,24 @@ export class TeacherService {
     });
   }
 
+  async deactivate(id: string) {
+    const teacher = await this.prisma.getClient().teacher.findUnique({ 
+      where: { id },
+      include: { user: true } // Incluir la relación con usuario
+    });
+    if (!teacher) {
+      throw new NotFoundException('Teacher not found');
+    }
+    if (!teacher.user) {
+      throw new NotFoundException('Associated user not found');
+    }
+    // Actualizar el estado isActive del usuario relacionado
+    await this.prisma.getClient().user.update({
+      where: { id: teacher.user.id },
+      data: { isActive: false }
+    });
+  }
+
   //async getTeacherSchedules(teacherId: string) {
   //  return Promise.resolve(undefined);
   //}

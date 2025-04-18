@@ -11,6 +11,7 @@ import {
   HttpCode,
   HttpStatus,
   Query,
+  Patch,
 } from '@nestjs/common';
 import { MonitorService } from './monitor.service';
 import { CreateMonitorDto, MonitorInformationDto } from './dto';
@@ -155,5 +156,14 @@ export class MonitorController {
       throw new UnauthorizedException('No se pudo obtener el ID del usuario');
     }
     return this.monitorService.getTeachersByMonitor(userId);
+  }
+
+  @Patch(':id/deactivate')
+  @Authorization({
+    permission: 'monitor.deactivate',
+    description: 'Desactivar un monitor por su id',
+  })
+  async deactivateMonitor(@Param('id') id: string) {
+    return this.monitorService.deactivate(id);
   }
 }
