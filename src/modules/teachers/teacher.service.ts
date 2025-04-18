@@ -49,7 +49,6 @@ export class TeacherService {
               maxHours: createDto.maxHours,
               scheduledHours: createDto.scheduledHours,
               jobStatus: createDto.jobStatus,
-              isActive: true,
               courseId: createDto.courseId,
               isCoordinator: createDto.isCoordinator || false,
             },
