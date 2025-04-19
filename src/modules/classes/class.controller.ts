@@ -31,6 +31,22 @@ import { JwtAuthGuard } from '@modules/auth/guards/jwt-auth.guard';
 export class ClassController {
   constructor(private readonly classService: ClassService) {}
 
+  @Get(':classId/schedules')
+  @HttpCode(HttpStatus.OK)
+  @Authorization({
+    permission: 'class.getSchedulesByClassId',
+    description: 'Obtener horarios de una clase por su ID',
+  })
+  @ApiOperation({
+    summary: 'Obtener horarios de una clase por su ID',
+    description: 'Get schedules of a class by its ID',
+  })
+  async getSchedulesByClassId(
+    @Param('classId', ParseUUIDPipe) classId: string,
+  ) {
+    return await this.classService.getSchedulesByClassId(classId);
+  }
+
   // ─────── CRUD ───────
   @Post()
   @HttpCode(HttpStatus.CREATED)

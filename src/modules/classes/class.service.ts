@@ -148,4 +148,41 @@ export class ClassService {
       ),
     );
   }
+
+  /**
+   * Obtiene los horarios de una clase por su ID.
+   * @param classId - ID de la clase
+   * @returns - Lista de horarios de la clase
+   * @throws NotFoundException - Si no se encuentran horarios para la clase
+   */
+  async getSchedulesByClassId(classId: string) {
+    const schedules = await this.prisma.getClient().schedule.findMany({
+      where: { classId },
+      select: {
+        id: true,
+        weekday: true,
+        course: {
+          select: { name: true },
+        },
+        hourSession: {
+          select: {
+            startTime: true,
+            endTime: true,
+          },
+        },
+      },
+    });
+
+    if (!schedules) {
+      throw new NotFoundException('No se encontraron horarios para esta clase');
+    }
+
+    return schedules.map((schedule) => ({
+      id: schedule.id,
+      weekday: schedule.weekday,
+      startTime: schedule.hourSession.startTime,
+      endTime: schedule.hourSession.endTime,
+      courseName: schedule.course.name,
+    }));
+  }
 }
