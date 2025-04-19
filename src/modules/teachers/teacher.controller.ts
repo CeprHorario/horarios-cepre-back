@@ -48,7 +48,6 @@ export class TeacherController {
   }
 
   @Get()
-  @Unauthenticated()
   @ApiOperation({ summary: 'Obtener todos los profesores activos' })
   @ApiQuery({
     name: 'page',
@@ -67,6 +66,10 @@ export class TeacherController {
     description: 'Lista de profesores paginada',
     type: TeacherGetSummaryDto,
     isArray: true,
+  })
+  @Authorization({
+    permission: 'teacher.list',
+    description: 'Obtiene todos los profesores',
   })
   findAll(
     @Query('page') page: number = 1,
@@ -183,7 +186,6 @@ export class TeacherController {
   }
 
   @Patch(':id/deactivate')
-  @Unauthenticated()
   @Authorization({
     permission: 'teacher.deactivate',
     description: 'Desactivar un teacher por su id',

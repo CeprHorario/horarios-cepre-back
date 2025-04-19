@@ -76,7 +76,6 @@ export class TeacherService {
     total: number;
     page: number;
     limit: number;
-    activeCount: number; // Nuevo campo para el conteo de activos
   }> {
     const offset = (page - 1) * limit;
 
@@ -86,7 +85,7 @@ export class TeacherService {
       },
     };
 
-    const [teachers, total, activeCount] = await this.prisma.getClient().$transaction([
+    const [teachers, total] = await this.prisma.getClient().$transaction([
       this.prisma.getClient().teacher.findMany({
         skip: offset,
         take: limit,
@@ -115,7 +114,6 @@ export class TeacherService {
           },
         },
       }),
-      this.prisma.getClient().teacher.count(),
       this.prisma.getClient().teacher.count({
         where: activeFilter,
       }), 
@@ -134,7 +132,7 @@ export class TeacherService {
       }),
     );
 
-    return { data, total, page, limit, activeCount };
+    return { data, total, page, limit };
   }
 
   async findOne(id: string): Promise<TeacherBaseDto> {

@@ -41,7 +41,6 @@ export class MonitorService {
     total: number;
     page: number;
     limit: number;
-    activeCount: number; // Nuevo campo para el conteo de activos
   }> {
     const offset = (page - 1) * limit;
 
@@ -51,16 +50,13 @@ export class MonitorService {
       },
     };
 
-    const [monitors, total, activeCount] = await this.prisma.getClient().$transaction([
+    const [monitors, total] = await this.prisma.getClient().$transaction([
       this.prisma.getClient().monitor.findMany({
         skip: offset,
         take: limit,
         where: activeFilter,
         include: {
           user: {
-            select: {
-              isActive: true, // Añadido para verificación
-            },
             include: {
               userProfile: true,
             },
@@ -72,7 +68,6 @@ export class MonitorService {
           },
         },
       }),
-      this.prisma.getClient().monitor.count(),
       this.prisma.getClient().monitor.count({
         where: activeFilter,
       }),
@@ -89,7 +84,7 @@ export class MonitorService {
       }),
     );
 
-    return { data, total, page, limit, activeCount };
+    return { data, total, page, limit };
   }
 
   async findOne(id: string): Promise<MonitorBaseDto> {

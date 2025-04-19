@@ -55,7 +55,6 @@ export class SupervisorService {
     total: number;
     page: number;
     limit: number;
-    activeCount: number; // Nuevo campo para el conteo de activos
   }> {
     const offset = (page - 1) * limit;
   
@@ -66,7 +65,7 @@ export class SupervisorService {
       },
     };
   
-    const [supervisors, total, activeCount] = await this.prisma.getClient().$transaction([
+    const [supervisors, total] = await this.prisma.getClient().$transaction([
       this.prisma.getClient().supervisor.findMany({
         skip: offset,
         take: limit,
@@ -88,7 +87,6 @@ export class SupervisorService {
           },
         },
       }),
-      this.prisma.getClient().supervisor.count(), // Total general
       this.prisma.getClient().supervisor.count({ // Conteo de activos
         where: activeFilter
       }),
@@ -104,8 +102,7 @@ export class SupervisorService {
       }),
     );
   
-    return { data, total, page, limit, activeCount // Número de supervisores activos
-    };
+    return { data, total, page, limit };
   }
 
   async findOne(id: string): Promise<SupervisorBaseDto> {
