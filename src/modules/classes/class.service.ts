@@ -13,6 +13,8 @@ import { HourSessionForTeacherDto } from '@modules/hour-session/dto';
 import { AreaDto } from '@modules/areas/dto';
 import { MonitorForTeacherDto } from '@modules/monitors/dto/monitorForTeacher.dto';
 import { UserProfileForTeacherDto } from '@modules/user-profile/dto/user-profile-for-teacher.dto';
+import { ScheduleForClass } from './dto/scheduleForClass.dto';
+import { TeacherResponseDto } from '@modules/monitors/dto/teacher-response.dto';
 
 @Injectable()
 export class ClassService {
@@ -147,5 +149,83 @@ export class ClassService {
         { excludeExtraneousValues: true },
       ),
     );
+  }
+
+  /**
+   * Obtiene los horarios de una clase por su ID.
+   * @param classId - ID de la clase
+   * @returns - Lista de horarios de la clase
+   * @throws NotFoundException - Si no se encuentran horarios para la clase
+   */
+  async getSchedulesByClassId(classId: string): Promise<ScheduleForClass[]> {
+    const schedules = await this.prisma.getClient().schedule.findMany({
+      where: { classId },
+      select: {
+        id: true,
+        weekday: true,
+        course: {
+          select: { name: true },
+        },
+        hourSession: {
+          select: {
+            startTime: true,
+            endTime: true,
+          },
+        },
+      },
+    });
+
+    if (!schedules) {
+      throw new NotFoundException('No se encontraron horarios para esta clase');
+    }
+
+    return schedules.map((schedule) => ({
+      id: schedule.id,
+      weekDay: schedule.weekday,
+      startTime: schedule.hourSession.startTime,
+      endTime: schedule.hourSession.endTime,
+      courseName: schedule.course.name,
+    }));
+  }
+
+  async getTeachersByClassId(classId: string): Promise<TeacherResponseDto[]> {
+    const teachers = await this.prisma.getClient().schedule.findMany({
+      distinct: ['teacherId'],
+      where: { classId },
+      select: {
+        teacher: {
+          select: {
+            id: true,
+            user: {
+              select: {
+                userProfile: {
+                  select: {
+                    firstName: true,
+                    lastName: true,
+                  },
+                },
+                email: true,
+              },
+            },
+          },
+        },
+        course: {
+          select: {
+            name: true,
+          },
+        },
+      },
+    });
+
+    if (!teachers) {
+      throw new NotFoundException('No se encontraron docentes para esta clase');
+    }
+    return teachers.map((teacher) => ({
+      teacherId: teacher.teacher?.id || 'no asignado',
+      firstName: teacher.teacher?.user?.userProfile?.firstName || 'no asignado',
+      lastName: teacher.teacher?.user?.userProfile?.lastName || 'no asignado',
+      email: teacher.teacher?.user.email || 'no asignado',
+      courseName: teacher.course.name || 'no asignado',
+    }));
   }
 }
