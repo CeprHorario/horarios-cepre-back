@@ -25,6 +25,7 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Authorization, Role } from '@modules/auth/decorators/authorization.decorator';
 import { JwtAuthGuard } from '@modules/auth/guards/jwt-auth.guard';
 import { ScheduleForClass } from './dto/scheduleForClass.dto';
+import { TeacherResponseDto } from '@modules/monitors/dto/teacher-response.dto';
 
 @Controller('classes')
 @ApiTags('Classes')
@@ -46,6 +47,22 @@ export class ClassController {
     @Param('classId', ParseUUIDPipe) classId: string,
   ): Promise<ScheduleForClass[]> {
     return await this.classService.getSchedulesByClassId(classId);
+  }
+
+  @Get(':classId/teachers')
+  @HttpCode(HttpStatus.OK)
+  @Authorization({
+    permission: 'class.getTeachersByClassId',
+    description: 'Obtener docentes de una clase por su ID',
+  })
+  @ApiOperation({
+    summary: 'Obtener docentes de una clase por su ID',
+    description: 'Get teachers of a class by its ID',
+  })
+  async getTeachersByClassId(
+    @Param('classId', ParseUUIDPipe) classId: string,
+  ): Promise<TeacherResponseDto[]> {
+    return await this.classService.getTeachersByClassId(classId);
   }
 
   // ─────── CRUD ───────
