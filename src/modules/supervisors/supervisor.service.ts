@@ -249,7 +249,14 @@ export class SupervisorService {
   async deactivate(id: string) {
     const supervisor = await this.prisma.getClient().supervisor.findUnique({ 
       where: { id },
-      include: { users: true } // Incluir la relación con usuario
+      include: { 
+        users: {
+          include: { 
+            userProfile: 
+              { select: { firstName: true, lastName: true } } 
+            } 
+      }
+      }  // Incluir la relación con usuario
     });
     if (!supervisor) {
       throw new NotFoundException('Teacher not found');
@@ -261,9 +268,9 @@ export class SupervisorService {
       where: { id: supervisor.users.id },
       data: { isActive: false }
     });
-    return this.prisma.getClient().supervisor.findUnique({
-      where: { id },
-      include: { users: true }
+    return plainToInstance(SupervisorBaseDto, {
+          firstName: supervisor.users?.userProfile?.firstName || '',
+          lastName: supervisor.users?.userProfile?.lastName || ''
     });
   }
 

@@ -291,7 +291,14 @@ export class TeacherService {
   async deactivate(id: string) {
     const teacher = await this.prisma.getClient().teacher.findUnique({ 
       where: { id },
-      include: { user: true } // Incluir la relación con usuario
+      include: { 
+        user: {
+          include: { 
+            userProfile: 
+              { select: { firstName: true, lastName: true } } 
+            } 
+      }
+      }  // Incluir la relación con usuario
     });
     if (!teacher) {
       throw new NotFoundException('Teacher not found');
@@ -304,10 +311,11 @@ export class TeacherService {
       where: { id: teacher.user.id },
       data: { isActive: false }
     });
-    return this.prisma.getClient().teacher.findUnique({
-      where: { id },
-      include: { user: true }
+    return plainToInstance(TeacherBaseDto, {
+          firstName: teacher.user?.userProfile?.firstName || '',
+          lastName: teacher.user?.userProfile?.lastName || ''
     });
+    
   }
 
   //async getTeacherSchedules(teacherId: string) {

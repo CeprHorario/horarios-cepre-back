@@ -304,7 +304,14 @@ export class MonitorService {
   async deactivate(id: string) {
     const monitor = await this.prisma.getClient().monitor.findUnique({ 
       where: { id },
-      include: { user: true } // Incluir la relación con usuario
+      include: { 
+        user: {
+          include: { 
+            userProfile: 
+              { select: { firstName: true, lastName: true } } 
+            } 
+      }
+      } 
     });
     if (!monitor) {
       throw new NotFoundException('Monitor not found');
@@ -316,9 +323,9 @@ export class MonitorService {
       where: { id: monitor.user.id },
       data: { isActive: false }
     });
-    return this.prisma.getClient().monitor.findUnique({
-      where: { id },
-      include: { user: true }
+    return plainToInstance(MonitorBaseDto, {
+      firstName: monitor.user?.userProfile?.firstName || '',
+      lastName: monitor.user?.userProfile?.lastName || ''
     });
   }
 
