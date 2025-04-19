@@ -79,16 +79,18 @@ export class TeacherService {
   }> {
     const offset = (page - 1) * limit;
 
+    const activeFilter = {
+      user: {
+        isActive: true,
+      },
+    };
+
     const [teachers, total] = await this.prisma.getClient().$transaction([
       this.prisma.getClient().teacher.findMany({
         skip: offset,
         take: limit,
         relationLoadStrategy: 'join',
-        where: { 
-          user: {
-            isActive: true,
-         } 
-        },
+        where: activeFilter,
         select: {
           id: true,
           jobStatus: true,
@@ -112,7 +114,9 @@ export class TeacherService {
           },
         },
       }),
-      this.prisma.getClient().teacher.count(),
+      this.prisma.getClient().teacher.count({
+        where: activeFilter,
+      }), 
     ]);
 
     const data = teachers.map((teacher) =>
@@ -287,7 +291,14 @@ export class TeacherService {
   async deactivate(id: string) {
     const teacher = await this.prisma.getClient().teacher.findUnique({ 
       where: { id },
-      include: { user: true } // Incluir la relación con usuario
+      include: { 
+        user: {
+          include: { 
+            userProfile: 
+              { select: { firstName: true, lastName: true } } 
+            } 
+      }
+      }  // Incluir la relación con usuario
     });
     if (!teacher) {
       throw new NotFoundException('Teacher not found');
@@ -300,6 +311,11 @@ export class TeacherService {
       where: { id: teacher.user.id },
       data: { isActive: false }
     });
+    return plainToInstance(TeacherBaseDto, {
+          firstName: teacher.user?.userProfile?.firstName || '',
+          lastName: teacher.user?.userProfile?.lastName || ''
+    });
+    
   }
 
   //async getTeacherSchedules(teacherId: string) {

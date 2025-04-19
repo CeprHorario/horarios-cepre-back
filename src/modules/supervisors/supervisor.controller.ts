@@ -48,8 +48,8 @@ export class SupervisorController {
   })
   @ApiOperation({ summary: 'Obtener todos los supervisores activos' })
   @Authorization({
-    permission: 'supervisor.getAll',
-    description: 'Obtiene los monitores de este supervisor',
+    permission: 'supervisor.list',
+    description: 'Obtiene los supervisores',
   })
   findAll(
     @Query('page') page: number = 1,

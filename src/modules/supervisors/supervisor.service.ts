@@ -57,20 +57,24 @@ export class SupervisorService {
     limit: number;
   }> {
     const offset = (page - 1) * limit;
-
+  
+    // Filtro para supervisores con usuarios activos
+    const activeFilter = {
+      users: {
+        isActive: true,
+      },
+    };
+  
     const [supervisors, total] = await this.prisma.getClient().$transaction([
       this.prisma.getClient().supervisor.findMany({
         skip: offset,
         take: limit,
-        where: { 
-          users: {
-            isActive: true,
-         } 
-        },
+        where: activeFilter,
         select: {
           id: true,
-          users: {
+          users: { 
             select: {
+              isActive: true, 
               userProfile: {
                 select: {
                   firstName: true,
@@ -83,9 +87,11 @@ export class SupervisorService {
           },
         },
       }),
-      this.prisma.getClient().supervisor.count(),
+      this.prisma.getClient().supervisor.count({ // Conteo de activos
+        where: activeFilter
+      }),
     ]);
-
+  
     const data = supervisors.map((supervisor) =>
       plainToInstance(SupervisorGetSummaryDto, {
         id: supervisor.id,
@@ -95,7 +101,7 @@ export class SupervisorService {
         phone: supervisor.users?.userProfile?.phone || null,
       }),
     );
-
+  
     return { data, total, page, limit };
   }
 
@@ -243,7 +249,14 @@ export class SupervisorService {
   async deactivate(id: string) {
     const supervisor = await this.prisma.getClient().supervisor.findUnique({ 
       where: { id },
-      include: { users: true } // Incluir la relación con usuario
+      include: { 
+        users: {
+          include: { 
+            userProfile: 
+              { select: { firstName: true, lastName: true } } 
+            } 
+      }
+      }  // Incluir la relación con usuario
     });
     if (!supervisor) {
       throw new NotFoundException('Teacher not found');
@@ -254,6 +267,10 @@ export class SupervisorService {
     await this.prisma.getClient().user.update({
       where: { id: supervisor.users.id },
       data: { isActive: false }
+    });
+    return plainToInstance(SupervisorBaseDto, {
+          firstName: supervisor.users?.userProfile?.firstName || '',
+          lastName: supervisor.users?.userProfile?.lastName || ''
     });
   }
 

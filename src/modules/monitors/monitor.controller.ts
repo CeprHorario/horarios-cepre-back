@@ -53,7 +53,7 @@ export class MonitorController {
 
   @Get()
   @Authorization({
-    permission: 'monitor.getAll',
+    permission: 'monitor.list',
     description: 'Obtener un monitor por ID',
   })
   @ApiOperation({ summary: 'Obtener todos los monitores activos' })

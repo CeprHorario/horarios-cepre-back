@@ -44,15 +44,17 @@ export class MonitorService {
   }> {
     const offset = (page - 1) * limit;
 
+    const activeFilter = {
+      user: {
+        isActive: true,
+      },
+    };
+
     const [monitors, total] = await this.prisma.getClient().$transaction([
       this.prisma.getClient().monitor.findMany({
         skip: offset,
         take: limit,
-        where: { 
-          user: {
-            isActive: true,
-         } 
-        },
+        where: activeFilter,
         include: {
           user: {
             include: {
@@ -66,7 +68,9 @@ export class MonitorService {
           },
         },
       }),
-      this.prisma.getClient().monitor.count(),
+      this.prisma.getClient().monitor.count({
+        where: activeFilter,
+      }),
     ]);
 
     const data = monitors.map((monitor) =>
@@ -300,7 +304,14 @@ export class MonitorService {
   async deactivate(id: string) {
     const monitor = await this.prisma.getClient().monitor.findUnique({ 
       where: { id },
-      include: { user: true } // Incluir la relación con usuario
+      include: { 
+        user: {
+          include: { 
+            userProfile: 
+              { select: { firstName: true, lastName: true } } 
+            } 
+      }
+      } 
     });
     if (!monitor) {
       throw new NotFoundException('Monitor not found');
@@ -311,6 +322,10 @@ export class MonitorService {
     await this.prisma.getClient().user.update({
       where: { id: monitor.user.id },
       data: { isActive: false }
+    });
+    return plainToInstance(MonitorBaseDto, {
+      firstName: monitor.user?.userProfile?.firstName || '',
+      lastName: monitor.user?.userProfile?.lastName || ''
     });
   }
 
