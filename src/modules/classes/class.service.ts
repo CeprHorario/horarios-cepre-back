@@ -13,6 +13,7 @@ import { HourSessionForTeacherDto } from '@modules/hour-session/dto';
 import { AreaDto } from '@modules/areas/dto';
 import { MonitorForTeacherDto } from '@modules/monitors/dto/monitorForTeacher.dto';
 import { UserProfileForTeacherDto } from '@modules/user-profile/dto/user-profile-for-teacher.dto';
+import { ScheduleForClass } from './dto/scheduleForClass.dto';
 
 @Injectable()
 export class ClassService {
@@ -155,7 +156,7 @@ export class ClassService {
    * @returns - Lista de horarios de la clase
    * @throws NotFoundException - Si no se encuentran horarios para la clase
    */
-  async getSchedulesByClassId(classId: string) {
+  async getSchedulesByClassId(classId: string): Promise<ScheduleForClass[]> {
     const schedules = await this.prisma.getClient().schedule.findMany({
       where: { classId },
       select: {
@@ -179,7 +180,7 @@ export class ClassService {
 
     return schedules.map((schedule) => ({
       id: schedule.id,
-      weekday: schedule.weekday,
+      weekDay: schedule.weekday,
       startTime: schedule.hourSession.startTime,
       endTime: schedule.hourSession.endTime,
       courseName: schedule.course.name,

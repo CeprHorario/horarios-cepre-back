@@ -24,6 +24,7 @@ import {
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Authorization, Role } from '@modules/auth/decorators/authorization.decorator';
 import { JwtAuthGuard } from '@modules/auth/guards/jwt-auth.guard';
+import { ScheduleForClass } from './dto/scheduleForClass.dto';
 
 @Controller('classes')
 @ApiTags('Classes')
@@ -43,7 +44,7 @@ export class ClassController {
   })
   async getSchedulesByClassId(
     @Param('classId', ParseUUIDPipe) classId: string,
-  ) {
+  ): Promise<ScheduleForClass[]> {
     return await this.classService.getSchedulesByClassId(classId);
   }
 
