@@ -7,6 +7,7 @@ import { CreateTeacherWithUserDto } from './dto/create-teacher.dto';
 import { Role } from '@modules/auth/decorators/authorization.decorator';
 import { TeacherGetSummaryDto } from './dto/teacher-get-summary.dto';
 import { TeacherUpdateDto } from './dto/teacher-update.dto';
+import { TeacherGetByIdDto } from './dto/teacher-get-by-id.dto';
 
 @Injectable()
 export class TeacherService {
@@ -116,7 +117,7 @@ export class TeacherService {
       }),
       this.prisma.getClient().teacher.count({
         where: activeFilter,
-      }), 
+      }),
     ]);
 
     const data = teachers.map((teacher) =>
@@ -135,15 +136,54 @@ export class TeacherService {
     return { data, total, page, limit };
   }
 
-  async findOne(id: string): Promise<TeacherBaseDto> {
-    const teacher = await this.prisma.getClient().teacher.findUnique({
-      where: { id },
-      include: { user: true }, // Incluye la relación con el usuario
-    });
-    if (!teacher) {
-      throw new NotFoundException(`Teacher with ID ${id} not found`);
+  async findOne(id: string): Promise<TeacherGetByIdDto> {
+    try {
+      const teacher = await this.prisma.getClient().teacher.findUnique({
+        where: { id },
+        include: {
+          user: {
+            select: {
+              email: true,
+              userProfile: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                  personalEmail: true,
+                  phone: true,
+                },
+              },
+            },
+          },
+          courses: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      });
+
+      if (!teacher) {
+        throw new NotFoundException(`Teacher with ID ${id} not found`);
+      }
+
+      return plainToInstance(TeacherGetByIdDto, {
+        teacherId: teacher.id,
+        firstName: teacher.user?.userProfile?.firstName || '',
+        lastName: teacher.user?.userProfile?.lastName || '',
+        email: teacher.user?.email || '',
+        personalEmail: teacher.user?.userProfile?.personalEmail || null,
+        phone: teacher.user?.userProfile?.phone || null,
+        courseId: teacher.courses?.id || '',
+        courseName: teacher.courses?.name || '',
+      });
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      console.error('Error en findOne:', error); // Agregar un log para depuración
+      throw new Error('Ocurrió un error inesperado al buscar el profesor');
     }
-    return this.mapToTeacherDto(teacher);
   }
 
   async update(
