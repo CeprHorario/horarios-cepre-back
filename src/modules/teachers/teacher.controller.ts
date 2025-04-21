@@ -11,6 +11,7 @@ import {
   BadRequestException,
   Query,
   Patch,
+  NotFoundException,
 } from '@nestjs/common';
 import { TeacherService } from './teacher.service';
 import { CreateTeacherWithUserDto } from './dto/create-teacher.dto';
@@ -30,7 +31,7 @@ import {
   ApiParam,
   ApiResponse,
 } from '@nestjs/swagger';
-import { TeacherDto } from './dto/teacher.dto';
+import { TeacherGetByIdDto } from './dto/teacher-get-by-id.dto';
 
 @ApiTags('Teachers')
 @Controller('teachers')
@@ -93,10 +94,18 @@ export class TeacherController {
   @ApiResponse({
     status: 200,
     description: 'Detalles de un profesor',
-    type: TeacherDto,
+    type: TeacherGetByIdDto,
   })
-  findOne(@Param('id') id: string) {
-    return this.teacherService.findOne(id);
+  @ApiResponse({
+    status: 404,
+    description: 'Profesor no encontrado',
+  })
+  async findOne(@Param('id') id: string): Promise<TeacherGetByIdDto> {
+    const teacher = await this.teacherService.findOne(id);
+    if (!teacher) {
+      throw new NotFoundException(`Profesor con ID ${id} no encontrado`);
+    }
+    return teacher;
   }
 
   @Put(':id')
