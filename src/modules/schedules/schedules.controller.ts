@@ -116,7 +116,6 @@ export class ScheduleController {
     permission: 'schedule.getAvailableClassrooms',
     description: 'Obtener aulas disponibles',
   })
-  @Unauthenticated()
   @ApiOperation({
     summary: 'Obtener aulas disponibles',
     description: 'Get available classrooms',
