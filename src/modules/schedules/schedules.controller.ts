@@ -9,12 +9,15 @@ import {
   HttpCode,
   HttpStatus,
   ParseIntPipe,
+  Patch,
+  BadRequestException,
 } from '@nestjs/common';
 import { ScheduleService } from './schedules.service';
 import { ScheduleBaseDto, CreateScheduleDto, UpdateScheduleDto } from './dto';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Authorization } from '@modules/auth/decorators/authorization.decorator';
 import { LoadScheduleDto } from './dto';
+import { Unauthenticated } from '@modules/auth/decorators/unauthenticated.decorator';
 
 @Controller('schedules')
 @ApiTags('Schedules')
@@ -105,5 +108,28 @@ export class ScheduleController {
   })
   delete(@Param('id', ParseIntPipe) id: number): Promise<ScheduleBaseDto> {
     return this.scheduleService.delete(id);
+  }
+
+  @Unauthenticated()
+  @Patch('/asignar/profesor')
+  async assignTeacherToSchedules(
+    @Body() assignTeacherDto: { classroomIds: string[]; teacherId: string },
+  ) {
+    const { classroomIds, teacherId } = assignTeacherDto;
+
+    if (!Array.isArray(classroomIds) || classroomIds.length === 0) {
+      throw new BadRequestException('Se deben proporcionar al menos un ID de salón.');
+    }
+
+    try {
+      const updatedSchedules = await this.scheduleService.assignTeacherToSchedules(
+        classroomIds,
+        teacherId,
+      );
+
+      return { message: 'Profesor asignado correctamente a los horarios', updatedSchedules };
+    } catch (error) {
+      throw new BadRequestException(error.message);
+    }
   }
 }

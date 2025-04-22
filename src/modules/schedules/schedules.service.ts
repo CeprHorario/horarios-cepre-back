@@ -75,4 +75,65 @@ export class ScheduleService {
   private mapToScheduleDto(obj: any): ScheduleBaseDto {
     return plainToInstance(ScheduleBaseDto, obj);
   }
+
+  async assignTeacherToSchedules(
+    classroomIds: string[], 
+    teacherId: string 
+  ) {
+    const teacher = await this.prisma.getClient().teacher.findUnique({
+      where: { id: teacherId },
+      include: { schedules: true, courses: true }
+    });
+  
+    if (!teacher) {
+      throw new Error('Profesor no encontrado');
+    }
+  
+    const { scheduledHours, maxHours, courseId } = teacher;
+  
+    if (maxHours === null || scheduledHours >= maxHours) {
+      throw new Error('El profesor ha alcanzado su límite de horas');
+    }
+  
+    const schedulesToAssign = await this.prisma.getClient().schedule.findMany({
+      where: {
+        classId: { in: classroomIds }, 
+        courseId: courseId,
+        teacherId: null, 
+      },
+    });
+  
+    if (schedulesToAssign.length === 0) {
+      throw new Error('No hay horarios disponibles para este curso y estos salones');
+    }
+  
+    const totalHoursToAdd = schedulesToAssign.length;
+    const newTotalScheduledHours = scheduledHours + totalHoursToAdd;
+  
+    if (newTotalScheduledHours > maxHours) {
+      throw new Error('El profesor no tiene suficiente capacidad para asumir estos horarios');
+    }
+  
+    const updatedSchedules = await this.prisma.getClient().$transaction(async (prisma) => {
+      const updatedSchedules = await prisma.schedule.updateMany({
+        where: {
+          id: { in: schedulesToAssign.map(schedule => schedule.id) }
+        },
+        data: { teacherId: teacher.id }
+      });
+  
+      await prisma.teacher.update({
+        where: { id: teacher.id },
+        data: {
+          scheduledHours: newTotalScheduledHours
+        }
+      });
+  
+      return updatedSchedules;
+    });
+  
+    return updatedSchedules;
+  }
+  
+  
 }
