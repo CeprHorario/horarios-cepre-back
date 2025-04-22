@@ -31,6 +31,8 @@ import {
   ApiResponse,
 } from '@nestjs/swagger';
 import { TeacherGetByIdDto } from './dto/teacher-get-by-id.dto';
+import { Schedule } from '@prisma/client';
+import { ScheduleTeacherDto } from './dto/schedule-teacher.dto';
 
 @ApiTags('Teachers')
 @Controller('teachers')
@@ -203,7 +205,6 @@ export class TeacherController {
     return this.teacherService.deactivate(id);
   }
 
-  /*
   @Get(':teacherId/schedules')
   @ApiOperation({
     summary: 'Obtener los horarios y aulas donde enseña un profesor',
@@ -216,10 +217,11 @@ export class TeacherController {
   @ApiResponse({
     status: 200,
     description: 'Lista de aulas y horarios',
-    type: [Object],
+    type: [ScheduleTeacherDto],
   })
-  async getTeacherSchedules(@Param('teacherId') teacherId: string) {
+  async getTeacherSchedules(
+    @Param('teacherId') teacherId: string,
+  ): Promise<ScheduleTeacherDto[]> {
     return this.teacherService.getTeacherSchedules(teacherId);
   }
- */
 }
