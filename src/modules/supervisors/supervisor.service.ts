@@ -8,6 +8,7 @@ import { CreateSupervisorWithUserDto } from './dto/create-supervisor.dto';
 import { Role } from '@modules/auth/decorators/authorization.decorator';
 import { UpdateSupervisorWithProfileDto } from './dto/update-supervisor-with-profile.dto';
 import { SupervisorGetSummaryDto } from './dto/supervisor-get-summary.dto';
+import { AssignMonitorDto } from './dto/assign-monitor.dto';
 
 @Injectable()
 export class SupervisorService {
@@ -274,6 +275,54 @@ export class SupervisorService {
       firstName: supervisor.users?.userProfile?.firstName || '',
       lastName: supervisor.users?.userProfile?.lastName || '',
     });
+  }
+
+  async assignMonitor(
+    assignMonitorDto: AssignMonitorDto,
+  ): Promise<{ mensaje: string }> {
+    const { id_monitor, id_supervisor } = assignMonitorDto;
+
+    const monitor = await this.prisma.getClient().monitor.findUnique({
+      where: { id: id_monitor },
+    });
+
+    if (!monitor) {
+      throw new NotFoundException({
+        mensaje: `El monitor con ID ${id_monitor} no fue encontrado.`,
+      });
+    }
+
+    if (id_supervisor) {
+      // Asignar monitor a supervisor
+      const supervisor = await this.prisma.getClient().supervisor.findUnique({
+        where: { id: id_supervisor },
+      });
+
+      if (!supervisor) {
+        throw new NotFoundException({
+          mensaje: `El supervisor con ID ${id_supervisor} no fue encontrado.`,
+        });
+      }
+
+      await this.prisma.getClient().monitor.update({
+        where: { id: id_monitor },
+        data: { supervisorId: id_supervisor },
+      });
+
+      return {
+        mensaje: `El monitor con ID ${id_monitor} fue asignado al supervisor con ID ${id_supervisor}.`,
+      };
+    } else {
+      // Desasignar monitor
+      await this.prisma.getClient().monitor.update({
+        where: { id: id_monitor },
+        data: { supervisorId: null },
+      });
+
+      return {
+        mensaje: `El monitor con ID ${id_monitor} fue desasignado de cualquier supervisor.`,
+      };
+    }
   }
 
   // ─────── Métodos auxiliares ───────
