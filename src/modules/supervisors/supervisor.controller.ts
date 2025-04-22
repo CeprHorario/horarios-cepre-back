@@ -25,6 +25,8 @@ import { JwtAuthGuard } from '@modules/auth/guards/jwt-auth.guard';
 import { CreateSupervisorWithUserDto } from './dto/create-supervisor.dto';
 import { MonitorForSupervisorDto } from '@modules/monitors/dto/monitorForSupervisor.dto';
 import { SupervisorGetSummaryDto } from './dto/supervisor-get-summary.dto';
+import { AssignMonitorDto } from './dto/assign-monitor.dto';
+
 @Controller('supervisors')
 @UseGuards(JwtAuthGuard)
 export class SupervisorController {
@@ -136,5 +138,15 @@ export class SupervisorController {
   })
   async deactivateSupervisor(@Param('id') id: string) {
     return this.supervisorService.deactivate(id);
+  }
+
+  @Patch('assignMonitor')
+  @Authorization({
+    permission: 'supervisor.assignMonitor',
+    description: 'Asignar o desasignar un monitor a un supervisor',
+  })
+  @ApiOperation({ summary: 'Asignar o desasignar un monitor a un supervisor' })
+  async assignMonitor(@Body() assignMonitorDto: AssignMonitorDto) {
+    return this.supervisorService.assignMonitor(assignMonitorDto);
   }
 }

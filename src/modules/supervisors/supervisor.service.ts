@@ -8,6 +8,7 @@ import { CreateSupervisorWithUserDto } from './dto/create-supervisor.dto';
 import { Role } from '@modules/auth/decorators/authorization.decorator';
 import { UpdateSupervisorWithProfileDto } from './dto/update-supervisor-with-profile.dto';
 import { SupervisorGetSummaryDto } from './dto/supervisor-get-summary.dto';
+import { AssignMonitorDto } from './dto/assign-monitor.dto';
 
 @Injectable()
 export class SupervisorService {
@@ -57,14 +58,14 @@ export class SupervisorService {
     limit: number;
   }> {
     const offset = (page - 1) * limit;
-  
+
     // Filtro para supervisores con usuarios activos
     const activeFilter = {
       users: {
         isActive: true,
       },
     };
-  
+
     const [supervisors, total] = await this.prisma.getClient().$transaction([
       this.prisma.getClient().supervisor.findMany({
         skip: offset,
@@ -72,9 +73,10 @@ export class SupervisorService {
         where: activeFilter,
         select: {
           id: true,
-          users: { 
+          shiftId: true,
+          users: {
             select: {
-              isActive: true, 
+              isActive: true,
               userProfile: {
                 select: {
                   firstName: true,
@@ -87,21 +89,23 @@ export class SupervisorService {
           },
         },
       }),
-      this.prisma.getClient().supervisor.count({ // Conteo de activos
-        where: activeFilter
+      this.prisma.getClient().supervisor.count({
+        // Conteo de activos
+        where: activeFilter,
       }),
     ]);
-  
+
     const data = supervisors.map((supervisor) =>
       plainToInstance(SupervisorGetSummaryDto, {
         id: supervisor.id,
+        shiftId: supervisor.shiftId || null, // Mapear shiftId
         firstName: supervisor.users?.userProfile?.firstName || '',
         lastName: supervisor.users?.userProfile?.lastName || '',
         personalEmail: supervisor.users?.userProfile?.personalEmail || null,
         phone: supervisor.users?.userProfile?.phone || null,
       }),
     );
-  
+
     return { data, total, page, limit };
   }
 
@@ -247,16 +251,15 @@ export class SupervisorService {
   }
 
   async deactivate(id: string) {
-    const supervisor = await this.prisma.getClient().supervisor.findUnique({ 
+    const supervisor = await this.prisma.getClient().supervisor.findUnique({
       where: { id },
-      include: { 
+      include: {
         users: {
-          include: { 
-            userProfile: 
-              { select: { firstName: true, lastName: true } } 
-            } 
-      }
-      }  // Incluir la relación con usuario
+          include: {
+            userProfile: { select: { firstName: true, lastName: true } },
+          },
+        },
+      }, // Incluir la relación con usuario
     });
     if (!supervisor) {
       throw new NotFoundException('Teacher not found');
@@ -266,12 +269,60 @@ export class SupervisorService {
     }
     await this.prisma.getClient().user.update({
       where: { id: supervisor.users.id },
-      data: { isActive: false }
+      data: { isActive: false },
     });
     return plainToInstance(SupervisorBaseDto, {
-          firstName: supervisor.users?.userProfile?.firstName || '',
-          lastName: supervisor.users?.userProfile?.lastName || ''
+      firstName: supervisor.users?.userProfile?.firstName || '',
+      lastName: supervisor.users?.userProfile?.lastName || '',
     });
+  }
+
+  async assignMonitor(
+    assignMonitorDto: AssignMonitorDto,
+  ): Promise<{ mensaje: string }> {
+    const { id_monitor, id_supervisor } = assignMonitorDto;
+
+    const monitor = await this.prisma.getClient().monitor.findUnique({
+      where: { id: id_monitor },
+    });
+
+    if (!monitor) {
+      throw new NotFoundException({
+        mensaje: `El monitor con ID ${id_monitor} no fue encontrado.`,
+      });
+    }
+
+    if (id_supervisor) {
+      // Asignar monitor a supervisor
+      const supervisor = await this.prisma.getClient().supervisor.findUnique({
+        where: { id: id_supervisor },
+      });
+
+      if (!supervisor) {
+        throw new NotFoundException({
+          mensaje: `El supervisor con ID ${id_supervisor} no fue encontrado.`,
+        });
+      }
+
+      await this.prisma.getClient().monitor.update({
+        where: { id: id_monitor },
+        data: { supervisorId: id_supervisor },
+      });
+
+      return {
+        mensaje: `El monitor con ID ${id_monitor} fue asignado al supervisor con ID ${id_supervisor}.`,
+      };
+    } else {
+      // Desasignar monitor
+      await this.prisma.getClient().monitor.update({
+        where: { id: id_monitor },
+        data: { supervisorId: null },
+      });
+
+      return {
+        mensaje: `El monitor con ID ${id_monitor} fue desasignado de cualquier supervisor.`,
+      };
+    }
   }
 
   // ─────── Métodos auxiliares ───────
