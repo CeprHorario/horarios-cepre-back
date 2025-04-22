@@ -325,6 +325,58 @@ export class SupervisorService {
     }
   }
 
+  async getSupervisorMonitors(id: string): Promise<any> {
+    // Primero obtenemos los datos del supervisor
+    const supervisor = await this.prisma.getClient().supervisor.findUnique({
+      where: { id },
+      include: {
+        users: {
+          select: {
+            email: true,
+            userProfile: {
+              select: {
+                firstName: true,
+                lastName: true,
+                personalEmail: true,
+              },
+            },
+        },
+      },
+      },
+    });
+
+    if (!supervisor) {
+      throw new NotFoundException('Supervisor no encontrado');
+    }
+
+    // Luego obtenemos los monitores asignados
+    const monitors = await this.prisma.getClient().monitor.findMany({
+      where: {
+        supervisors: {
+          id: id,
+        },
+      },
+      include: {
+        user: {
+          select: {
+            email: true
+          }
+        }
+      },
+    });
+
+    return {
+      firstName: supervisor.users.userProfile?.firstName,
+      lastName: supervisor.users.userProfile?.lastName,
+      email: supervisor.users.email,
+      shift_id: supervisor.shiftId,
+      monitores_asignados: monitors.map(monitor => ({
+        monitor_id: monitor.id,
+        email: monitor.user.email
+      }))
+    };
+}
+
   // ─────── Métodos auxiliares ───────
 
   private mapToSupervisorDto(obj: any): SupervisorBaseDto {
