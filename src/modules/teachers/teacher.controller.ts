@@ -22,7 +22,6 @@ import { ImportTeacherDto } from './dto/import-teacher.dto';
 import { TeacherGetSummaryDto } from './dto/teacher-get-summary.dto';
 import { TeacherUpdateDto } from './dto/teacher-update.dto';
 import csvParser from 'csv-parser';
-import { Unauthenticated } from '@modules/auth/decorators/unauthenticated.decorator';
 import {
   ApiBody,
   ApiOperation,
@@ -109,7 +108,10 @@ export class TeacherController {
   }
 
   @Put(':id')
-  @Unauthenticated()
+  @Authorization({
+    permission: 'teacher.update',
+    description: 'Actualizar un profesor por su id',
+  })
   @ApiOperation({ summary: 'Actualizar un profesor por su ID' })
   @ApiParam({ name: 'id', type: String, description: 'ID del profesor' })
   @ApiBody({
@@ -135,10 +137,9 @@ export class TeacherController {
   }
 
   @Post('json')
-  @Unauthenticated()
   @Authorization({
     permission: 'teacher.importjson',
-    description: 'Eliminar un profesor por su id',
+    description: 'Crear profesores desde un archivo JSON',
   })
   @ApiOperation({
     summary: 'Crear profesores desde un archivo JSON',
@@ -150,10 +151,9 @@ export class TeacherController {
 
   // ✅ Cargar desde CSV
   @Post('csv')
-  @Unauthenticated()
   @Authorization({
     permission: 'teacher.importcsv',
-    description: 'Eliminar un profesor por su id',
+    description: 'Crear profesores desde un archivo CSV',
   })
   @UseInterceptors(FileInterceptor('file'))
   async createTeachersFromCsv(@UploadedFile() file: Express.Multer.File) {
