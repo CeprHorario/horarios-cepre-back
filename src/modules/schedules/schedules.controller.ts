@@ -18,7 +18,6 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Authorization, Role } from '@modules/auth/decorators/authorization.decorator';
 import { LoadScheduleDto } from './dto';
 import { Weekday } from '@prisma/client';
-import { Unauthenticated } from '@modules/auth/decorators/unauthenticated.decorator';
 
 @Controller('schedules')
 @ApiTags('Schedules')
