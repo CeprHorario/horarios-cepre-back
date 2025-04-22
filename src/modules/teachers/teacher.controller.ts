@@ -219,6 +219,10 @@ export class TeacherController {
     description: 'Lista de aulas y horarios',
     type: [ScheduleTeacherDto],
   })
+  @Authorization({
+    permission: 'teacher.getSchedules',
+    description: 'Obtener los horarios y aulas donde enseña un profesor',
+  })
   async getTeacherSchedules(
     @Param('teacherId') teacherId: string,
   ): Promise<ScheduleTeacherDto[]> {
