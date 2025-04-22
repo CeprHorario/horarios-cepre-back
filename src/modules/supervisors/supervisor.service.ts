@@ -331,17 +331,18 @@ export class SupervisorService {
       where: { id },
       include: {
         users: {
-          include: {
+          select: {
+            email: true,
             userProfile: {
               select: {
                 firstName: true,
                 lastName: true,
                 personalEmail: true,
               },
-            }
-          },
+            },
         },
-      }
+      },
+      },
     });
 
     if (!supervisor) {
@@ -358,7 +359,6 @@ export class SupervisorService {
       include: {
         user: {
           select: {
-            id: true,
             email: true
           }
         }
@@ -368,11 +368,11 @@ export class SupervisorService {
     return {
       firstName: supervisor.users.userProfile?.firstName,
       lastName: supervisor.users.userProfile?.lastName,
-      email: supervisor.users.userProfile?.personalEmail,
-      shift: supervisor.shiftId,
+      email: supervisor.users.email,
+      shift_id: supervisor.shiftId,
       monitores_asignados: monitors.map(monitor => ({
-        user_id: monitor.user.id,
-        email_id: monitor.user.email
+        monitor_id: monitor.id,
+        email: monitor.user.email
       }))
     };
 }
