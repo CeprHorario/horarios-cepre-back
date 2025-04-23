@@ -32,11 +32,29 @@ import {
 } from '@nestjs/swagger';
 import { TeacherGetByIdDto } from './dto/teacher-get-by-id.dto';
 import { ScheduleTeacherDto } from './dto/schedule-teacher.dto';
+import { TeacherFilteredDto } from '@modules/teachers/dto/teacherFiltered.dto';
 
 @ApiTags('Teachers')
 @Controller('teachers')
 export class TeacherController {
   constructor(private readonly teacherService: TeacherService) {}
+
+  @Get('available')
+  @Authorization({
+    permission: 'teacher.available',
+    description: 'Obtener profesores disponibles para un curso y horarios',
+  })
+  async getFilteredTeachers(
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+    @Body() data: TeacherFilteredDto,
+  ): Promise<{
+    data: TeacherGetSummaryDto[];
+    page: number;
+    limit: number;
+  }> {
+    return await this.teacherService.getFilteredTeachers(data, page, limit);
+  }
 
   @Post()
   @Authorization({
