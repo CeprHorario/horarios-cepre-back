@@ -9,6 +9,8 @@ import { TeacherGetSummaryDto } from './dto/teacher-get-summary.dto';
 import { TeacherUpdateDto } from './dto/teacher-update.dto';
 import { TeacherGetByIdDto } from './dto/teacher-get-by-id.dto';
 import { ScheduleTeacherDto } from './dto/schedule-teacher.dto';
+import { TeacherFilteredDto } from '@modules/teachers/dto/teacherFiltered.dto';
+import { Length } from 'class-validator';
 
 @Injectable()
 export class TeacherService {
@@ -418,5 +420,59 @@ export class TeacherService {
         }, new Map<string, ScheduleTeacherDto>())
         .values(),
     );
+  }
+
+  async getFilteredTeachers(
+    body: TeacherFilteredDto,
+    page: number,
+    limit: number,
+  ) {
+    const ids = await this.prisma.getClient().$queryRaw<{ id: string }[]>`
+      SELECT id FROM "teachers"
+      WHERE courseId = ${body.courseId} AND (max_hours - scheduled_hours) >= ${body.schedules.length}
+    `;
+
+    const offset = (page - 1) * limit;
+
+    const teachers = await this.prisma.getClient().teacher.findMany({
+      skip: offset,
+      take: limit,
+      where: {
+        id: { in: ids.map((t) => t.id) },
+        AND: body.schedules.map(({ hourSessionId, weekday }) => ({
+          schedules: {
+            none: {
+              hourSessionId,
+              weekday,
+            },
+          },
+        })),
+      },
+      select: {
+        id: true,
+        user: {
+          select: {
+            email: true,
+            userProfile: {
+              select: {
+                firstName: true,
+                lastName: true,
+                phone: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const data = teachers.map((teacher) => ({
+      id: teacher.id,
+      firstName: teacher.user?.userProfile?.firstName || 'no asignado',
+      lastName: teacher.user?.userProfile?.lastName || 'no asignado',
+      email: teacher.user?.email || null,
+      phone: teacher.user?.userProfile?.phone || null,
+    }));
+
+    return { data, page, limit };
   }
 }
