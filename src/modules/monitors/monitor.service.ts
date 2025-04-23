@@ -12,6 +12,7 @@ import { ScheduleDto, Weekday } from './dto/schedule.dto';
 import { TeacherResponseDto } from './dto/teacher-response.dto';
 import { UpdateMonitorAsAdminDto } from './dto/updateMonitorAsAdmin.dto';
 import { MonitorGetSummaryDto } from './dto/monitor-get-summary.dto';
+import { MonitorWithoutSupervisorDto } from './dto/monitorWithoutSupervisor.dto';
 
 @Injectable()
 export class MonitorService {
@@ -327,6 +328,31 @@ export class MonitorService {
       firstName: monitor.user?.userProfile?.firstName || '',
       lastName: monitor.user?.userProfile?.lastName || ''
     });
+  }
+
+  async findAllWithSupervisor(hasSupervisor: boolean): Promise<MonitorWithoutSupervisorDto[]> {
+    const monitors = await this.prisma.getClient().monitor.findMany({
+      where: {
+        supervisorId: hasSupervisor ? { not: null } : null,
+      },
+      include: {
+        classes: {
+          select: { id: true, name: true },
+          include: {
+            shift: { select: { id: true, name: true }, },
+            area: { select: { id: true, name: true }, },
+          },
+        }
+      },
+    });
+    return monitors.map((monitor) => ({
+      monitorId: monitor.id,
+      className: monitor.classes?.name || 'no asignado',
+      shiftId: monitor.classes?.shift.id || 0,
+      shiftName: monitor.classes?.shift.name || 'no asignado',
+      areaId: monitor.classes?.area.id || 0,
+      areaName: monitor.classes?.area.name || 'no asignado',
+    }));
   }
 
   // ─────── Métodos auxiliares ───────
