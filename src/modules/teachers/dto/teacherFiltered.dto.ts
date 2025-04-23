@@ -3,7 +3,7 @@ import { Weekday } from '@prisma/client';
 import { Type } from 'class-transformer';
 import { IsEnum, IsNumber } from 'class-validator';
 
-class SchedulesInput {
+class HourSessionInput {
   @IsNumber()
   @ApiProperty({ example: 123 })
   hourSessionId: number;
@@ -18,7 +18,7 @@ export class TeacherFilteredDto {
   @ApiProperty({ example: 321 })
   courseId: number;
 
-  @Type(() => SchedulesInput)
-  @ApiProperty({ type: [SchedulesInput] })
-  schedules: SchedulesInput[];
+  @Type(() => HourSessionInput)
+  @ApiProperty({ type: [HourSessionInput] })
+  hourSessions: HourSessionInput[];
 }

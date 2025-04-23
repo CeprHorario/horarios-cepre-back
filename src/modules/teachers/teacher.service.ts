@@ -429,7 +429,7 @@ export class TeacherService {
   ) {
     const ids = await this.prisma.getClient().$queryRaw<{ id: string }[]>`
       SELECT id FROM "teachers"
-      WHERE courseId = ${body.courseId} AND (max_hours - scheduled_hours) >= ${body.schedules.length}
+      WHERE courseId = ${body.courseId} AND (max_hours - scheduled_hours) >= ${body.hourSessions.length}
     `;
 
     const offset = (page - 1) * limit;
@@ -439,7 +439,7 @@ export class TeacherService {
       take: limit,
       where: {
         id: { in: ids.map((t) => t.id) },
-        AND: body.schedules.map(({ hourSessionId, weekday }) => ({
+        AND: body.hourSessions.map(({ hourSessionId, weekday }) => ({
           schedules: {
             none: {
               hourSessionId,
