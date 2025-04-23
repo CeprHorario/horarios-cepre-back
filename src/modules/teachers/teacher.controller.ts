@@ -92,6 +92,18 @@ export class TeacherController {
     required: true,
     description: 'Texto de búsqueda (nombre, apellido o correo)',
   })
+  @ApiQuery({
+    name: 'page',
+    type: Number,
+    required: false,
+    description: 'Número de página',
+  })
+  @ApiQuery({
+    name: 'limit',
+    type: Number,
+    required: false,
+    description: 'Cantidad de resultados por página',
+  })
   @ApiResponse({
     status: 200,
     description: 'Lista de profesores que coinciden con la búsqueda',
@@ -102,8 +114,17 @@ export class TeacherController {
     permission: 'teacher.search',
     description: 'Buscar profesores',
   })
-  search(@Query('query') query: string): Promise<TeacherGetSummaryDto[]> {
-    return this.teacherService.search(query);
+  search(
+    @Query('query') query: string,
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 20,
+  ): Promise<{
+    data: TeacherGetSummaryDto[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    return this.teacherService.search(query, Number(page), Number(limit));
   }
 
   @Get(':id')

@@ -364,60 +364,109 @@ export class TeacherService {
     });
   }
 
-  async search(query: string): Promise<TeacherGetSummaryDto[]> {
-    const teachers = await this.prisma.getClient().teacher.findMany({
-      where: {
-        OR: [
-          {
-            user: {
-              userProfile: {
-                firstName: { contains: query, mode: 'insensitive' },
+  async search(
+    query: string,
+    page: number = 1,
+    limit: number = 20,
+  ): Promise<{
+    data: TeacherGetSummaryDto[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    const offset = (page - 1) * limit;
+
+    const [teachers, total] = await this.prisma.getClient().$transaction([
+      this.prisma.getClient().teacher.findMany({
+        skip: limit > 0 ? offset : undefined,
+        take: limit > 0 ? limit : undefined,
+        where: {
+          OR: [
+            {
+              user: {
+                userProfile: {
+                  firstName: { contains: query, mode: 'insensitive' },
+                },
               },
             },
-          },
-          {
-            user: {
-              userProfile: {
-                lastName: { contains: query, mode: 'insensitive' },
+            {
+              user: {
+                userProfile: {
+                  lastName: { contains: query, mode: 'insensitive' },
+                },
               },
             },
-          },
-          {
-            user: {
-              userProfile: {
-                personalEmail: { contains: query, mode: 'insensitive' },
+            {
+              user: {
+                userProfile: {
+                  personalEmail: { contains: query, mode: 'insensitive' },
+                },
               },
             },
-          },
-          {
-            user: {
-              userProfile: {
-                phone: { contains: query, mode: 'insensitive' },
+            {
+              user: {
+                userProfile: {
+                  phone: { contains: query, mode: 'insensitive' },
+                },
               },
             },
-          },
-        ],
-      },
-      select: {
-        id: true,
-        jobStatus: true,
-        isCoordinator: true,
-        user: {
-          select: {
-            userProfile: {
-              select: {
-                firstName: true,
-                lastName: true,
-                phone: true,
-                personalEmail: true,
+          ],
+        },
+        select: {
+          id: true,
+          jobStatus: true,
+          isCoordinator: true,
+          user: {
+            select: {
+              userProfile: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                  phone: true,
+                  personalEmail: true,
+                },
               },
             },
           },
         },
-      },
-    });
+      }),
+      this.prisma.getClient().teacher.count({
+        where: {
+          OR: [
+            {
+              user: {
+                userProfile: {
+                  firstName: { contains: query, mode: 'insensitive' },
+                },
+              },
+            },
+            {
+              user: {
+                userProfile: {
+                  lastName: { contains: query, mode: 'insensitive' },
+                },
+              },
+            },
+            {
+              user: {
+                userProfile: {
+                  personalEmail: { contains: query, mode: 'insensitive' },
+                },
+              },
+            },
+            {
+              user: {
+                userProfile: {
+                  phone: { contains: query, mode: 'insensitive' },
+                },
+              },
+            },
+          ],
+        },
+      }),
+    ]);
 
-    return teachers.map((teacher) =>
+    const data = teachers.map((teacher) =>
       plainToInstance(TeacherGetSummaryDto, {
         id: teacher.id,
         email: teacher.user?.userProfile?.personalEmail || '',
@@ -428,6 +477,8 @@ export class TeacherService {
         isCoordinator: teacher.isCoordinator || false,
       }),
     );
+
+    return { data, total, page, limit };
   }
 
   async findByCourse(
