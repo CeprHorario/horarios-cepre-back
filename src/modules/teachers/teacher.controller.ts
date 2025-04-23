@@ -83,6 +83,28 @@ export class TeacherController {
     return this.teacherService.findAll(Number(page), Number(limit));
   }
 
+  @Get('search')
+  @ApiOperation({ summary: 'Buscar profesores por nombre, apellido o correo' })
+  @ApiQuery({
+    name: 'query',
+    type: String,
+    required: true,
+    description: 'Texto de búsqueda (nombre, apellido o correo)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de profesores que coinciden con la búsqueda',
+    type: TeacherGetSummaryDto,
+    isArray: true,
+  })
+  @Authorization({
+    permission: 'teacher.search',
+    description: 'Buscar profesores',
+  })
+  search(@Query('query') query: string): Promise<TeacherGetSummaryDto[]> {
+    return this.teacherService.search(query);
+  }
+
   @Get(':id')
   @Authorization({
     permission: 'teacher.getById',
@@ -203,23 +225,34 @@ export class TeacherController {
     return this.teacherService.deactivate(id);
   }
 
-  /*
-  @Get(':teacherId/schedules')
-  @ApiOperation({
-    summary: 'Obtener los horarios y aulas donde enseña un profesor',
+  @Get('by-course/:courseId')
+  @ApiOperation({ summary: 'Obtener profesores por curso' })
+  @ApiParam({ name: 'courseId', type: String, description: 'ID del curso' })
+  @ApiQuery({
+    name: 'page',
+    type: Number,
+    required: false,
+    description: 'Número de página',
   })
-  @ApiParam({
-    name: 'teacherId',
-    type: 'string',
-    example: '550e8400-e29b-41d4-a716-446655440000',
+  @ApiQuery({
+    name: 'limit',
+    type: Number,
+    required: false,
+    description: 'Cantidad de resultados por página',
   })
-  @ApiResponse({
-    status: 200,
-    description: 'Lista de aulas y horarios',
-    type: [Object],
+  @Authorization({
+    permission: 'teacher.listByCourse',
+    description: 'Listar profesores por curso',
   })
-  async getTeacherSchedules(@Param('teacherId') teacherId: string) {
-    return this.teacherService.getTeacherSchedules(teacherId);
+  findByCourse(
+    @Param('courseId') courseId: string,
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 20,
+  ) {
+    return this.teacherService.findByCourse(
+      courseId,
+      Number(page),
+      Number(limit),
+    );
   }
- */
 }

@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '@database/prisma/prisma.service';
 import { TeacherBaseDto } from './dto';
 import { plainToInstance } from 'class-transformer';
@@ -88,8 +92,8 @@ export class TeacherService {
 
     const [teachers, total] = await this.prisma.getClient().$transaction([
       this.prisma.getClient().teacher.findMany({
-        skip: offset,
-        take: limit,
+        skip: limit > 0 ? offset : undefined, // Si limit es 0, no aplica paginación
+        take: limit > 0 ? limit : undefined, // Si limit es 0, no aplica límite
         relationLoadStrategy: 'join',
         where: activeFilter,
         select: {
@@ -178,7 +182,10 @@ export class TeacherService {
         courseName: teacher.courses?.name || '',
       });
     } catch (error) {
-      if (error instanceof NotFoundException) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      ) {
         throw error;
       }
       console.error('Error en findOne:', error); // Agregar un log para depuración
@@ -329,16 +336,15 @@ export class TeacherService {
   }
 
   async deactivate(id: string) {
-    const teacher = await this.prisma.getClient().teacher.findUnique({ 
+    const teacher = await this.prisma.getClient().teacher.findUnique({
       where: { id },
-      include: { 
+      include: {
         user: {
-          include: { 
-            userProfile: 
-              { select: { firstName: true, lastName: true } } 
-            } 
-      }
-      }  // Incluir la relación con usuario
+          include: {
+            userProfile: { select: { firstName: true, lastName: true } },
+          },
+        },
+      }, // Incluir la relación con usuario
     });
     if (!teacher) {
       throw new NotFoundException('Teacher not found');
@@ -349,13 +355,144 @@ export class TeacherService {
     // Actualizar el estado isActive del usuario relacionado
     await this.prisma.getClient().user.update({
       where: { id: teacher.user.id },
-      data: { isActive: false }
+      data: { isActive: false },
     });
     return plainToInstance(TeacherBaseDto, {
-          firstName: teacher.user?.userProfile?.firstName || '',
-          lastName: teacher.user?.userProfile?.lastName || ''
+      firstName: teacher.user?.userProfile?.firstName || '',
+      lastName: teacher.user?.userProfile?.lastName || '',
     });
-    
+  }
+
+  async search(query: string): Promise<TeacherGetSummaryDto[]> {
+    const teachers = await this.prisma.getClient().teacher.findMany({
+      where: {
+        OR: [
+          {
+            user: {
+              userProfile: {
+                firstName: { contains: query, mode: 'insensitive' },
+              },
+            },
+          },
+          {
+            user: {
+              userProfile: {
+                lastName: { contains: query, mode: 'insensitive' },
+              },
+            },
+          },
+          {
+            user: {
+              userProfile: {
+                personalEmail: { contains: query, mode: 'insensitive' },
+              },
+            },
+          },
+          {
+            user: {
+              userProfile: {
+                phone: { contains: query, mode: 'insensitive' },
+              },
+            },
+          },
+        ],
+      },
+      select: {
+        id: true,
+        jobStatus: true,
+        isCoordinator: true,
+        user: {
+          select: {
+            userProfile: {
+              select: {
+                firstName: true,
+                lastName: true,
+                phone: true,
+                personalEmail: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return teachers.map((teacher) =>
+      plainToInstance(TeacherGetSummaryDto, {
+        id: teacher.id,
+        email: teacher.user?.userProfile?.personalEmail || '',
+        firstName: teacher.user?.userProfile?.firstName || '',
+        lastName: teacher.user?.userProfile?.lastName || '',
+        phone: teacher.user?.userProfile?.phone || null,
+        jobStatus: teacher.jobStatus || '',
+        isCoordinator: teacher.isCoordinator || false,
+      }),
+    );
+  }
+
+  async findByCourse(
+    courseId: string,
+    page: number = 1,
+    limit: number = 20,
+  ): Promise<{
+    data: TeacherGetSummaryDto[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    const offset = (page - 1) * limit;
+
+    const [teachers, total] = await this.prisma.getClient().$transaction([
+      this.prisma.getClient().teacher.findMany({
+        skip: limit > 0 ? offset : undefined,
+        take: limit > 0 ? limit : undefined,
+        relationLoadStrategy: 'join',
+        where: {
+          courseId: Number(courseId),
+          user: { isActive: true },
+        },
+        select: {
+          id: true,
+          jobStatus: true,
+          isCoordinator: true,
+          courses: {
+            select: { name: true },
+          },
+          user: {
+            select: {
+              userProfile: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                  personalEmail: true,
+                  phone: true,
+                },
+              },
+            },
+          },
+        },
+      }),
+      this.prisma.getClient().teacher.count({
+        where: {
+          courseId: Number(courseId),
+          user: { isActive: true },
+        },
+      }),
+    ]);
+
+    const data = teachers.map((teacher) =>
+      plainToInstance(TeacherGetSummaryDto, {
+        id: teacher.id,
+        courseName: teacher.courses?.name || '',
+        firstName: teacher.user?.userProfile?.firstName || '',
+        lastName: teacher.user?.userProfile?.lastName || '',
+        personalEmail: teacher.user?.userProfile?.personalEmail || null,
+        phone: teacher.user?.userProfile?.phone || null,
+        jobStatus: teacher.jobStatus || '',
+        isCoordinator: teacher.isCoordinator || false,
+      }),
+    );
+
+    return { data, total, page, limit };
   }
 
   //async getTeacherSchedules(teacherId: string) {
