@@ -427,13 +427,23 @@ export class TeacherService {
     page: number,
     limit: number,
   ) {
+    // Validar hourSessions
+    const count = await this.prisma.getClient().hourSession.count({
+      where: { id: { in: body.hourSessions.map((h) => h.hourSessionId) } },
+    });
+    if (count !== body.hourSessions.length) {
+      throw new NotFoundException('Some hour sessions do not exist');
+    }
+
+    // Buscar profesores que tengan horas disponibles
     const ids = await this.prisma.getClient().$queryRaw<{ id: string }[]>`
       SELECT id FROM "teachers"
       WHERE course_id = ${body.courseId} AND (max_hours - scheduled_hours) >= ${body.hourSessions.length}
     `;
+    if (ids.length === 0) return { data: [], page, limit };
 
+    // Verificar si hay profesores disponibles
     const offset = (page - 1) * limit;
-
     const teachers = await this.prisma.getClient().teacher.findMany({
       skip: offset,
       take: limit,
