@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '@database/prisma/prisma.service';
 import { TeacherBaseDto } from './dto';
 import { plainToInstance } from 'class-transformer';
@@ -8,6 +12,9 @@ import { Role } from '@modules/auth/decorators/authorization.decorator';
 import { TeacherGetSummaryDto } from './dto/teacher-get-summary.dto';
 import { TeacherUpdateDto } from './dto/teacher-update.dto';
 import { TeacherGetByIdDto } from './dto/teacher-get-by-id.dto';
+import { ScheduleTeacherDto } from './dto/schedule-teacher.dto';
+import { TeacherFilteredDto } from '@modules/teachers/dto/teacherFiltered.dto';
+import { JobStatus } from '@prisma/client';
 
 @Injectable()
 export class TeacherService {
@@ -88,8 +95,8 @@ export class TeacherService {
 
     const [teachers, total] = await this.prisma.getClient().$transaction([
       this.prisma.getClient().teacher.findMany({
-        skip: offset,
-        take: limit,
+        skip: limit > 0 ? offset : undefined, // Si limit es 0, no aplica paginación
+        take: limit > 0 ? limit : undefined, // Si limit es 0, no aplica límite
         relationLoadStrategy: 'join',
         where: activeFilter,
         select: {
@@ -178,7 +185,10 @@ export class TeacherService {
         courseName: teacher.courses?.name || '',
       });
     } catch (error) {
-      if (error instanceof NotFoundException) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      ) {
         throw error;
       }
       console.error('Error en findOne:', error); // Agregar un log para depuración
@@ -329,16 +339,15 @@ export class TeacherService {
   }
 
   async deactivate(id: string) {
-    const teacher = await this.prisma.getClient().teacher.findUnique({ 
+    const teacher = await this.prisma.getClient().teacher.findUnique({
       where: { id },
-      include: { 
+      include: {
         user: {
-          include: { 
-            userProfile: 
-              { select: { firstName: true, lastName: true } } 
-            } 
-      }
-      }  // Incluir la relación con usuario
+          include: {
+            userProfile: { select: { firstName: true, lastName: true } },
+          },
+        },
+      }, // Incluir la relación con usuario
     });
     if (!teacher) {
       throw new NotFoundException('Teacher not found');
@@ -349,16 +358,323 @@ export class TeacherService {
     // Actualizar el estado isActive del usuario relacionado
     await this.prisma.getClient().user.update({
       where: { id: teacher.user.id },
-      data: { isActive: false }
+      data: { isActive: false },
     });
     return plainToInstance(TeacherBaseDto, {
-          firstName: teacher.user?.userProfile?.firstName || '',
-          lastName: teacher.user?.userProfile?.lastName || ''
+      firstName: teacher.user?.userProfile?.firstName || '',
+      lastName: teacher.user?.userProfile?.lastName || '',
     });
-    
+  }
+
+  async search(
+    query: string,
+    page: number = 1,
+    limit: number = 20,
+  ): Promise<{
+    data: TeacherGetSummaryDto[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    const offset = (page - 1) * limit;
+
+    const [teachers, total] = await this.prisma.getClient().$transaction([
+      this.prisma.getClient().teacher.findMany({
+        skip: limit > 0 ? offset : undefined,
+        take: limit > 0 ? limit : undefined,
+        where: {
+          OR: [
+            {
+              user: {
+                userProfile: {
+                  firstName: { contains: query, mode: 'insensitive' },
+                },
+              },
+            },
+            {
+              user: {
+                userProfile: {
+                  lastName: { contains: query, mode: 'insensitive' },
+                },
+              },
+            },
+            {
+              user: {
+                userProfile: {
+                  personalEmail: { contains: query, mode: 'insensitive' },
+                },
+              },
+            },
+            {
+              user: {
+                userProfile: {
+                  phone: { contains: query, mode: 'insensitive' },
+                },
+              },
+            },
+          ],
+        },
+        select: {
+          id: true,
+          jobStatus: true,
+          isCoordinator: true,
+          user: {
+            select: {
+              userProfile: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                  phone: true,
+                  personalEmail: true,
+                },
+              },
+            },
+          },
+        },
+      }),
+      this.prisma.getClient().teacher.count({
+        where: {
+          OR: [
+            {
+              user: {
+                userProfile: {
+                  firstName: { contains: query, mode: 'insensitive' },
+                },
+              },
+            },
+            {
+              user: {
+                userProfile: {
+                  lastName: { contains: query, mode: 'insensitive' },
+                },
+              },
+            },
+            {
+              user: {
+                userProfile: {
+                  personalEmail: { contains: query, mode: 'insensitive' },
+                },
+              },
+            },
+            {
+              user: {
+                userProfile: {
+                  phone: { contains: query, mode: 'insensitive' },
+                },
+              },
+            },
+          ],
+        },
+      }),
+    ]);
+
+    const data = teachers.map((teacher) =>
+      plainToInstance(TeacherGetSummaryDto, {
+        id: teacher.id,
+        email: teacher.user?.userProfile?.personalEmail || '',
+        firstName: teacher.user?.userProfile?.firstName || '',
+        lastName: teacher.user?.userProfile?.lastName || '',
+        phone: teacher.user?.userProfile?.phone || null,
+        jobStatus: teacher.jobStatus || '',
+        isCoordinator: teacher.isCoordinator || false,
+      }),
+    );
+
+    return { data, total, page, limit };
+  }
+
+  async findByCourse(
+    courseId: string,
+    page: number = 1,
+    limit: number = 20,
+  ): Promise<{
+    data: TeacherGetSummaryDto[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    const offset = (page - 1) * limit;
+
+    const [teachers, total] = await this.prisma.getClient().$transaction([
+      this.prisma.getClient().teacher.findMany({
+        skip: limit > 0 ? offset : undefined,
+        take: limit > 0 ? limit : undefined,
+        relationLoadStrategy: 'join',
+        where: {
+          courseId: Number(courseId),
+          user: { isActive: true },
+        },
+        select: {
+          id: true,
+          jobStatus: true,
+          isCoordinator: true,
+          courses: {
+            select: { name: true },
+          },
+          user: {
+            select: {
+              userProfile: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                  personalEmail: true,
+                  phone: true,
+                },
+              },
+            },
+          },
+        },
+      }),
+      this.prisma.getClient().teacher.count({
+        where: {
+          courseId: Number(courseId),
+          user: { isActive: true },
+        },
+      }),
+    ]);
+
+    const data = teachers.map((teacher) =>
+      plainToInstance(TeacherGetSummaryDto, {
+        id: teacher.id,
+        courseName: teacher.courses?.name || '',
+        firstName: teacher.user?.userProfile?.firstName || '',
+        lastName: teacher.user?.userProfile?.lastName || '',
+        personalEmail: teacher.user?.userProfile?.personalEmail || null,
+        phone: teacher.user?.userProfile?.phone || null,
+        jobStatus: teacher.jobStatus || '',
+        isCoordinator: teacher.isCoordinator || false,
+      }),
+    );
+
+    return { data, total, page, limit };
   }
 
   //async getTeacherSchedules(teacherId: string) {
   //  return Promise.resolve(undefined);
   //}
+  async getTeacherSchedules(teacherId: string): Promise<ScheduleTeacherDto[]> {
+    const schedules = await this.prisma.getClient().schedule.findMany({
+      where: { teacherId },
+      include: {
+        course: {
+          select: {
+            name: true,
+          },
+        },
+        clas: {
+          select: {
+            id: true,
+            name: true,
+            urlMeet: true,
+            urlClassroom: true,
+            shift: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
+        hourSession: {
+          select: {
+            startTime: true,
+            endTime: true,
+          },
+        },
+      },
+    });
+
+    return Array.from(
+      schedules
+        .reduce((map, s) => {
+          const key = s.clas.id;
+          if (!map.has(key))
+            map.set(key, {
+              classId: s.clas.id,
+              className: s.clas.name,
+              courseName: s.course.name,
+              urlMeet: s.clas.urlMeet || '',
+              urlClassroom: s.clas.urlClassroom || '',
+              shiftName: s.clas.shift.name,
+              schedules: [],
+            });
+          map.get(key)!.schedules.push({
+            weekday: s.weekday,
+            hourSession: {
+              startTime: s.hourSession.startTime.toISOString(),
+              endTime: s.hourSession.endTime.toISOString(),
+            },
+          });
+          return map;
+        }, new Map<string, ScheduleTeacherDto>())
+        .values(),
+    );
+  }
+
+  async getFilteredTeachers(
+    body: TeacherFilteredDto,
+    page: number,
+    limit: number,
+  ) {
+    // Validar hourSessions
+    const count = await this.prisma.getClient().hourSession.count({
+      where: { id: { in: body.hourSessions.map((h) => h.hourSessionId) } },
+    });
+    if (count !== body.hourSessions.length) {
+      throw new NotFoundException('Some hour sessions do not exist');
+    }
+
+    // Buscar profesores que tengan horas disponibles
+    const ids = await this.prisma.getClient().$queryRaw<{ id: string }[]>`
+      SELECT id FROM "teachers"
+      WHERE course_id = ${body.courseId} AND (max_hours - scheduled_hours) >= ${body.hourSessions.length}
+    `;
+    if (ids.length === 0) return { data: [], page, limit };
+
+    // Verificar si hay profesores disponibles
+    const offset = (page - 1) * limit;
+    const teachers = await this.prisma.getClient().teacher.findMany({
+      skip: offset,
+      take: limit,
+      where: {
+        id: { in: ids.map((t) => t.id) },
+        AND: body.hourSessions.map(({ hourSessionId, weekday }) => ({
+          schedules: {
+            none: {
+              hourSessionId,
+              weekday,
+            },
+          },
+        })),
+      },
+      select: {
+        id: true,
+        jobStatus: true,
+        isCoordinator: true,
+        user: {
+          select: {
+            userProfile: {
+              select: {
+                firstName: true,
+                lastName: true,
+                phone: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const data = teachers.map((teacher) =>
+      plainToInstance(TeacherGetSummaryDto, {
+        id: teacher.id,
+        firstName: teacher.user?.userProfile?.firstName || '',
+        lastName: teacher.user?.userProfile?.lastName || '',
+        phone: teacher.user?.userProfile?.phone || null,
+        jobStatus: teacher.jobStatus || JobStatus.FullTime,
+        isCoordinator: teacher.isCoordinator || false,
+      }),
+    );
+
+    return { data, page, limit };
+  }
 }
