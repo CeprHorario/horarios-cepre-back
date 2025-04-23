@@ -299,4 +299,5 @@ export class TeacherController {
   async getTeacherSchedules(@Param('teacherId') teacherId: string) {
     return this.teacherService.getTeacherSchedules(teacherId);
   }
+  */
 }
