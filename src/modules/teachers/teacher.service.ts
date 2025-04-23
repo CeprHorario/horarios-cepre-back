@@ -12,6 +12,7 @@ import { Role } from '@modules/auth/decorators/authorization.decorator';
 import { TeacherGetSummaryDto } from './dto/teacher-get-summary.dto';
 import { TeacherUpdateDto } from './dto/teacher-update.dto';
 import { TeacherGetByIdDto } from './dto/teacher-get-by-id.dto';
+import { ScheduleTeacherDto } from './dto/schedule-teacher.dto';
 
 @Injectable()
 export class TeacherService {
@@ -498,4 +499,61 @@ export class TeacherService {
   //async getTeacherSchedules(teacherId: string) {
   //  return Promise.resolve(undefined);
   //}
+  async getTeacherSchedules(teacherId: string): Promise<ScheduleTeacherDto[]> {
+    const schedules = await this.prisma.getClient().schedule.findMany({
+      where: { teacherId },
+      include: {
+        course: {
+          select: {
+            name: true,
+          },
+        },
+        clas: {
+          select: {
+            id: true,
+            name: true,
+            urlMeet: true,
+            urlClassroom: true,
+            shift: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
+        hourSession: {
+          select: {
+            startTime: true,
+            endTime: true,
+          },
+        },
+      },
+    });
+
+    return Array.from(
+      schedules
+        .reduce((map, s) => {
+          const key = s.clas.id;
+          if (!map.has(key))
+            map.set(key, {
+              classId: s.clas.id,
+              className: s.clas.name,
+              courseName: s.course.name,
+              urlMeet: s.clas.urlMeet || '',
+              urlClassroom: s.clas.urlClassroom || '',
+              shiftName: s.clas.shift.name,
+              schedules: [],
+            });
+          map.get(key)!.schedules.push({
+            weekday: s.weekday,
+            hourSession: {
+              startTime: s.hourSession.startTime.toISOString(),
+              endTime: s.hourSession.endTime.toISOString(),
+            },
+          });
+          return map;
+        }, new Map<string, ScheduleTeacherDto>())
+        .values(),
+    );
+  }
 }

@@ -31,6 +31,7 @@ import {
   ApiResponse,
 } from '@nestjs/swagger';
 import { TeacherGetByIdDto } from './dto/teacher-get-by-id.dto';
+import { ScheduleTeacherDto } from './dto/schedule-teacher.dto';
 
 @ApiTags('Teachers')
 @Controller('teachers')
@@ -225,6 +226,30 @@ export class TeacherController {
     return this.teacherService.deactivate(id);
   }
 
+  @Get(':teacherId/schedules')
+  @ApiOperation({
+    summary: 'Obtener los horarios y aulas donde enseña un profesor',
+  })
+  @ApiParam({
+    name: 'teacherId',
+    type: 'string',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de aulas y horarios',
+    type: [ScheduleTeacherDto],
+  })
+  @Authorization({
+    permission: 'teacher.getSchedules',
+    description: 'Obtener los horarios y aulas donde enseña un profesor',
+  })
+  async getTeacherSchedules(
+    @Param('teacherId') teacherId: string,
+  ): Promise<ScheduleTeacherDto[]> {
+    return this.teacherService.getTeacherSchedules(teacherId);
+  }
+
   @Get('by-course/:courseId')
   @ApiOperation({ summary: 'Obtener profesores por curso' })
   @ApiParam({ name: 'courseId', type: String, description: 'ID del curso' })
@@ -254,5 +279,24 @@ export class TeacherController {
       Number(page),
       Number(limit),
     );
+  }
+
+  /*
+  @Get(':teacherId/schedules')
+  @ApiOperation({
+    summary: 'Obtener los horarios y aulas donde enseña un profesor',
+  })
+  @ApiParam({
+    name: 'teacherId',
+    type: 'string',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de aulas y horarios',
+    type: [Object],
+  })
+  async getTeacherSchedules(@Param('teacherId') teacherId: string) {
+    return this.teacherService.getTeacherSchedules(teacherId);
   }
 }

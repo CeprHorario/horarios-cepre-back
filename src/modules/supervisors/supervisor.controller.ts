@@ -149,4 +149,22 @@ export class SupervisorController {
   async assignMonitor(@Body() assignMonitorDto: AssignMonitorDto) {
     return this.supervisorService.assignMonitor(assignMonitorDto);
   }
+
+  @Get(':id/monitors')
+  @Authorization({
+    roles: [Role.SUPERVISOR],
+    permission: 'supervisor.monitors',
+    description: 'Obtiene los monitores de este supervisor',
+  })
+  @ApiOperation({ summary: 'Obtener los monitores de este supervisor' })
+  @ApiResponse({
+    status: 200,
+    description: 'Monitores obtenidos.',
+    type: [MonitorForSupervisorDto],
+  })
+  @ApiResponse({ status: 404, description: 'Ta sin monitores.' })
+  getSupervisorMonitors(@Param('id') id: string) {
+    return this.supervisorService.getSupervisorMonitors(id);
+  }
+  
 }
