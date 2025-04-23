@@ -31,7 +31,6 @@ import {
   ApiResponse,
 } from '@nestjs/swagger';
 import { TeacherGetByIdDto } from './dto/teacher-get-by-id.dto';
-import { Schedule } from '@prisma/client';
 import { ScheduleTeacherDto } from './dto/schedule-teacher.dto';
 
 @ApiTags('Teachers')

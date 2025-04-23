@@ -13,6 +13,7 @@ import { TeacherResponseDto } from './dto/teacher-response.dto';
 import { UpdateMonitorAsAdminDto } from './dto/updateMonitorAsAdmin.dto';
 import { MonitorGetSummaryDto } from './dto/monitor-get-summary.dto';
 import { MonitorWithoutSupervisorDto } from './dto/monitorWithoutSupervisor.dto';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class MonitorService {
@@ -330,29 +331,57 @@ export class MonitorService {
     });
   }
 
-  async findAllWithSupervisor(hasSupervisor: boolean): Promise<MonitorWithoutSupervisorDto[]> {
-    const monitors = await this.prisma.getClient().monitor.findMany({
-      where: {
-        supervisorId: hasSupervisor ? { not: null } : null,
-      },
-      include: {
-        classes: {
-          select: { id: true, name: true },
-          include: {
-            shift: { select: { id: true, name: true }, },
-            area: { select: { id: true, name: true }, },
+  async findAllWithSupervisor(
+    hasSupervisor: boolean,
+    page: number = 1,
+    limit: number = 20,
+  ): Promise<{
+    data: MonitorWithoutSupervisorDto[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    const offset = (page - 1) * limit;
+  
+    const where: Prisma.MonitorWhereInput = {
+      supervisorId: hasSupervisor ? { not: null } : null,
+    };
+  
+    const [monitors, total] = await this.prisma.getClient().$transaction([
+      this.prisma.getClient().monitor.findMany({
+        skip: offset,
+        take: limit,
+        where,
+        select: {
+          id: true,
+          classes: {
+            select: {
+              id: true,
+              name: true,
+              shift: {
+                select: { id: true, name: true },
+              },
+              area: {
+                select: { id: true, name: true },
+              },
+            },
           },
-        }
-      },
-    });
-    return monitors.map((monitor) => ({
+        },
+        orderBy: { classes: { name: 'asc' } },
+      }),
+      this.prisma.getClient().monitor.count({ where }),
+    ]);
+  
+    const data = monitors.map((monitor) => ({
       monitorId: monitor.id,
       className: monitor.classes?.name || 'no asignado',
-      shiftId: monitor.classes?.shift.id || 0,
-      shiftName: monitor.classes?.shift.name || 'no asignado',
-      areaId: monitor.classes?.area.id || 0,
-      areaName: monitor.classes?.area.name || 'no asignado',
+      shiftId: monitor.classes?.shift?.id || 0,
+      shiftName: monitor.classes?.shift?.name || 'no asignado',
+      areaId: monitor.classes?.area?.id || 0,
+      areaName: monitor.classes?.area?.name || 'no asignado',
     }));
+  
+    return { data, total, page, limit };
   }
 
   // ─────── Métodos auxiliares ───────

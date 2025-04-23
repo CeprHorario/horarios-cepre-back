@@ -12,6 +12,7 @@ import {
   HttpStatus,
   Query,
   Patch,
+  ParseBoolPipe,
 } from '@nestjs/common';
 import { MonitorService } from './monitor.service';
 import { CreateMonitorDto, MonitorInformationDto } from './dto';
@@ -52,6 +53,31 @@ export class MonitorController {
     return this.monitorService.create(createMonitorDto);
   }
 
+  @Get('filtered')
+  @Authorization({
+    permission: 'monitor.list',
+    description: 'Obtener todos los monitores activos',
+  })
+  @ApiOperation({ summary: 'Obtener todos los monitores activos' })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de monitores paginada',
+    type: MonitorWithoutSupervisorDto,
+    isArray: true,
+  })
+  findAllWithSupervisor(
+    @Query('has_supervisor', new ParseBoolPipe()) hasSupervisor: boolean,
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 20,
+  ): Promise<{
+    data: MonitorWithoutSupervisorDto[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    return this.monitorService.findAllWithSupervisor(hasSupervisor, page, limit);
+  }
+
   @Get()
   @Authorization({
     permission: 'monitor.list',
@@ -74,13 +100,6 @@ export class MonitorController {
     limit: number;
   }> {
     return this.monitorService.findAllBasicInfo(Number(page), Number(limit));
-  }
-
-  @Get()
-  async findAllWithSupervisor(
-    @Query('has_supervisor') hasSupervisor: boolean,
-  ): Promise<MonitorWithoutSupervisorDto[]> {
-    return await this.monitorService.findAllWithSupervisor(hasSupervisor);
   }
 
   @Get(':id/')
