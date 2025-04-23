@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Weekday } from '@prisma/client';
 import { Type } from 'class-transformer';
-import { IsEnum, IsNumber } from 'class-validator';
+import { IsEnum, IsNumber, ValidateNested } from 'class-validator';
 
 class HourSessionInput {
   @IsNumber()
@@ -20,5 +20,6 @@ export class TeacherFilteredDto {
 
   @Type(() => HourSessionInput)
   @ApiProperty({ type: [HourSessionInput] })
+  @ValidateNested({ each: true })
   hourSessions: HourSessionInput[];
 }

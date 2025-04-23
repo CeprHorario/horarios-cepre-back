@@ -10,7 +10,7 @@ import { TeacherUpdateDto } from './dto/teacher-update.dto';
 import { TeacherGetByIdDto } from './dto/teacher-get-by-id.dto';
 import { ScheduleTeacherDto } from './dto/schedule-teacher.dto';
 import { TeacherFilteredDto } from '@modules/teachers/dto/teacherFiltered.dto';
-import { Length } from 'class-validator';
+import { JobStatus } from '@prisma/client';
 
 @Injectable()
 export class TeacherService {
@@ -429,7 +429,7 @@ export class TeacherService {
   ) {
     const ids = await this.prisma.getClient().$queryRaw<{ id: string }[]>`
       SELECT id FROM "teachers"
-      WHERE courseId = ${body.courseId} AND (max_hours - scheduled_hours) >= ${body.hourSessions.length}
+      WHERE course_id = ${body.courseId} AND (max_hours - scheduled_hours) >= ${body.hourSessions.length}
     `;
 
     const offset = (page - 1) * limit;
@@ -450,9 +450,10 @@ export class TeacherService {
       },
       select: {
         id: true,
+        jobStatus: true,
+        isCoordinator: true,
         user: {
           select: {
-            email: true,
             userProfile: {
               select: {
                 firstName: true,
@@ -465,13 +466,16 @@ export class TeacherService {
       },
     });
 
-    const data = teachers.map((teacher) => ({
-      id: teacher.id,
-      firstName: teacher.user?.userProfile?.firstName || 'no asignado',
-      lastName: teacher.user?.userProfile?.lastName || 'no asignado',
-      email: teacher.user?.email || null,
-      phone: teacher.user?.userProfile?.phone || null,
-    }));
+    const data = teachers.map((teacher) =>
+      plainToInstance(TeacherGetSummaryDto, {
+        id: teacher.id,
+        firstName: teacher.user?.userProfile?.firstName || '',
+        lastName: teacher.user?.userProfile?.lastName || '',
+        phone: teacher.user?.userProfile?.phone || null,
+        jobStatus: teacher.jobStatus || JobStatus.FullTime,
+        isCoordinator: teacher.isCoordinator || false,
+      }),
+    );
 
     return { data, page, limit };
   }

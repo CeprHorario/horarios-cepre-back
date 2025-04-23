@@ -40,7 +40,7 @@ import { TeacherFilteredDto } from '@modules/teachers/dto/teacherFiltered.dto';
 export class TeacherController {
   constructor(private readonly teacherService: TeacherService) {}
 
-  @Post('filtered')
+  @Get('filtered')
   @Unauthenticated()
   async getFilteredTeachers(
     @Query('page') page: number = 1,
@@ -48,7 +48,6 @@ export class TeacherController {
     @Body() data: TeacherFilteredDto,
   ): Promise<{
     data: TeacherGetSummaryDto[];
-    total: number;
     page: number;
     limit: number;
   }> {
