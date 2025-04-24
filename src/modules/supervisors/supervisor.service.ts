@@ -344,11 +344,9 @@ export class SupervisorService {
       },
       },
     });
-
     if (!supervisor) {
       throw new NotFoundException('Supervisor no encontrado');
     }
-
     // Luego obtenemos los monitores asignados
     const monitors = await this.prisma.getClient().monitor.findMany({
       where: {
@@ -357,8 +355,32 @@ export class SupervisorService {
         },
       },
       include: {
+        classes: {
+          select: {
+            name: true,
+            urlMeet: true,
+            shift: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+            area: {
+              select: {
+                id: true,
+                name: true,
+              },
+            }
+          },
+        },
         user: {
           select: {
+            userProfile: {
+              select: {
+                firstName: true,
+                lastName: true,
+              },
+            },
             email: true
           }
         }
@@ -371,7 +393,14 @@ export class SupervisorService {
       email: supervisor.users.email,
       shift_id: supervisor.shiftId,
       monitores_asignados: monitors.map(monitor => ({
-        monitor_id: monitor.id,
+        monitorId: monitor.id,
+        className: monitor.classes?.name || 'no asignada',
+        shiftId: monitor.classes?.shift?.id || 'no asignado',
+        shiftName: monitor.classes?.shift?.name || 'no asignado',
+        areaId: monitor.classes?.area?.id || 'no asignado',
+        areaName: monitor.classes?.area?.name || 'no asignado',
+        firstName: monitor.user.userProfile?.firstName,
+        lastName: monitor.user.userProfile?.lastName,
         email: monitor.user.email
       }))
     };
