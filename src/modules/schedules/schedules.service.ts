@@ -25,6 +25,36 @@ export class ScheduleService {
     return data;
   }
 
+  async getPublicScheduleByTeacher(email: string, dni: string) {
+    const schedules = await this.prisma.getClient().user.findFirst({
+      where: { AND: [{ email, isActive: true }, { userProfile: { dni } }] },
+      select: {
+        teacher: {
+          select: {
+            courses: {
+              select: { name: true },
+            },
+            schedules: {
+              select: {
+                clas: {
+                  select: { name: true, shift: { select: { name: true } } },
+                },
+                weekday: true,
+                hourSession: { select: { startTime: true, endTime: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!schedules) {
+      throw new NotFoundException('Profesor no encontrado');
+    }
+
+    return schedules;
+  }
+
   // ─────── CRUD ───────
   async create(createScheduleDto: CreateScheduleDto): Promise<ScheduleBaseDto> {
     const schedule = await this.prisma.getClient().schedule.create({

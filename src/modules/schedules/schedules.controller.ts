@@ -37,6 +37,29 @@ export class ScheduleController {
     return this.scheduleService.loadWithCourses(data);
   }
 
+  @Get('public/teachers')
+  @HttpCode(HttpStatus.OK)
+  @Unauthenticated()
+  /*@Authorization({
+    permission: 'schedule.public.getTeachers',
+    description: 'Obtener el horario de un profesor - publico',
+  })*/
+  async getPublicScheduleByTeacher(
+    @Query('email') email: string,
+    @Query('dni') dni: string,
+  ) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const isEmailValid = email ? emailRegex.test(email) : false;
+    const isDniValid = dni ? dni.length >= 8 : false;
+
+    if (!isEmailValid && !isDniValid) {
+      throw new BadRequestException(
+        'Se debe proporcionar un email válido o un DNI con al menos 8 caracteres',
+      );
+    }
+    return await this.scheduleService.getPublicScheduleByTeacher(email, dni);
+  }
+
   // ─────── CRUD ───────
   @Post()
   @HttpCode(HttpStatus.CREATED)
