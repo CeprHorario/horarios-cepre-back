@@ -624,10 +624,13 @@ export class TeacherService {
     limit: number,
   ) {
     // Validar hourSessions
+    const hourSessionIds = [
+      ...new Set(body.hourSessions.map((h) => h.hourSessionId)),
+    ];
     const count = await this.prisma.getClient().hourSession.count({
-      where: { id: { in: body.hourSessions.map((h) => h.hourSessionId) } },
+      where: { id: { in: hourSessionIds } },
     });
-    if (count !== body.hourSessions.length) {
+    if (count !== hourSessionIds.length) {
       throw new NotFoundException('Some hour sessions do not exist');
     }
 
