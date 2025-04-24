@@ -166,7 +166,7 @@ export class MonitorController {
 
   @Get('/datos/teachers')
   @Authorization({
-    roles: [Role.MONITOR, Role.ADMIN],
+    roles: [Role.MONITOR, Role.ADMIN, Role.SUPERVISOR],
     permission: 'monitor.listTeachersByMonitor',
     description: 'Cargar los docentes de un monitor',
   })
