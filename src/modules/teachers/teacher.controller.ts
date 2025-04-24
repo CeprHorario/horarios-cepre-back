@@ -12,6 +12,8 @@ import {
   Query,
   Patch,
   NotFoundException,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { TeacherService } from './teacher.service';
 import { CreateTeacherWithUserDto } from './dto/create-teacher.dto';
@@ -39,7 +41,8 @@ import { TeacherFilteredDto } from '@modules/teachers/dto/teacherFiltered.dto';
 export class TeacherController {
   constructor(private readonly teacherService: TeacherService) {}
 
-  @Get('available')
+  @Post('available')
+  @HttpCode(HttpStatus.OK)
   @Authorization({
     permission: 'teacher.available',
     description: 'Obtener profesores disponibles para un curso y horarios',
