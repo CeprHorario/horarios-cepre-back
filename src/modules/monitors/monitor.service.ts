@@ -333,6 +333,7 @@ export class MonitorService {
 
   async findAllWithSupervisor(
     hasSupervisor: boolean,
+    shiftId?: number,
     page: number = 1,
     limit: number = 20,
   ): Promise<{
@@ -345,6 +346,9 @@ export class MonitorService {
   
     const where: Prisma.MonitorWhereInput = {
       supervisorId: hasSupervisor ? { not: null } : null,
+      classes: {
+        ...(shiftId !== undefined ? { shiftId } : {}),
+      },
     };
   
     const [monitors, total] = await this.prisma.getClient().$transaction([

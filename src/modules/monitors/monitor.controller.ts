@@ -69,13 +69,19 @@ export class MonitorController {
     @Query('has_supervisor', new ParseBoolPipe()) hasSupervisor: boolean,
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 20,
+    @Query('shiftId') shiftId?: number,
   ): Promise<{
     data: MonitorWithoutSupervisorDto[];
     total: number;
     page: number;
     limit: number;
   }> {
-    return this.monitorService.findAllWithSupervisor(hasSupervisor, page, limit);
+    return this.monitorService.findAllWithSupervisor(
+      hasSupervisor,
+      shiftId,
+      page,
+      limit,
+    );
   }
 
   @Get()
