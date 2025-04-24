@@ -558,6 +558,7 @@ export class TeacherService {
       include: {
         course: {
           select: {
+            id: true,
             name: true,
           },
         },
@@ -565,10 +566,15 @@ export class TeacherService {
           select: {
             id: true,
             name: true,
-            urlMeet: true,
-            urlClassroom: true,
+            area: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
             shift: {
               select: {
+                id: true,
                 name: true,
               },
             },
@@ -591,9 +597,11 @@ export class TeacherService {
             map.set(key, {
               classId: s.clas.id,
               className: s.clas.name,
+              courseId: s.course.id,
               courseName: s.course.name,
-              urlMeet: s.clas.urlMeet || '',
-              urlClassroom: s.clas.urlClassroom || '',
+              areaId: s.clas.area.id,
+              areaName: s.clas.area.name,
+              shiftId: s.clas.shift.id,
               shiftName: s.clas.shift.name,
               schedules: [],
             });

@@ -1,7 +1,7 @@
 import { ScheduleForTeacherDto } from '@modules/schedules/dto';
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsString, IsUUID } from 'class-validator';
+import { IsNumber, IsString, IsUUID } from 'class-validator';
 
 export class ScheduleTeacherDto {
   @IsUUID()
@@ -11,17 +11,25 @@ export class ScheduleTeacherDto {
   @ApiProperty({ example: 'I-101 Ingenierías' })
   className: string;
 
+  @IsNumber()
+  @ApiProperty({ example: 321 })
+  courseId: number;
+
   @IsString()
   @ApiProperty({ example: 'Matemática' })
   courseName: string;
 
-  @IsString()
-  @ApiProperty({ example: 'meet.google.com/abc-defg-hij' })
-  urlMeet: string;
+  @IsNumber()
+  @ApiProperty({ example: 123 })
+  areaId: number;
 
   @IsString()
-  @ApiProperty({ example: 'classroom.google.com/abc-defg-hij' })
-  urlClassroom: string;
+  @ApiProperty({ example: 'Ingenierías' })
+  areaName: string;
+
+  @IsNumber()
+  @ApiProperty({ example: 456 })
+  shiftId: number;
 
   @IsString()
   @ApiProperty({ example: 'Turno 01' })
