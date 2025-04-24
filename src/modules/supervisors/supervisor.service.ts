@@ -395,12 +395,12 @@ export class SupervisorService {
       monitores_asignados: monitors.map(monitor => ({
         monitorId: monitor.id,
         className: monitor.classes?.name || 'no asignada',
-        shiftId: monitor.classes?.shift?.id || 'no asignado',
+        shiftId: monitor.classes?.shift?.id || 0,
         shiftName: monitor.classes?.shift?.name || 'no asignado',
-        areaId: monitor.classes?.area?.id || 'no asignado',
+        areaId: monitor.classes?.area?.id || 0,
         areaName: monitor.classes?.area?.name || 'no asignado',
-        firstName: monitor.user.userProfile?.firstName,
-        lastName: monitor.user.userProfile?.lastName,
+        firstName: monitor.user.userProfile?.firstName || 'no asignado',
+        lastName: monitor.user.userProfile?.lastName || 'no asignado',
         email: monitor.user.email
       }))
     };

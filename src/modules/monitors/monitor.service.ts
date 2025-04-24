@@ -370,6 +370,17 @@ export class MonitorService {
               },
             },
           },
+          user: {
+            select: {
+              userProfile: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                },
+              },
+              email: true
+            }
+          }
         },
         orderBy: { classes: { name: 'asc' } },
       }),
@@ -383,6 +394,9 @@ export class MonitorService {
       shiftName: monitor.classes?.shift?.name || 'no asignado',
       areaId: monitor.classes?.area?.id || 0,
       areaName: monitor.classes?.area?.name || 'no asignado',
+      firstName: monitor.user?.userProfile?.firstName || 'no asignado',
+      lastName: monitor.user?.userProfile?.lastName || 'no asignado',
+      email: monitor.user?.email,
     }));
   
     return { data, total, page, limit };
