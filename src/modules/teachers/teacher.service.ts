@@ -110,11 +110,11 @@ export class TeacherService {
           },
           user: {
             select: {
+              email: true,
               userProfile: {
                 select: {
                   firstName: true,
                   lastName: true,
-                  personalEmail: true,
                   phone: true,
                 },
               },
@@ -133,7 +133,7 @@ export class TeacherService {
         courseName: teacher.courses?.name || '',
         firstName: teacher.user?.userProfile?.firstName || '',
         lastName: teacher.user?.userProfile?.lastName || '',
-        personalEmail: teacher.user?.userProfile?.personalEmail || null,
+        email: teacher.user?.email || null,
         phone: teacher.user?.userProfile?.phone || null,
         jobStatus: teacher.jobStatus || '',
         isCoordinator: teacher.isCoordinator || false,

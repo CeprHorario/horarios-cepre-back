@@ -77,11 +77,11 @@ export class SupervisorService {
           users: {
             select: {
               isActive: true,
+              email: true,
               userProfile: {
                 select: {
                   firstName: true,
                   lastName: true,
-                  personalEmail: true,
                   phone: true,
                 },
               },
@@ -101,7 +101,7 @@ export class SupervisorService {
         shiftId: supervisor.shiftId || null, // Mapear shiftId
         firstName: supervisor.users?.userProfile?.firstName || '',
         lastName: supervisor.users?.userProfile?.lastName || '',
-        personalEmail: supervisor.users?.userProfile?.personalEmail || null,
+        email: supervisor.users?.email || null,
         phone: supervisor.users?.userProfile?.phone || null,
       }),
     );
