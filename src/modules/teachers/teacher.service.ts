@@ -1,13 +1,14 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {  Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@database/prisma/prisma.service';
 import { TeacherBaseDto } from './dto';
 import { plainToInstance } from 'class-transformer';
-import { ImportTeacherDto } from './dto/import-teacher.dto';
+import { CreateTeacherDto } from './dto/import-teacher.dto';
 import { CreateTeacherWithUserDto } from './dto/create-teacher.dto';
 import { Role } from '@modules/auth/decorators/authorization.decorator';
 import { TeacherGetSummaryDto } from './dto/teacher-get-summary.dto';
 import { TeacherUpdateDto } from './dto/teacher-update.dto';
 import { TeacherGetByIdDto } from './dto/teacher-get-by-id.dto';
+//import { Teacher } from '@prisma/client';
 
 @Injectable()
 export class TeacherService {
@@ -122,7 +123,7 @@ export class TeacherService {
 
     const data = teachers.map((teacher) =>
       plainToInstance(TeacherGetSummaryDto, {
-        id: teacher.id, // Incluye el ID en el mapeo
+        id: teacher.id, 
         courseName: teacher.courses?.name || '',
         firstName: teacher.user?.userProfile?.firstName || '',
         lastName: teacher.user?.userProfile?.lastName || '',
@@ -260,73 +261,73 @@ export class TeacherService {
     return plainToInstance(TeacherBaseDto, obj);
   }
 
-  async createTeachersFromJson(data: ImportTeacherDto[]) {
-    if (data.length === 0) return { message: 'No hay datos para procesar' };
+  async createManyTeachers(dtos: CreateTeacherDto[]) {
+    const prisma = this.prisma.getClient();
 
-    return this.prisma.getClient().$transaction(async (tx) => {
-      const courseNames = [...new Set(data.map((t) => t.courseName))]; // Eliminar nombres duplicados
-      const courses = await tx.course.findMany({
-        where: { name: { in: courseNames } },
-        select: { id: true, name: true },
-      });
-
-      const courseMap = new Map(courses.map((c) => [c.name, c.id]));
-
-      const missingCourses = courseNames.filter((name) => !courseMap.has(name));
-      if (missingCourses.length > 0) {
-        throw new Error(
-          `Los siguientes cursos no existen: ${missingCourses.join(', ')}`,
-        );
-      }
-
-      // Crear los usuarios
-      await tx.user.createMany({
-        data: data.map((t) => ({
-          email: t.email,
-          role: 'profesor',
-          isActive: true,
-        })),
-      });
-
-      // Obtener los nuevos usuarios creados
-      const newUsers = await tx.user.findMany({
-        where: {
-          email: { in: data.map((t) => t.email) },
+    const existingUsers = await prisma.user.findMany({
+      where: {
+        email: {
+          in: dtos.map((dto) => dto.email),
         },
-        select: { id: true, email: true },
-      });
-
-      // Mapear emails a IDs de usuario
-      const userMap = new Map(newUsers.map((u) => [u.email, u.id]));
-
-      // Crear los perfiles de usuario
-      await tx.userProfile.createMany({
-        data: data.map((t) => ({
-          userId: userMap.get(t.email)!,
-          dni: t.dni,
-          firstName: t.firstName,
-          lastName: t.lastName,
-          phone: t.phone,
-          phonesAdditional: t.phonesAdditional || [],
-          personalEmail: t.personalEmail,
-        })),
-      });
-
-      // Crear los profesores con el `jobStatus` y `courseId`
-      await tx.teacher.createMany({
-        data: data.map((t) => ({
-          userId: userMap.get(t.email)!,
-          courseId: courseMap.get(t.courseName)!, // Obtener el ID del curso
-          jobStatus: t.jobStatus,
-        })),
-      });
-
-      return {
-        message: 'Profesores creados correctamente',
-        inserted: data.length,
-      };
+      },
+      select: { email: true },
     });
+  
+    const existingEmails = new Set(existingUsers.map((u) => u.email));
+
+    const duplicated = dtos.filter((dto) => existingEmails.has(dto.email));
+    const toCreate = dtos.filter((dto) => !existingEmails.has(dto.email));
+
+    if (toCreate.length === 0) {
+      return {
+        creados: [],
+        noCreados: duplicated.map(d => ({ email: d.email, dni: d.dni })),
+      };
+    }
+
+    const result = await prisma.$transaction(
+      toCreate.map((dto) =>
+        prisma.user.create({
+          data: {
+            email: dto.email,
+            role: Role.TEACHER,
+            userProfile: {
+              create: {
+                dni: dto.dni,
+                firstName: dto.firstName,
+                lastName: dto.lastName,
+                phone: dto.phone,
+                phonesAdditional: dto.phonesAdditional ?? [],
+                personalEmail: dto.personalEmail || null,
+              },
+            },
+            teacher: {
+              create: {
+                courseId: dto.courseId,
+                maxHours: dto.maxHours,
+                scheduledHours: 0,
+                jobStatus: dto.jobStatus,
+              },
+            },
+          },
+          include: {
+            teacher: true,
+            userProfile: true,
+          },
+        })
+      )
+    );
+  
+    return {
+      creados: result.map((r) => ({
+        email: r.email,
+        dni: r.userProfile?.dni,
+      })),
+      noCreados: duplicated.map(d => ({ email: d.email, dni: d.dni })),
+    };
   }
+  
+  
 
   async deactivate(id: string) {
     const teacher = await this.prisma.getClient().teacher.findUnique({ 

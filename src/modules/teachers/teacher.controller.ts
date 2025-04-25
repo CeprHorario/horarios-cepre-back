@@ -6,9 +6,6 @@ import {
   Param,
   Put,
   Delete,
-  UseInterceptors,
-  UploadedFile,
-  BadRequestException,
   Query,
   Patch,
   NotFoundException,
@@ -16,12 +13,10 @@ import {
 import { TeacherService } from './teacher.service';
 import { CreateTeacherWithUserDto } from './dto/create-teacher.dto';
 import { Authorization } from '@modules/auth/decorators/authorization.decorator';
-import { FileInterceptor } from '@nestjs/platform-express';
-import { Readable } from 'stream';
-import { ImportTeacherDto } from './dto/import-teacher.dto';
+
+import { CreateTeacherDto } from './dto/import-teacher.dto';
 import { TeacherGetSummaryDto } from './dto/teacher-get-summary.dto';
 import { TeacherUpdateDto } from './dto/teacher-update.dto';
-import csvParser from 'csv-parser';
 import { Unauthenticated } from '@modules/auth/decorators/unauthenticated.decorator';
 import {
   ApiBody,
@@ -143,57 +138,12 @@ export class TeacherController {
   @ApiOperation({
     summary: 'Crear profesores desde un archivo JSON',
   })
-  @ApiBody({ type: [ImportTeacherDto] })
-  async createTeachersFromJson(@Body() importTeacherDto: ImportTeacherDto[]) {
-    return this.teacherService.createTeachersFromJson(importTeacherDto);
+  @ApiBody({ type: [CreateTeacherDto] })
+  async createTeachersFromJson(@Body() importTeacherDto: CreateTeacherDto[]) {
+    return this.teacherService.createManyTeachers(importTeacherDto);
   }
 
-  // ✅ Cargar desde CSV
-  @Post('csv')
-  @Unauthenticated()
-  @Authorization({
-    permission: 'teacher.importcsv',
-    description: 'Eliminar un profesor por su id',
-  })
-  @UseInterceptors(FileInterceptor('file'))
-  async createTeachersFromCsv(@UploadedFile() file: Express.Multer.File) {
-    if (!file) {
-      throw new BadRequestException('No file uploaded');
-    }
-
-    const records: ImportTeacherDto[] = [];
-
-    return new Promise((resolve, reject) => {
-      Readable.from(file.buffer)
-        .pipe(csvParser())
-        .on('data', (row) => {
-          records.push({
-            email: row.email,
-            dni: row.dni,
-            firstName: row.first_name,
-            lastName: row.last_name,
-            phone: row.phone || null,
-            phonesAdditional: row.phone_aditional
-              ? row.phone_aditional.split(';')
-              : [],
-            personalEmail: row.personal_email || null,
-            jobStatus: row.job_status || null,
-            courseName: row.course_name || null,
-          });
-        })
-        .on('end', async () => {
-          try {
-            const result =
-              await this.teacherService.createTeachersFromJson(records);
-            resolve(result);
-          } catch (error) {
-            reject(error);
-          }
-        })
-        .on('error', reject);
-    });
-  }
-
+  
   @Patch(':id/deactivate')
   @Authorization({
     permission: 'teacher.deactivate',
