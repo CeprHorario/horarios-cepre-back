@@ -1,5 +1,8 @@
-
-import {  BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '@database/prisma/prisma.service';
 import { TeacherBaseDto } from './dto';
 import { plainToInstance } from 'class-transformer';
@@ -94,8 +97,8 @@ export class TeacherService {
 
     const [teachers, total] = await this.prisma.getClient().$transaction([
       this.prisma.getClient().teacher.findMany({
-        skip: limit > 0 ? offset : undefined, // Si limit es 0, no aplica paginación
-        take: limit > 0 ? limit : undefined, // Si limit es 0, no aplica límite
+        skip: limit > 0 ? offset : undefined,
+        take: limit > 0 ? limit : undefined,
         relationLoadStrategy: 'join',
         where: activeFilter,
         select: {
@@ -128,7 +131,7 @@ export class TeacherService {
 
     const data = teachers.map((teacher) =>
       plainToInstance(TeacherGetSummaryDto, {
-        id: teacher.id, 
+        id: teacher.id,
         courseName: teacher.courses?.name || '',
         firstName: teacher.user?.userProfile?.firstName || '',
         lastName: teacher.user?.userProfile?.lastName || '',
@@ -280,7 +283,7 @@ export class TeacherService {
       },
       select: { email: true },
     });
-  
+
     const existingEmails = new Set(existingUsers.map((u) => u.email));
 
     const duplicated = dtos.filter((dto) => existingEmails.has(dto.email));
@@ -289,7 +292,7 @@ export class TeacherService {
     if (toCreate.length === 0) {
       return {
         creados: [],
-        noCreados: duplicated.map(d => ({ email: d.email, dni: d.dni })),
+        noCreados: duplicated.map((d) => ({ email: d.email, dni: d.dni })),
       };
     }
 
@@ -322,20 +325,18 @@ export class TeacherService {
             teacher: true,
             userProfile: true,
           },
-        })
-      )
+        }),
+      ),
     );
-  
+
     return {
       creados: result.map((r) => ({
         email: r.email,
         dni: r.userProfile?.dni,
       })),
-      noCreados: duplicated.map(d => ({ email: d.email, dni: d.dni })),
+      noCreados: duplicated.map((d) => ({ email: d.email, dni: d.dni })),
     };
   }
-  
-  
 
   async deactivate(id: string) {
     const teacher = await this.prisma.getClient().teacher.findUnique({
@@ -662,6 +663,7 @@ export class TeacherService {
         isCoordinator: true,
         user: {
           select: {
+            email: true,
             userProfile: {
               select: {
                 firstName: true,
@@ -679,6 +681,7 @@ export class TeacherService {
         id: teacher.id,
         firstName: teacher.user?.userProfile?.firstName || '',
         lastName: teacher.user?.userProfile?.lastName || '',
+        email: teacher.user?.email || '',
         phone: teacher.user?.userProfile?.phone || null,
         jobStatus: teacher.jobStatus || JobStatus.FullTime,
         isCoordinator: teacher.isCoordinator || false,
