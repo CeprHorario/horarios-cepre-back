@@ -20,8 +20,6 @@ import { CreateTeacherDto } from './dto/import-teacher.dto';
 import { TeacherGetSummaryDto } from './dto/teacher-get-summary.dto';
 import { TeacherUpdateDto } from './dto/teacher-update.dto';
 
-import { Unauthenticated } from '@modules/auth/decorators/unauthenticated.decorator';
-
 import {
   ApiBody,
   ApiOperation,
@@ -211,7 +209,7 @@ export class TeacherController {
   @ApiBody({ type: [CreateTeacherDto] })
   async createTeachersFromJson(@Body() importTeacherDto: CreateTeacherDto[]) {
     return this.teacherService.createManyTeachers(importTeacherDto);
-
+  }
   
   @Patch(':id/deactivate')
   @Authorization({

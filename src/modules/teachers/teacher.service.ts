@@ -1,5 +1,5 @@
 
-import {  Injectable, NotFoundException } from '@nestjs/common';
+import {  BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@database/prisma/prisma.service';
 import { TeacherBaseDto } from './dto';
 import { plainToInstance } from 'class-transformer';
