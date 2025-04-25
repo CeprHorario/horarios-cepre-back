@@ -12,6 +12,7 @@ import {
   HttpStatus,
   Query,
   Patch,
+  ParseBoolPipe,
 } from '@nestjs/common';
 import { MonitorService } from './monitor.service';
 import { CreateMonitorDto, MonitorInformationDto } from './dto';
@@ -24,6 +25,7 @@ import { TeacherResponseDto } from './dto/teacher-response.dto';
 import { UpdateMonitorAsAdminDto } from './dto/updateMonitorAsAdmin.dto';
 import { MonitorGetSummaryDto } from './dto/monitor-get-summary.dto';
 import { ApiResponse,ApiOperation } from '@nestjs/swagger';
+import { MonitorWithoutSupervisorDto } from './dto/monitorWithoutSupervisor.dto';
 @Controller('monitors')
 export class MonitorController {
   constructor(private readonly monitorService: MonitorService) {}
@@ -49,6 +51,37 @@ export class MonitorController {
   })
   create(@Body() createMonitorDto: CreateMonitorDto) {
     return this.monitorService.create(createMonitorDto);
+  }
+
+  @Get('filtered')
+  @Authorization({
+    permission: 'monitor.list',
+    description: 'Obtener todos los monitores activos',
+  })
+  @ApiOperation({ summary: 'Obtener todos los monitores activos' })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de monitores paginada',
+    type: MonitorWithoutSupervisorDto,
+    isArray: true,
+  })
+  findAllWithSupervisor(
+    @Query('has_supervisor', new ParseBoolPipe()) hasSupervisor: boolean,
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 20,
+    @Query('shiftId') shiftId?: number,
+  ): Promise<{
+    data: MonitorWithoutSupervisorDto[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    return this.monitorService.findAllWithSupervisor(
+      hasSupervisor,
+      shiftId,
+      page,
+      limit,
+    );
   }
 
   @Get()
@@ -133,7 +166,7 @@ export class MonitorController {
 
   @Get('/datos/teachers')
   @Authorization({
-    roles: [Role.MONITOR, Role.ADMIN],
+    roles: [Role.MONITOR, Role.ADMIN, Role.SUPERVISOR],
     permission: 'monitor.listTeachersByMonitor',
     description: 'Cargar los docentes de un monitor',
   })

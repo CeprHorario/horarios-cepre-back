@@ -11,13 +11,16 @@ import {
   ParseIntPipe,
   Patch,
   BadRequestException,
+  Query,
+
 } from '@nestjs/common';
 import { ScheduleService } from './schedules.service';
 import { ScheduleBaseDto, CreateScheduleDto, UpdateScheduleDto } from './dto';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { Authorization } from '@modules/auth/decorators/authorization.decorator';
+import { Authorization, Role } from '@modules/auth/decorators/authorization.decorator';
 import { LoadScheduleDto } from './dto';
 import { Unauthenticated } from '@modules/auth/decorators/unauthenticated.decorator';
+import { Weekday } from '@prisma/client';
 
 @Controller('schedules')
 @ApiTags('Schedules')
@@ -110,6 +113,7 @@ export class ScheduleController {
     return this.scheduleService.delete(id);
   }
 
+
   @Unauthenticated()
   @Patch('/asignar/profesor')
   async assignTeacherToSchedules(
@@ -132,4 +136,47 @@ export class ScheduleController {
       throw new BadRequestException(error.message);
     }
   }
+
+  @Authorization({
+    roles: [Role.ADMIN],
+    permission: 'schedule.getAvailableClassrooms',
+    description: 'Obtener aulas disponibles',
+  })
+  @ApiOperation({
+    summary: 'Obtener aulas disponibles',
+    description: 'Get available classrooms',
+  })
+  @Get('/salones/disponibles')
+  async getAvailableClassrooms(
+    @Query('course_id', ParseIntPipe) courseId: number,
+    @Query('horario') horario: string,
+    @Query('teacher_id') teacherId?: string,
+    @Query('page', ParseIntPipe) page: number = 1, 
+    @Query('pageSize', ParseIntPipe) pageSize: number = 10 
+  ) {
+    try {
+      const parsedHorario = JSON.parse(horario) as Array<{
+        id_hour_session: number;
+        weekday: Weekday;
+      }>;
+
+      if (!Array.isArray(parsedHorario)) {
+        throw new BadRequestException('El horario debe ser un array');
+      }
+
+      return this.scheduleService.findAvailableClassrooms(
+        courseId,
+        parsedHorario,
+        teacherId,
+        page, 
+        pageSize 
+      );
+    } catch (error) {
+      if (error instanceof SyntaxError) {
+        throw new BadRequestException('Formato de horario inválido. Debe ser un JSON válido');
+      }
+      throw error;
+    }
+  }
+
 }

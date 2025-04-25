@@ -38,4 +38,12 @@ export class SupervisorGetSummaryDto {
   })
   @Expose()
   phone: string | null;
+
+  @ApiProperty({
+    description: 'ID del turno asociado al supervisor',
+    nullable: true,
+    example: 1,
+  })
+  @Expose()
+  shiftId: number | null;
 }

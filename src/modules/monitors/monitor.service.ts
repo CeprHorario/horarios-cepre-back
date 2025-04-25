@@ -12,6 +12,8 @@ import { ScheduleDto, Weekday } from './dto/schedule.dto';
 import { TeacherResponseDto } from './dto/teacher-response.dto';
 import { UpdateMonitorAsAdminDto } from './dto/updateMonitorAsAdmin.dto';
 import { MonitorGetSummaryDto } from './dto/monitor-get-summary.dto';
+import { MonitorWithoutSupervisorDto } from './dto/monitorWithoutSupervisor.dto';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class MonitorService {
@@ -78,7 +80,7 @@ export class MonitorService {
         id: monitor.id,
         firstName: monitor.user?.userProfile?.firstName || '',
         lastName: monitor.user?.userProfile?.lastName || '',
-        personalEmail: monitor.user?.userProfile?.personalEmail || '',
+        email: monitor.user?.email || '',
         phone: monitor.user?.userProfile?.phone || '',
         className: monitor.classes?.name || '',
       }),
@@ -327,6 +329,77 @@ export class MonitorService {
       firstName: monitor.user?.userProfile?.firstName || '',
       lastName: monitor.user?.userProfile?.lastName || ''
     });
+  }
+
+  async findAllWithSupervisor(
+    hasSupervisor: boolean,
+    shiftId?: number,
+    page: number = 1,
+    limit: number = 20,
+  ): Promise<{
+    data: MonitorWithoutSupervisorDto[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    const offset = (page - 1) * limit;
+  
+    const where: Prisma.MonitorWhereInput = {
+      supervisorId: hasSupervisor ? { not: null } : null,
+      classes: {
+        ...(shiftId !== undefined ? { shiftId } : {}),
+      },
+    };
+  
+    const [monitors, total] = await this.prisma.getClient().$transaction([
+      this.prisma.getClient().monitor.findMany({
+        skip: offset,
+        take: limit,
+        where,
+        select: {
+          id: true,
+          classes: {
+            select: {
+              id: true,
+              name: true,
+              shift: {
+                select: { id: true, name: true },
+              },
+              area: {
+                select: { id: true, name: true },
+              },
+            },
+          },
+          user: {
+            select: {
+              userProfile: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                },
+              },
+              email: true
+            }
+          }
+        },
+        orderBy: { classes: { name: 'asc' } },
+      }),
+      this.prisma.getClient().monitor.count({ where }),
+    ]);
+  
+    const data = monitors.map((monitor) => ({
+      monitorId: monitor.id,
+      className: monitor.classes?.name || 'no asignado',
+      shiftId: monitor.classes?.shift?.id || 0,
+      shiftName: monitor.classes?.shift?.name || 'no asignado',
+      areaId: monitor.classes?.area?.id || 0,
+      areaName: monitor.classes?.area?.name || 'no asignado',
+      firstName: monitor.user?.userProfile?.firstName || 'no asignado',
+      lastName: monitor.user?.userProfile?.lastName || 'no asignado',
+      email: monitor.user?.email,
+    }));
+  
+    return { data, total, page, limit };
   }
 
   // ─────── Métodos auxiliares ───────
