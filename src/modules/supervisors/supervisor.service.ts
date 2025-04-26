@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '@database/prisma/prisma.service';
 import { SupervisorBaseDto } from './dto';
 import { plainToInstance } from 'class-transformer';
@@ -169,6 +169,23 @@ export class SupervisorService {
     id: string,
     updateSupervisorDto: UpdateSupervisorWithProfileDto,
   ): Promise<SupervisorGetSummaryDto> {
+    // 1. Verificar si el email ya existe en otro usuario
+  if (updateSupervisorDto.email) {
+    const existingUser = await this.prisma.getClient().user.findFirst({
+      where: {
+        email: updateSupervisorDto.email,
+        NOT: {
+          supervisor: {
+            id: id // Excluye al propio supervisor que se está actualizando
+          }
+        }
+      }
+    });
+
+    if (existingUser) {
+      throw new ConflictException('El correo electrónico ya está en uso por otro usuario');
+    }
+  }
     const supervisor = await this.prisma.getClient().supervisor.update({
       where: { id },
       data: {

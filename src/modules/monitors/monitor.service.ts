@@ -1,5 +1,5 @@
 /* eslint-disable prettier/prettier */
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ConflictException} from '@nestjs/common';
 import { PrismaService } from '@database/prisma/prisma.service';
 import {
   CreateMonitorDto,
@@ -181,7 +181,22 @@ export class MonitorService {
         },
       });
     }
-
+    if (updateMonitorDto.email) {
+        const existingUser = await this.prisma.getClient().user.findFirst({
+          where: {
+            email: updateMonitorDto.email,
+            NOT: {
+              monitor: {
+                id: id 
+              }
+            }
+          }
+        });
+    
+        if (existingUser) {
+          throw new ConflictException('El correo electrónico ya está en uso por otro usuario');
+        }
+      }
     const monitor = await this.prisma.getClient().monitor.update({
       where: { id },
       data: {
