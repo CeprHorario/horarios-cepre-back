@@ -206,11 +206,11 @@ export class TeacherService {
         isCoordinator: updateTeacherDto.isCoordinator,
         user: {
           update: {
+            email: updateTeacherDto.email,
             userProfile: {
               update: {
                 firstName: updateTeacherDto.firstName,
                 lastName: updateTeacherDto.lastName,
-                personalEmail: updateTeacherDto.personalEmail,
                 phone: updateTeacherDto.phone,
               },
             },
@@ -225,11 +225,11 @@ export class TeacherService {
       include: {
         user: {
           select: {
+            email: true,
             userProfile: {
               select: {
                 firstName: true,
                 lastName: true,
-                personalEmail: true,
                 phone: true,
               },
             },
@@ -245,10 +245,10 @@ export class TeacherService {
 
     return plainToInstance(TeacherGetSummaryDto, {
       id: teacher.id,
+      email: teacher.user?.email || null,
       courseName: teacher.courses?.name || '',
       firstName: teacher.user?.userProfile?.firstName || '',
       lastName: teacher.user?.userProfile?.lastName || '',
-      personalEmail: teacher.user?.userProfile?.personalEmail || null,
       phone: teacher.user?.userProfile?.phone || null,
       jobStatus: teacher.jobStatus || '',
       isCoordinator: teacher.isCoordinator || false,
