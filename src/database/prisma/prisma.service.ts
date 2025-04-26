@@ -4,6 +4,7 @@ import { PrismaClientFactory } from './prisma-client.factory';
 import { AsyncLocalStorage } from 'async_hooks';
 
 import { initialDataSchema } from './data/seed';
+import { ProcessAdmissionDto } from '@modules/admissions/dto/create-admission.dto';
 
 @Injectable()
 export class PrismaService {
@@ -21,10 +22,13 @@ export class PrismaService {
     return await this.factory.setMainClient(schema);
   }
 
-  async migrationInitialSchema(schema: string): Promise<void> {
+  async migrationInitialSchema(
+    schema: string,
+    body: ProcessAdmissionDto,
+  ): Promise<void> {
     const client: PrismaClient = await this.setMainClient(schema);
 
     // Realizamos las migraciones iniciales
-    await initialDataSchema(schema, client);
+    await initialDataSchema(schema, body, client);
   }
 }

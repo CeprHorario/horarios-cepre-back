@@ -36,20 +36,32 @@ export interface User {
 }
 
 export interface Area {
+  id?: number;
   name: string;
   description: string;
 }
 
 export interface Sede {
+  id?: number;
   name: string;
   description: string;
 }
 
 export interface Shift {
   name: string;
+  startTime?: string;
+  endTime?: string;
+}
+
+export interface ShiftTimes {
+  id?: number;
+  name: string;
+  startTime: Date;
+  endTime: Date;
 }
 
 export interface Course {
+  id?: number;
   name: string;
   color: string;
   description: string;

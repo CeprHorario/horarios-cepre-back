@@ -35,7 +35,7 @@ export class AdmissionsService {
     await this.schemaManager.setCurrentSchema(nameParsed, admission[0].year);
 
     // Establecer el nuevo proceso en mi prisma factory y la migracion de data inicial
-    await this.prisma.migrationInitialSchema(admission[0].name);
+    await this.prisma.migrationInitialSchema(admission[0].name, body);
     return admission;
   }
 
