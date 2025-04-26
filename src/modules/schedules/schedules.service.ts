@@ -3,7 +3,7 @@ import { PrismaService } from '@database/prisma/prisma.service';
 import { ScheduleBaseDto, CreateScheduleDto, UpdateScheduleDto } from './dto';
 import { plainToInstance } from 'class-transformer';
 import { LoadScheduleDto } from './dto';
-import { Prisma, Weekday } from '@prisma/client';
+import {Weekday } from '@prisma/client';
 
 @Injectable()
 export class ScheduleService {
@@ -142,84 +142,102 @@ export class ScheduleService {
   async findAvailableClassrooms(
     id_course: number,
     horario: Array<{ id_hour_session: number; weekday: Weekday }>,
-    id_teacher?: string,
     page: number = 1,
     pageSize: number = 10
   ) {
+    const availableTimeSlots = new Set(horario.map(
+      slot => `${slot.id_hour_session}-${slot.weekday}`
+    ));
+  
     const allClassroomsInAreas = await this.prisma.getClient().class.findMany({
       where: {
         schedules: {
           some: {
-            courseId: id_course, 
+            courseId: id_course,
           },
         },
       },
       select: { id: true },
     });
   
-    const allClassroomIds = allClassroomsInAreas.map((classroom) => classroom.id);
+    const allClassroomIds = allClassroomsInAreas.map(c => c.id);
   
     if (allClassroomIds.length === 0) {
-      return []; 
+      return [];
     }
-
-    const conflictConditions: Prisma.ScheduleWhereInput[] = horario.flatMap((slot) => {
-      const conditions: Prisma.ScheduleWhereInput[] = [
-        {
-          hourSessionId: slot.id_hour_session,
-          weekday: slot.weekday,
-          courseId: id_course,
-          teacherId: null,  
-        },
-      ];
   
-      if (id_teacher) {
-        conditions.push({
-          hourSessionId: slot.id_hour_session,
-          weekday: slot.weekday,
-          teacherId: id_teacher,
-        });
-      }
-  
-      return conditions;
-    });
-  
-    const conflictingSchedules = await this.prisma.getClient().schedule.findMany({
+    // Traemos todos los schedules del curso en esos salones
+    const courseSchedules = await this.prisma.getClient().schedule.findMany({
       where: {
         classId: { in: allClassroomIds },
-        OR: conflictConditions,
-      },
-      select: { classId: true },
-    });
-  
-    const conflictingClassroomIds = conflictingSchedules.map((schedule) => schedule.classId);
-    const startIndex = (page - 1) * pageSize;
-    const paginatedClassroomIds = conflictingClassroomIds.slice(startIndex, startIndex + pageSize);
-  
-
-    const classrooms = await this.prisma.getClient().class.findMany({
-      where: {
-      id: { in: paginatedClassroomIds },
-      },
-      include: {
-      sede: true,
-      shift: true,
-      schedules: {
-        where: {
         courseId: id_course,
         teacherId: null,
-        },
-        select: {
-        hourSession: {
+      },
+      select: {
+        id: true,
+        classId: true,
+        hourSessionId: true,
+        weekday: true,
+      },
+    });
+  
+    // AGRUPAMOS POR classId (que es string)
+    const schedulesByClassroom = new Map<string, { hourSessionId: number; weekday: Weekday }[]>();
+  
+    for (const schedule of courseSchedules) {
+      if (!schedulesByClassroom.has(schedule.classId)) {
+        schedulesByClassroom.set(schedule.classId, []);
+      }
+      schedulesByClassroom.get(schedule.classId)!.push({
+        hourSessionId: schedule.hourSessionId,
+        weekday: schedule.weekday,
+      });
+    }
+  
+    // VERIFICAMOS
+    const matchingClassroomIds: string[] = [];
+  
+    for (const [classId, slots] of schedulesByClassroom.entries()) {
+      const allSlotsAvailable = slots.every(slot => 
+        availableTimeSlots.has(`${slot.hourSessionId}-${slot.weekday}`)
+      );
+  
+      if (allSlotsAvailable) {
+        matchingClassroomIds.push(classId);
+      }
+    }
+  
+    // PAGINAMOS
+    const startIndex = (page - 1) * pageSize;
+    const paginatedClassroomIds = matchingClassroomIds.slice(startIndex, startIndex + pageSize);
+  
+    if (paginatedClassroomIds.length === 0) {
+      return [];
+    }
+  
+    const classrooms = await this.prisma.getClient().class.findMany({
+      where: {
+        id: { in: paginatedClassroomIds },
+      },
+      include: {
+        sede: true,
+        shift: true,
+        schedules: {
+          where: {
+            courseId: id_course,
+            teacherId: null,
+          },
           select: {
-          id: true,
-          startTime: true,
-          endTime: true,
+            hourSession: {
+              select: {
+                id: true,
+                startTime: true,
+                endTime: true,
+              },
+            },
+            weekday: true,
           },
         },
-        weekday: true,
-        },
-      },
       },
     });
   

@@ -150,7 +150,6 @@ export class ScheduleController {
   async getAvailableClassrooms(
     @Query('course_id', ParseIntPipe) courseId: number,
     @Query('horario') horario: string,
-    @Query('teacher_id') teacherId?: string,
     @Query('page', ParseIntPipe) page: number = 1, 
     @Query('pageSize', ParseIntPipe) pageSize: number = 10 
   ) {
@@ -167,7 +166,6 @@ export class ScheduleController {
       return this.scheduleService.findAvailableClassrooms(
         courseId,
         parsedHorario,
-        teacherId,
         page, 
         pageSize 
       );
