@@ -2,12 +2,13 @@ import { Injectable } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 
 import { admissionProcesses } from '@database/drizzle/schema';
-import { AdmissionBaseDto, AdmissionDto, CreateAdmissionDto } from './dto';
+import { AdmissionBaseDto } from './dto';
 
 import { DrizzleService } from '@database/drizzle/drizzle.service';
 import { eq } from 'drizzle-orm';
 import { SchemaManagerService } from '@database/schema-manager/schema-manger.service';
 import { PrismaService } from '@database/prisma/prisma.service';
+import { ProcessAdmissionDto } from './dto/create-admission.dto';
 
 @Injectable()
 export class AdmissionsService {
@@ -18,19 +19,22 @@ export class AdmissionsService {
   ) {}
 
   // Metodo para crear un nuevo proceso de admisión
-  async create(dataCreate: CreateAdmissionDto) {
-    dataCreate.name = dataCreate.name.replace(/\s/g, '_').toLowerCase();
-    const obj = await this.drizzle.db
+  async create(body: ProcessAdmissionDto) {
+    const nameParsed = `${body.name.replace(/\s/g, '_').toLowerCase()}_${body.year}`;
+    const admission = await this.drizzle.db
       .insert(admissionProcesses)
-      .values(dataCreate)
+      .values({
+        name: nameParsed,
+        year: body.year,
+        started: body.started,
+        finished: body.finished,
+      })
       .returning();
-    const admission: AdmissionDto[] = plainToInstance(AdmissionDto, obj);
 
     // Establecer el nuevo proceso en mi prisma factory y la migracion de data inicial
-    await this.schemaManager.setCurrentSchema(
-      admission[0].name,
-      admission[0].year,
-    );
+    await this.schemaManager.setCurrentSchema(nameParsed, admission[0].year);
+
+    // Establecer el nuevo proceso en mi prisma factory y la migracion de data inicial
     await this.prisma.migrationInitialSchema(admission[0].name);
     return admission;
   }

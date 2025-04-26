@@ -9,8 +9,8 @@ import {
 } from '@nestjs/common';
 import { AdmissionsService } from './admissions.service';
 import { ApiOperation } from '@nestjs/swagger';
-import { CreateAdmissionDto } from './dto';
 import { Authorization } from '@modules/auth/decorators/authorization.decorator';
+import { ProcessAdmissionDto } from './dto/create-admission.dto';
 
 @Controller('admissions')
 export class AdmissionsController {
@@ -26,8 +26,8 @@ export class AdmissionsController {
     summary: 'Crear un nuevo proceso de admisión',
     description: 'Create a new process admision',
   })
-  async create(@Body() dataCreate: CreateAdmissionDto) {
-    return await this.service.create(dataCreate);
+  async create(@Body() body: ProcessAdmissionDto) {
+    return await this.service.create(body);
   }
 
   @Get()

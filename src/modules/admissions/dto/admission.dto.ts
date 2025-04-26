@@ -32,6 +32,16 @@ export class AdmissionDto {
   @Max(2100)
   year: number;
 
+  @IsDate()
+  @IsNotEmpty()
+  @Type(() => Date)
+  started: Date;
+
+  @IsDate()
+  @IsNotEmpty()
+  @Type(() => Date)
+  finished: Date;
+
   @IsOptional()
   @IsString()
   @MaxLength(255)
