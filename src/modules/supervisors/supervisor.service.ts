@@ -129,11 +129,11 @@ export class SupervisorService {
       data: {
         users: {
           update: {
+            email: updateSupervisorDto.email,
             userProfile: {
               update: {
                 firstName: updateSupervisorDto.firstName,
                 lastName: updateSupervisorDto.lastName,
-                personalEmail: updateSupervisorDto.personalEmail,
                 phone: updateSupervisorDto.phone,
               },
             },
@@ -143,6 +143,7 @@ export class SupervisorService {
       include: {
         users: {
           select: {
+            email: true,
             userProfile: {
               select: {
                 firstName: true,
@@ -158,9 +159,9 @@ export class SupervisorService {
 
     return plainToInstance(SupervisorGetSummaryDto, {
       id: supervisor.id,
+      email: supervisor.users?.email || null,
       firstName: supervisor.users?.userProfile?.firstName || '',
       lastName: supervisor.users?.userProfile?.lastName || '',
-      personalEmail: supervisor.users?.userProfile?.personalEmail || null,
       phone: supervisor.users?.userProfile?.phone || null,
     });
   }
