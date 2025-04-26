@@ -1,0 +1,3602 @@
+[
+  [
+    {
+      "dia": "Lunes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 2,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 3,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 4,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 5,
+          "curso": "Biología"
+        },
+        {
+          "bloque": 6,
+          "curso": "Biología"
+        },
+        {
+          "bloque": 7,
+          "curso": "Psicología"
+        }
+      ]
+    },
+    {
+      "dia": "Martes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Geografía"
+        },
+        {
+          "bloque": 2,
+          "curso": "Geografía"
+        },
+        {
+          "bloque": 3,
+          "curso": "Química"
+        },
+        {
+          "bloque": 4,
+          "curso": "Química"
+        },
+        {
+          "bloque": 5,
+          "curso": "Física"
+        },
+        {
+          "bloque": 6,
+          "curso": "Física"
+        },
+        {
+          "bloque": 7,
+          "curso": "Cívica"
+        }
+      ]
+    },
+    {
+      "dia": "Miercoles",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 2,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 3,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 4,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 5,
+          "curso": "Psicología"
+        },
+        {
+          "bloque": 6,
+          "curso": "Psicología"
+        },
+        {
+          "bloque": 7,
+          "curso": "Biología"
+        }
+      ]
+    },
+    {
+      "dia": "Jueves",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 2,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 3,
+          "curso": "Química"
+        },
+        {
+          "bloque": 4,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 5,
+          "curso": "Física"
+        },
+        {
+          "bloque": 6,
+          "curso": "Física"
+        },
+        {
+          "bloque": 7,
+          "curso": "Filosofía"
+        }
+      ]
+    },
+    {
+      "dia": "Viernes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Historia"
+        },
+        {
+          "bloque": 2,
+          "curso": "Historia"
+        },
+        {
+          "bloque": 3,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 4,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 5,
+          "curso": "Lenguaje"
+        },
+        {
+          "bloque": 6,
+          "curso": "Lenguaje"
+        },
+        {
+          "bloque": 7,
+          "curso": "Literatura"
+        }
+      ]
+    },
+    {
+      "dia": "Sabado",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 2,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 3,
+          "curso": "Química"
+        },
+        {
+          "bloque": 4,
+          "curso": "Química"
+        },
+        {
+          "bloque": 5,
+          "curso": "Inglés"
+        },
+        {
+          "bloque": 6,
+          "curso": "Inglés"
+        },
+        {
+          "bloque": 7,
+          "curso": "Física"
+        }
+      ]
+    }
+  ],
+  [
+    {
+      "dia": "Lunes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Biología"
+        },
+        {
+          "bloque": 2,
+          "curso": "Biología"
+        },
+        {
+          "bloque": 3,
+          "curso": "Psicología"
+        },
+        {
+          "bloque": 4,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 5,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 6,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 7,
+          "curso": "Matemática"
+        }
+      ]
+    },
+    {
+      "dia": "Martes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Física"
+        },
+        {
+          "bloque": 2,
+          "curso": "Física"
+        },
+        {
+          "bloque": 3,
+          "curso": "Cívica"
+        },
+        {
+          "bloque": 4,
+          "curso": "Geografía"
+        },
+        {
+          "bloque": 5,
+          "curso": "Geografía"
+        },
+        {
+          "bloque": 6,
+          "curso": "Química"
+        },
+        {
+          "bloque": 7,
+          "curso": "Química"
+        }
+      ]
+    },
+    {
+      "dia": "Miercoles",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Psicología"
+        },
+        {
+          "bloque": 2,
+          "curso": "Psicología"
+        },
+        {
+          "bloque": 3,
+          "curso": "Biología"
+        },
+        {
+          "bloque": 4,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 5,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 6,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 7,
+          "curso": "Matemática"
+        }
+      ]
+    },
+    {
+      "dia": "Jueves",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Física"
+        },
+        {
+          "bloque": 2,
+          "curso": "Física"
+        },
+        {
+          "bloque": 3,
+          "curso": "Filosofía"
+        },
+        {
+          "bloque": 4,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 5,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 6,
+          "curso": "Química"
+        },
+        {
+          "bloque": 7,
+          "curso": "Matemática"
+        }
+      ]
+    },
+    {
+      "dia": "Viernes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Lenguaje"
+        },
+        {
+          "bloque": 2,
+          "curso": "Lenguaje"
+        },
+        {
+          "bloque": 3,
+          "curso": "Literatura"
+        },
+        {
+          "bloque": 4,
+          "curso": "Historia"
+        },
+        {
+          "bloque": 5,
+          "curso": "Historia"
+        },
+        {
+          "bloque": 6,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 7,
+          "curso": "Matemática"
+        }
+      ]
+    },
+    {
+      "dia": "Sabado",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Inglés"
+        },
+        {
+          "bloque": 2,
+          "curso": "Inglés"
+        },
+        {
+          "bloque": 3,
+          "curso": "Física"
+        },
+        {
+          "bloque": 4,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 5,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 6,
+          "curso": "Química"
+        },
+        {
+          "bloque": 7,
+          "curso": "Química"
+        }
+      ]
+    }
+  ],
+  [
+    {
+      "dia": "Lunes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 2,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 3,
+          "curso": "Biología"
+        },
+        {
+          "bloque": 4,
+          "curso": "Biología"
+        },
+        {
+          "bloque": 5,
+          "curso": "Psicología"
+        },
+        {
+          "bloque": 6,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 7,
+          "curso": "Razonamiento Matemático"
+        }
+      ]
+    },
+    {
+      "dia": "Martes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Química"
+        },
+        {
+          "bloque": 2,
+          "curso": "Química"
+        },
+        {
+          "bloque": 3,
+          "curso": "Física"
+        },
+        {
+          "bloque": 4,
+          "curso": "Física"
+        },
+        {
+          "bloque": 5,
+          "curso": "Cívica"
+        },
+        {
+          "bloque": 6,
+          "curso": "Geografía"
+        },
+        {
+          "bloque": 7,
+          "curso": "Geografía"
+        }
+      ]
+    },
+    {
+      "dia": "Miercoles",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 2,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 3,
+          "curso": "Psicología"
+        },
+        {
+          "bloque": 4,
+          "curso": "Psicología"
+        },
+        {
+          "bloque": 5,
+          "curso": "Biología"
+        },
+        {
+          "bloque": 6,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 7,
+          "curso": "Razonamiento Verbal"
+        }
+      ]
+    },
+    {
+      "dia": "Jueves",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Química"
+        },
+        {
+          "bloque": 2,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 3,
+          "curso": "Física"
+        },
+        {
+          "bloque": 4,
+          "curso": "Física"
+        },
+        {
+          "bloque": 5,
+          "curso": "Filosofía"
+        },
+        {
+          "bloque": 6,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 7,
+          "curso": "Razonamiento Lógico"
+        }
+      ]
+    },
+    {
+      "dia": "Viernes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 2,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 3,
+          "curso": "Lenguaje"
+        },
+        {
+          "bloque": 4,
+          "curso": "Lenguaje"
+        },
+        {
+          "bloque": 5,
+          "curso": "Literatura"
+        },
+        {
+          "bloque": 6,
+          "curso": "Historia"
+        },
+        {
+          "bloque": 7,
+          "curso": "Historia"
+        }
+      ]
+    },
+    {
+      "dia": "Sabado",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Química"
+        },
+        {
+          "bloque": 2,
+          "curso": "Química"
+        },
+        {
+          "bloque": 3,
+          "curso": "Inglés"
+        },
+        {
+          "bloque": 4,
+          "curso": "Inglés"
+        },
+        {
+          "bloque": 5,
+          "curso": "Física"
+        },
+        {
+          "bloque": 6,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 7,
+          "curso": "Razonamiento Verbal"
+        }
+      ]
+    }
+  ],
+  [
+    {
+      "dia": "Lunes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Geografía"
+        },
+        {
+          "bloque": 2,
+          "curso": "Geografía"
+        },
+        {
+          "bloque": 3,
+          "curso": "Química"
+        },
+        {
+          "bloque": 4,
+          "curso": "Química"
+        },
+        {
+          "bloque": 5,
+          "curso": "Física"
+        },
+        {
+          "bloque": 6,
+          "curso": "Física"
+        },
+        {
+          "bloque": 7,
+          "curso": "Cívica"
+        }
+      ]
+    },
+    {
+      "dia": "Martes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 2,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 3,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 4,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 5,
+          "curso": "Psicología"
+        },
+        {
+          "bloque": 6,
+          "curso": "Psicología"
+        },
+        {
+          "bloque": 7,
+          "curso": "Biología"
+        }
+      ]
+    },
+    {
+      "dia": "Miercoles",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 2,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 3,
+          "curso": "Química"
+        },
+        {
+          "bloque": 4,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 5,
+          "curso": "Física"
+        },
+        {
+          "bloque": 6,
+          "curso": "Física"
+        },
+        {
+          "bloque": 7,
+          "curso": "Filosofía"
+        }
+      ]
+    },
+    {
+      "dia": "Jueves",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Historia"
+        },
+        {
+          "bloque": 2,
+          "curso": "Historia"
+        },
+        {
+          "bloque": 3,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 4,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 5,
+          "curso": "Lenguaje"
+        },
+        {
+          "bloque": 6,
+          "curso": "Lenguaje"
+        },
+        {
+          "bloque": 7,
+          "curso": "Literatura"
+        }
+      ]
+    },
+    {
+      "dia": "Viernes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 2,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 3,
+          "curso": "Química"
+        },
+        {
+          "bloque": 4,
+          "curso": "Química"
+        },
+        {
+          "bloque": 5,
+          "curso": "Inglés"
+        },
+        {
+          "bloque": 6,
+          "curso": "Inglés"
+        },
+        {
+          "bloque": 7,
+          "curso": "Física"
+        }
+      ]
+    },
+    {
+      "dia": "Sabado",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 2,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 3,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 4,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 5,
+          "curso": "Biología"
+        },
+        {
+          "bloque": 6,
+          "curso": "Biología"
+        },
+        {
+          "bloque": 7,
+          "curso": "Psicología"
+        }
+      ]
+    }
+  ],
+  [
+    {
+      "dia": "Lunes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Física"
+        },
+        {
+          "bloque": 2,
+          "curso": "Física"
+        },
+        {
+          "bloque": 3,
+          "curso": "Cívica"
+        },
+        {
+          "bloque": 4,
+          "curso": "Geografía"
+        },
+        {
+          "bloque": 5,
+          "curso": "Geografía"
+        },
+        {
+          "bloque": 6,
+          "curso": "Química"
+        },
+        {
+          "bloque": 7,
+          "curso": "Química"
+        }
+      ]
+    },
+    {
+      "dia": "Martes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Psicología"
+        },
+        {
+          "bloque": 2,
+          "curso": "Psicología"
+        },
+        {
+          "bloque": 3,
+          "curso": "Biología"
+        },
+        {
+          "bloque": 4,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 5,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 6,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 7,
+          "curso": "Matemática"
+        }
+      ]
+    },
+    {
+      "dia": "Miercoles",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Física"
+        },
+        {
+          "bloque": 2,
+          "curso": "Física"
+        },
+        {
+          "bloque": 3,
+          "curso": "Filosofía"
+        },
+        {
+          "bloque": 4,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 5,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 6,
+          "curso": "Química"
+        },
+        {
+          "bloque": 7,
+          "curso": "Matemática"
+        }
+      ]
+    },
+    {
+      "dia": "Jueves",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Lenguaje"
+        },
+        {
+          "bloque": 2,
+          "curso": "Lenguaje"
+        },
+        {
+          "bloque": 3,
+          "curso": "Literatura"
+        },
+        {
+          "bloque": 4,
+          "curso": "Historia"
+        },
+        {
+          "bloque": 5,
+          "curso": "Historia"
+        },
+        {
+          "bloque": 6,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 7,
+          "curso": "Matemática"
+        }
+      ]
+    },
+    {
+      "dia": "Viernes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Inglés"
+        },
+        {
+          "bloque": 2,
+          "curso": "Inglés"
+        },
+        {
+          "bloque": 3,
+          "curso": "Física"
+        },
+        {
+          "bloque": 4,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 5,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 6,
+          "curso": "Química"
+        },
+        {
+          "bloque": 7,
+          "curso": "Química"
+        }
+      ]
+    },
+    {
+      "dia": "Sabado",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Biología"
+        },
+        {
+          "bloque": 2,
+          "curso": "Biología"
+        },
+        {
+          "bloque": 3,
+          "curso": "Psicología"
+        },
+        {
+          "bloque": 4,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 5,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 6,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 7,
+          "curso": "Matemática"
+        }
+      ]
+    }
+  ],
+  [
+    {
+      "dia": "Lunes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Química"
+        },
+        {
+          "bloque": 2,
+          "curso": "Química"
+        },
+        {
+          "bloque": 3,
+          "curso": "Física"
+        },
+        {
+          "bloque": 4,
+          "curso": "Física"
+        },
+        {
+          "bloque": 5,
+          "curso": "Cívica"
+        },
+        {
+          "bloque": 6,
+          "curso": "Geografía"
+        },
+        {
+          "bloque": 7,
+          "curso": "Geografía"
+        }
+      ]
+    },
+    {
+      "dia": "Martes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 2,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 3,
+          "curso": "Psicología"
+        },
+        {
+          "bloque": 4,
+          "curso": "Psicología"
+        },
+        {
+          "bloque": 5,
+          "curso": "Biología"
+        },
+        {
+          "bloque": 6,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 7,
+          "curso": "Razonamiento Verbal"
+        }
+      ]
+    },
+    {
+      "dia": "Miercoles",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Química"
+        },
+        {
+          "bloque": 2,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 3,
+          "curso": "Física"
+        },
+        {
+          "bloque": 4,
+          "curso": "Física"
+        },
+        {
+          "bloque": 5,
+          "curso": "Filosofía"
+        },
+        {
+          "bloque": 6,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 7,
+          "curso": "Razonamiento Lógico"
+        }
+      ]
+    },
+    {
+      "dia": "Jueves",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 2,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 3,
+          "curso": "Lenguaje"
+        },
+        {
+          "bloque": 4,
+          "curso": "Lenguaje"
+        },
+        {
+          "bloque": 5,
+          "curso": "Literatura"
+        },
+        {
+          "bloque": 6,
+          "curso": "Historia"
+        },
+        {
+          "bloque": 7,
+          "curso": "Historia"
+        }
+      ]
+    },
+    {
+      "dia": "Viernes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Química"
+        },
+        {
+          "bloque": 2,
+          "curso": "Química"
+        },
+        {
+          "bloque": 3,
+          "curso": "Inglés"
+        },
+        {
+          "bloque": 4,
+          "curso": "Inglés"
+        },
+        {
+          "bloque": 5,
+          "curso": "Física"
+        },
+        {
+          "bloque": 6,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 7,
+          "curso": "Razonamiento Verbal"
+        }
+      ]
+    },
+    {
+      "dia": "Sabado",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 2,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 3,
+          "curso": "Biología"
+        },
+        {
+          "bloque": 4,
+          "curso": "Biología"
+        },
+        {
+          "bloque": 5,
+          "curso": "Psicología"
+        },
+        {
+          "bloque": 6,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 7,
+          "curso": "Razonamiento Matemático"
+        }
+      ]
+    }
+  ],
+  [
+    {
+      "dia": "Lunes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 2,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 3,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 4,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 5,
+          "curso": "Psicología"
+        },
+        {
+          "bloque": 6,
+          "curso": "Psicología"
+        },
+        {
+          "bloque": 7,
+          "curso": "Biología"
+        }
+      ]
+    },
+    {
+      "dia": "Martes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 2,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 3,
+          "curso": "Química"
+        },
+        {
+          "bloque": 4,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 5,
+          "curso": "Física"
+        },
+        {
+          "bloque": 6,
+          "curso": "Física"
+        },
+        {
+          "bloque": 7,
+          "curso": "Filosofía"
+        }
+      ]
+    },
+    {
+      "dia": "Miercoles",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Historia"
+        },
+        {
+          "bloque": 2,
+          "curso": "Historia"
+        },
+        {
+          "bloque": 3,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 4,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 5,
+          "curso": "Lenguaje"
+        },
+        {
+          "bloque": 6,
+          "curso": "Lenguaje"
+        },
+        {
+          "bloque": 7,
+          "curso": "Literatura"
+        }
+      ]
+    },
+    {
+      "dia": "Jueves",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 2,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 3,
+          "curso": "Química"
+        },
+        {
+          "bloque": 4,
+          "curso": "Química"
+        },
+        {
+          "bloque": 5,
+          "curso": "Inglés"
+        },
+        {
+          "bloque": 6,
+          "curso": "Inglés"
+        },
+        {
+          "bloque": 7,
+          "curso": "Física"
+        }
+      ]
+    },
+    {
+      "dia": "Viernes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 2,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 3,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 4,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 5,
+          "curso": "Biología"
+        },
+        {
+          "bloque": 6,
+          "curso": "Biología"
+        },
+        {
+          "bloque": 7,
+          "curso": "Psicología"
+        }
+      ]
+    },
+    {
+      "dia": "Sabado",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Geografía"
+        },
+        {
+          "bloque": 2,
+          "curso": "Geografía"
+        },
+        {
+          "bloque": 3,
+          "curso": "Química"
+        },
+        {
+          "bloque": 4,
+          "curso": "Química"
+        },
+        {
+          "bloque": 5,
+          "curso": "Física"
+        },
+        {
+          "bloque": 6,
+          "curso": "Física"
+        },
+        {
+          "bloque": 7,
+          "curso": "Cívica"
+        }
+      ]
+    }
+  ],
+  [
+    {
+      "dia": "Lunes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Psicología"
+        },
+        {
+          "bloque": 2,
+          "curso": "Psicología"
+        },
+        {
+          "bloque": 3,
+          "curso": "Biología"
+        },
+        {
+          "bloque": 4,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 5,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 6,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 7,
+          "curso": "Matemática"
+        }
+      ]
+    },
+    {
+      "dia": "Martes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Física"
+        },
+        {
+          "bloque": 2,
+          "curso": "Física"
+        },
+        {
+          "bloque": 3,
+          "curso": "Filosofía"
+        },
+        {
+          "bloque": 4,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 5,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 6,
+          "curso": "Química"
+        },
+        {
+          "bloque": 7,
+          "curso": "Matemática"
+        }
+      ]
+    },
+    {
+      "dia": "Miercoles",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Lenguaje"
+        },
+        {
+          "bloque": 2,
+          "curso": "Lenguaje"
+        },
+        {
+          "bloque": 3,
+          "curso": "Literatura"
+        },
+        {
+          "bloque": 4,
+          "curso": "Historia"
+        },
+        {
+          "bloque": 5,
+          "curso": "Historia"
+        },
+        {
+          "bloque": 6,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 7,
+          "curso": "Matemática"
+        }
+      ]
+    },
+    {
+      "dia": "Jueves",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Inglés"
+        },
+        {
+          "bloque": 2,
+          "curso": "Inglés"
+        },
+        {
+          "bloque": 3,
+          "curso": "Física"
+        },
+        {
+          "bloque": 4,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 5,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 6,
+          "curso": "Química"
+        },
+        {
+          "bloque": 7,
+          "curso": "Química"
+        }
+      ]
+    },
+    {
+      "dia": "Viernes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Biología"
+        },
+        {
+          "bloque": 2,
+          "curso": "Biología"
+        },
+        {
+          "bloque": 3,
+          "curso": "Psicología"
+        },
+        {
+          "bloque": 4,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 5,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 6,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 7,
+          "curso": "Matemática"
+        }
+      ]
+    },
+    {
+      "dia": "Sabado",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Física"
+        },
+        {
+          "bloque": 2,
+          "curso": "Física"
+        },
+        {
+          "bloque": 3,
+          "curso": "Cívica"
+        },
+        {
+          "bloque": 4,
+          "curso": "Geografía"
+        },
+        {
+          "bloque": 5,
+          "curso": "Geografía"
+        },
+        {
+          "bloque": 6,
+          "curso": "Química"
+        },
+        {
+          "bloque": 7,
+          "curso": "Química"
+        }
+      ]
+    }
+  ],
+  [
+    {
+      "dia": "Lunes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 2,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 3,
+          "curso": "Psicología"
+        },
+        {
+          "bloque": 4,
+          "curso": "Psicología"
+        },
+        {
+          "bloque": 5,
+          "curso": "Biología"
+        },
+        {
+          "bloque": 6,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 7,
+          "curso": "Razonamiento Verbal"
+        }
+      ]
+    },
+    {
+      "dia": "Martes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Química"
+        },
+        {
+          "bloque": 2,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 3,
+          "curso": "Física"
+        },
+        {
+          "bloque": 4,
+          "curso": "Física"
+        },
+        {
+          "bloque": 5,
+          "curso": "Filosofía"
+        },
+        {
+          "bloque": 6,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 7,
+          "curso": "Razonamiento Lógico"
+        }
+      ]
+    },
+    {
+      "dia": "Miercoles",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 2,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 3,
+          "curso": "Lenguaje"
+        },
+        {
+          "bloque": 4,
+          "curso": "Lenguaje"
+        },
+        {
+          "bloque": 5,
+          "curso": "Literatura"
+        },
+        {
+          "bloque": 6,
+          "curso": "Historia"
+        },
+        {
+          "bloque": 7,
+          "curso": "Historia"
+        }
+      ]
+    },
+    {
+      "dia": "Jueves",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Química"
+        },
+        {
+          "bloque": 2,
+          "curso": "Química"
+        },
+        {
+          "bloque": 3,
+          "curso": "Inglés"
+        },
+        {
+          "bloque": 4,
+          "curso": "Inglés"
+        },
+        {
+          "bloque": 5,
+          "curso": "Física"
+        },
+        {
+          "bloque": 6,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 7,
+          "curso": "Razonamiento Verbal"
+        }
+      ]
+    },
+    {
+      "dia": "Viernes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 2,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 3,
+          "curso": "Biología"
+        },
+        {
+          "bloque": 4,
+          "curso": "Biología"
+        },
+        {
+          "bloque": 5,
+          "curso": "Psicología"
+        },
+        {
+          "bloque": 6,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 7,
+          "curso": "Razonamiento Matemático"
+        }
+      ]
+    },
+    {
+      "dia": "Sabado",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Química"
+        },
+        {
+          "bloque": 2,
+          "curso": "Química"
+        },
+        {
+          "bloque": 3,
+          "curso": "Física"
+        },
+        {
+          "bloque": 4,
+          "curso": "Física"
+        },
+        {
+          "bloque": 5,
+          "curso": "Cívica"
+        },
+        {
+          "bloque": 6,
+          "curso": "Geografía"
+        },
+        {
+          "bloque": 7,
+          "curso": "Geografía"
+        }
+      ]
+    }
+  ],
+  [
+    {
+      "dia": "Lunes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 2,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 3,
+          "curso": "Química"
+        },
+        {
+          "bloque": 4,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 5,
+          "curso": "Física"
+        },
+        {
+          "bloque": 6,
+          "curso": "Física"
+        },
+        {
+          "bloque": 7,
+          "curso": "Filosofía"
+        }
+      ]
+    },
+    {
+      "dia": "Martes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Historia"
+        },
+        {
+          "bloque": 2,
+          "curso": "Historia"
+        },
+        {
+          "bloque": 3,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 4,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 5,
+          "curso": "Lenguaje"
+        },
+        {
+          "bloque": 6,
+          "curso": "Lenguaje"
+        },
+        {
+          "bloque": 7,
+          "curso": "Literatura"
+        }
+      ]
+    },
+    {
+      "dia": "Miercoles",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 2,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 3,
+          "curso": "Química"
+        },
+        {
+          "bloque": 4,
+          "curso": "Química"
+        },
+        {
+          "bloque": 5,
+          "curso": "Inglés"
+        },
+        {
+          "bloque": 6,
+          "curso": "Inglés"
+        },
+        {
+          "bloque": 7,
+          "curso": "Física"
+        }
+      ]
+    },
+    {
+      "dia": "Jueves",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 2,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 3,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 4,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 5,
+          "curso": "Biología"
+        },
+        {
+          "bloque": 6,
+          "curso": "Biología"
+        },
+        {
+          "bloque": 7,
+          "curso": "Psicología"
+        }
+      ]
+    },
+    {
+      "dia": "Viernes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Geografía"
+        },
+        {
+          "bloque": 2,
+          "curso": "Geografía"
+        },
+        {
+          "bloque": 3,
+          "curso": "Química"
+        },
+        {
+          "bloque": 4,
+          "curso": "Química"
+        },
+        {
+          "bloque": 5,
+          "curso": "Física"
+        },
+        {
+          "bloque": 6,
+          "curso": "Física"
+        },
+        {
+          "bloque": 7,
+          "curso": "Cívica"
+        }
+      ]
+    },
+    {
+      "dia": "Sabado",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 2,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 3,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 4,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 5,
+          "curso": "Psicología"
+        },
+        {
+          "bloque": 6,
+          "curso": "Psicología"
+        },
+        {
+          "bloque": 7,
+          "curso": "Biología"
+        }
+      ]
+    }
+  ],
+  [
+    {
+      "dia": "Lunes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Física"
+        },
+        {
+          "bloque": 2,
+          "curso": "Física"
+        },
+        {
+          "bloque": 3,
+          "curso": "Filosofía"
+        },
+        {
+          "bloque": 4,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 5,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 6,
+          "curso": "Química"
+        },
+        {
+          "bloque": 7,
+          "curso": "Matemática"
+        }
+      ]
+    },
+    {
+      "dia": "Martes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Lenguaje"
+        },
+        {
+          "bloque": 2,
+          "curso": "Lenguaje"
+        },
+        {
+          "bloque": 3,
+          "curso": "Literatura"
+        },
+        {
+          "bloque": 4,
+          "curso": "Historia"
+        },
+        {
+          "bloque": 5,
+          "curso": "Historia"
+        },
+        {
+          "bloque": 6,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 7,
+          "curso": "Matemática"
+        }
+      ]
+    },
+    {
+      "dia": "Miercoles",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Inglés"
+        },
+        {
+          "bloque": 2,
+          "curso": "Inglés"
+        },
+        {
+          "bloque": 3,
+          "curso": "Física"
+        },
+        {
+          "bloque": 4,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 5,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 6,
+          "curso": "Química"
+        },
+        {
+          "bloque": 7,
+          "curso": "Química"
+        }
+      ]
+    },
+    {
+      "dia": "Jueves",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Biología"
+        },
+        {
+          "bloque": 2,
+          "curso": "Biología"
+        },
+        {
+          "bloque": 3,
+          "curso": "Psicología"
+        },
+        {
+          "bloque": 4,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 5,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 6,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 7,
+          "curso": "Matemática"
+        }
+      ]
+    },
+    {
+      "dia": "Viernes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Física"
+        },
+        {
+          "bloque": 2,
+          "curso": "Física"
+        },
+        {
+          "bloque": 3,
+          "curso": "Cívica"
+        },
+        {
+          "bloque": 4,
+          "curso": "Geografía"
+        },
+        {
+          "bloque": 5,
+          "curso": "Geografía"
+        },
+        {
+          "bloque": 6,
+          "curso": "Química"
+        },
+        {
+          "bloque": 7,
+          "curso": "Química"
+        }
+      ]
+    },
+    {
+      "dia": "Sabado",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Psicología"
+        },
+        {
+          "bloque": 2,
+          "curso": "Psicología"
+        },
+        {
+          "bloque": 3,
+          "curso": "Biología"
+        },
+        {
+          "bloque": 4,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 5,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 6,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 7,
+          "curso": "Matemática"
+        }
+      ]
+    }
+  ],
+  [
+    {
+      "dia": "Lunes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Química"
+        },
+        {
+          "bloque": 2,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 3,
+          "curso": "Física"
+        },
+        {
+          "bloque": 4,
+          "curso": "Física"
+        },
+        {
+          "bloque": 5,
+          "curso": "Filosofía"
+        },
+        {
+          "bloque": 6,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 7,
+          "curso": "Razonamiento Lógico"
+        }
+      ]
+    },
+    {
+      "dia": "Martes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 2,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 3,
+          "curso": "Lenguaje"
+        },
+        {
+          "bloque": 4,
+          "curso": "Lenguaje"
+        },
+        {
+          "bloque": 5,
+          "curso": "Literatura"
+        },
+        {
+          "bloque": 6,
+          "curso": "Historia"
+        },
+        {
+          "bloque": 7,
+          "curso": "Historia"
+        }
+      ]
+    },
+    {
+      "dia": "Miercoles",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Química"
+        },
+        {
+          "bloque": 2,
+          "curso": "Química"
+        },
+        {
+          "bloque": 3,
+          "curso": "Inglés"
+        },
+        {
+          "bloque": 4,
+          "curso": "Inglés"
+        },
+        {
+          "bloque": 5,
+          "curso": "Física"
+        },
+        {
+          "bloque": 6,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 7,
+          "curso": "Razonamiento Verbal"
+        }
+      ]
+    },
+    {
+      "dia": "Jueves",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 2,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 3,
+          "curso": "Biología"
+        },
+        {
+          "bloque": 4,
+          "curso": "Biología"
+        },
+        {
+          "bloque": 5,
+          "curso": "Psicología"
+        },
+        {
+          "bloque": 6,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 7,
+          "curso": "Razonamiento Matemático"
+        }
+      ]
+    },
+    {
+      "dia": "Viernes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Química"
+        },
+        {
+          "bloque": 2,
+          "curso": "Química"
+        },
+        {
+          "bloque": 3,
+          "curso": "Física"
+        },
+        {
+          "bloque": 4,
+          "curso": "Física"
+        },
+        {
+          "bloque": 5,
+          "curso": "Cívica"
+        },
+        {
+          "bloque": 6,
+          "curso": "Geografía"
+        },
+        {
+          "bloque": 7,
+          "curso": "Geografía"
+        }
+      ]
+    },
+    {
+      "dia": "Sabado",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 2,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 3,
+          "curso": "Psicología"
+        },
+        {
+          "bloque": 4,
+          "curso": "Psicología"
+        },
+        {
+          "bloque": 5,
+          "curso": "Biología"
+        },
+        {
+          "bloque": 6,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 7,
+          "curso": "Razonamiento Verbal"
+        }
+      ]
+    }
+  ],
+  [
+    {
+      "dia": "Lunes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Historia"
+        },
+        {
+          "bloque": 2,
+          "curso": "Historia"
+        },
+        {
+          "bloque": 3,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 4,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 5,
+          "curso": "Lenguaje"
+        },
+        {
+          "bloque": 6,
+          "curso": "Lenguaje"
+        },
+        {
+          "bloque": 7,
+          "curso": "Literatura"
+        }
+      ]
+    },
+    {
+      "dia": "Martes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 2,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 3,
+          "curso": "Química"
+        },
+        {
+          "bloque": 4,
+          "curso": "Química"
+        },
+        {
+          "bloque": 5,
+          "curso": "Inglés"
+        },
+        {
+          "bloque": 6,
+          "curso": "Inglés"
+        },
+        {
+          "bloque": 7,
+          "curso": "Física"
+        }
+      ]
+    },
+    {
+      "dia": "Miercoles",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 2,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 3,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 4,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 5,
+          "curso": "Biología"
+        },
+        {
+          "bloque": 6,
+          "curso": "Biología"
+        },
+        {
+          "bloque": 7,
+          "curso": "Psicología"
+        }
+      ]
+    },
+    {
+      "dia": "Jueves",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Geografía"
+        },
+        {
+          "bloque": 2,
+          "curso": "Geografía"
+        },
+        {
+          "bloque": 3,
+          "curso": "Química"
+        },
+        {
+          "bloque": 4,
+          "curso": "Química"
+        },
+        {
+          "bloque": 5,
+          "curso": "Física"
+        },
+        {
+          "bloque": 6,
+          "curso": "Física"
+        },
+        {
+          "bloque": 7,
+          "curso": "Cívica"
+        }
+      ]
+    },
+    {
+      "dia": "Viernes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 2,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 3,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 4,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 5,
+          "curso": "Psicología"
+        },
+        {
+          "bloque": 6,
+          "curso": "Psicología"
+        },
+        {
+          "bloque": 7,
+          "curso": "Biología"
+        }
+      ]
+    },
+    {
+      "dia": "Sabado",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 2,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 3,
+          "curso": "Química"
+        },
+        {
+          "bloque": 4,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 5,
+          "curso": "Física"
+        },
+        {
+          "bloque": 6,
+          "curso": "Física"
+        },
+        {
+          "bloque": 7,
+          "curso": "Filosofía"
+        }
+      ]
+    }
+  ],
+  [
+    {
+      "dia": "Lunes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Lenguaje"
+        },
+        {
+          "bloque": 2,
+          "curso": "Lenguaje"
+        },
+        {
+          "bloque": 3,
+          "curso": "Literatura"
+        },
+        {
+          "bloque": 4,
+          "curso": "Historia"
+        },
+        {
+          "bloque": 5,
+          "curso": "Historia"
+        },
+        {
+          "bloque": 6,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 7,
+          "curso": "Matemática"
+        }
+      ]
+    },
+    {
+      "dia": "Martes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Inglés"
+        },
+        {
+          "bloque": 2,
+          "curso": "Inglés"
+        },
+        {
+          "bloque": 3,
+          "curso": "Física"
+        },
+        {
+          "bloque": 4,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 5,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 6,
+          "curso": "Química"
+        },
+        {
+          "bloque": 7,
+          "curso": "Química"
+        }
+      ]
+    },
+    {
+      "dia": "Miercoles",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Biología"
+        },
+        {
+          "bloque": 2,
+          "curso": "Biología"
+        },
+        {
+          "bloque": 3,
+          "curso": "Psicología"
+        },
+        {
+          "bloque": 4,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 5,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 6,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 7,
+          "curso": "Matemática"
+        }
+      ]
+    },
+    {
+      "dia": "Jueves",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Física"
+        },
+        {
+          "bloque": 2,
+          "curso": "Física"
+        },
+        {
+          "bloque": 3,
+          "curso": "Cívica"
+        },
+        {
+          "bloque": 4,
+          "curso": "Geografía"
+        },
+        {
+          "bloque": 5,
+          "curso": "Geografía"
+        },
+        {
+          "bloque": 6,
+          "curso": "Química"
+        },
+        {
+          "bloque": 7,
+          "curso": "Química"
+        }
+      ]
+    },
+    {
+      "dia": "Viernes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Psicología"
+        },
+        {
+          "bloque": 2,
+          "curso": "Psicología"
+        },
+        {
+          "bloque": 3,
+          "curso": "Biología"
+        },
+        {
+          "bloque": 4,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 5,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 6,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 7,
+          "curso": "Matemática"
+        }
+      ]
+    },
+    {
+      "dia": "Sabado",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Física"
+        },
+        {
+          "bloque": 2,
+          "curso": "Física"
+        },
+        {
+          "bloque": 3,
+          "curso": "Filosofía"
+        },
+        {
+          "bloque": 4,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 5,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 6,
+          "curso": "Química"
+        },
+        {
+          "bloque": 7,
+          "curso": "Matemática"
+        }
+      ]
+    }
+  ],
+  [
+    {
+      "dia": "Lunes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 2,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 3,
+          "curso": "Lenguaje"
+        },
+        {
+          "bloque": 4,
+          "curso": "Lenguaje"
+        },
+        {
+          "bloque": 5,
+          "curso": "Literatura"
+        },
+        {
+          "bloque": 6,
+          "curso": "Historia"
+        },
+        {
+          "bloque": 7,
+          "curso": "Historia"
+        }
+      ]
+    },
+    {
+      "dia": "Martes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Química"
+        },
+        {
+          "bloque": 2,
+          "curso": "Química"
+        },
+        {
+          "bloque": 3,
+          "curso": "Inglés"
+        },
+        {
+          "bloque": 4,
+          "curso": "Inglés"
+        },
+        {
+          "bloque": 5,
+          "curso": "Física"
+        },
+        {
+          "bloque": 6,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 7,
+          "curso": "Razonamiento Verbal"
+        }
+      ]
+    },
+    {
+      "dia": "Miercoles",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 2,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 3,
+          "curso": "Biología"
+        },
+        {
+          "bloque": 4,
+          "curso": "Biología"
+        },
+        {
+          "bloque": 5,
+          "curso": "Psicología"
+        },
+        {
+          "bloque": 6,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 7,
+          "curso": "Razonamiento Matemático"
+        }
+      ]
+    },
+    {
+      "dia": "Jueves",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Química"
+        },
+        {
+          "bloque": 2,
+          "curso": "Química"
+        },
+        {
+          "bloque": 3,
+          "curso": "Física"
+        },
+        {
+          "bloque": 4,
+          "curso": "Física"
+        },
+        {
+          "bloque": 5,
+          "curso": "Cívica"
+        },
+        {
+          "bloque": 6,
+          "curso": "Geografía"
+        },
+        {
+          "bloque": 7,
+          "curso": "Geografía"
+        }
+      ]
+    },
+    {
+      "dia": "Viernes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 2,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 3,
+          "curso": "Psicología"
+        },
+        {
+          "bloque": 4,
+          "curso": "Psicología"
+        },
+        {
+          "bloque": 5,
+          "curso": "Biología"
+        },
+        {
+          "bloque": 6,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 7,
+          "curso": "Razonamiento Verbal"
+        }
+      ]
+    },
+    {
+      "dia": "Sabado",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Química"
+        },
+        {
+          "bloque": 2,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 3,
+          "curso": "Física"
+        },
+        {
+          "bloque": 4,
+          "curso": "Física"
+        },
+        {
+          "bloque": 5,
+          "curso": "Filosofía"
+        },
+        {
+          "bloque": 6,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 7,
+          "curso": "Razonamiento Lógico"
+        }
+      ]
+    }
+  ],
+  [
+    {
+      "dia": "Lunes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 2,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 3,
+          "curso": "Química"
+        },
+        {
+          "bloque": 4,
+          "curso": "Química"
+        },
+        {
+          "bloque": 5,
+          "curso": "Inglés"
+        },
+        {
+          "bloque": 6,
+          "curso": "Inglés"
+        },
+        {
+          "bloque": 7,
+          "curso": "Física"
+        }
+      ]
+    },
+    {
+      "dia": "Martes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 2,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 3,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 4,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 5,
+          "curso": "Biología"
+        },
+        {
+          "bloque": 6,
+          "curso": "Biología"
+        },
+        {
+          "bloque": 7,
+          "curso": "Psicología"
+        }
+      ]
+    },
+    {
+      "dia": "Miercoles",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Geografía"
+        },
+        {
+          "bloque": 2,
+          "curso": "Geografía"
+        },
+        {
+          "bloque": 3,
+          "curso": "Química"
+        },
+        {
+          "bloque": 4,
+          "curso": "Química"
+        },
+        {
+          "bloque": 5,
+          "curso": "Física"
+        },
+        {
+          "bloque": 6,
+          "curso": "Física"
+        },
+        {
+          "bloque": 7,
+          "curso": "Cívica"
+        }
+      ]
+    },
+    {
+      "dia": "Jueves",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 2,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 3,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 4,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 5,
+          "curso": "Psicología"
+        },
+        {
+          "bloque": 6,
+          "curso": "Psicología"
+        },
+        {
+          "bloque": 7,
+          "curso": "Biología"
+        }
+      ]
+    },
+    {
+      "dia": "Viernes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 2,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 3,
+          "curso": "Química"
+        },
+        {
+          "bloque": 4,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 5,
+          "curso": "Física"
+        },
+        {
+          "bloque": 6,
+          "curso": "Física"
+        },
+        {
+          "bloque": 7,
+          "curso": "Filosofía"
+        }
+      ]
+    },
+    {
+      "dia": "Sabado",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Historia"
+        },
+        {
+          "bloque": 2,
+          "curso": "Historia"
+        },
+        {
+          "bloque": 3,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 4,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 5,
+          "curso": "Lenguaje"
+        },
+        {
+          "bloque": 6,
+          "curso": "Lenguaje"
+        },
+        {
+          "bloque": 7,
+          "curso": "Literatura"
+        }
+      ]
+    }
+  ],
+  [
+    {
+      "dia": "Lunes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Inglés"
+        },
+        {
+          "bloque": 2,
+          "curso": "Inglés"
+        },
+        {
+          "bloque": 3,
+          "curso": "Física"
+        },
+        {
+          "bloque": 4,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 5,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 6,
+          "curso": "Química"
+        },
+        {
+          "bloque": 7,
+          "curso": "Química"
+        }
+      ]
+    },
+    {
+      "dia": "Martes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Biología"
+        },
+        {
+          "bloque": 2,
+          "curso": "Biología"
+        },
+        {
+          "bloque": 3,
+          "curso": "Psicología"
+        },
+        {
+          "bloque": 4,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 5,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 6,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 7,
+          "curso": "Matemática"
+        }
+      ]
+    },
+    {
+      "dia": "Miercoles",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Física"
+        },
+        {
+          "bloque": 2,
+          "curso": "Física"
+        },
+        {
+          "bloque": 3,
+          "curso": "Cívica"
+        },
+        {
+          "bloque": 4,
+          "curso": "Geografía"
+        },
+        {
+          "bloque": 5,
+          "curso": "Geografía"
+        },
+        {
+          "bloque": 6,
+          "curso": "Química"
+        },
+        {
+          "bloque": 7,
+          "curso": "Química"
+        }
+      ]
+    },
+    {
+      "dia": "Jueves",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Psicología"
+        },
+        {
+          "bloque": 2,
+          "curso": "Psicología"
+        },
+        {
+          "bloque": 3,
+          "curso": "Biología"
+        },
+        {
+          "bloque": 4,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 5,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 6,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 7,
+          "curso": "Matemática"
+        }
+      ]
+    },
+    {
+      "dia": "Viernes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Física"
+        },
+        {
+          "bloque": 2,
+          "curso": "Física"
+        },
+        {
+          "bloque": 3,
+          "curso": "Filosofía"
+        },
+        {
+          "bloque": 4,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 5,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 6,
+          "curso": "Química"
+        },
+        {
+          "bloque": 7,
+          "curso": "Matemática"
+        }
+      ]
+    },
+    {
+      "dia": "Sabado",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Lenguaje"
+        },
+        {
+          "bloque": 2,
+          "curso": "Lenguaje"
+        },
+        {
+          "bloque": 3,
+          "curso": "Literatura"
+        },
+        {
+          "bloque": 4,
+          "curso": "Historia"
+        },
+        {
+          "bloque": 5,
+          "curso": "Historia"
+        },
+        {
+          "bloque": 6,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 7,
+          "curso": "Matemática"
+        }
+      ]
+    }
+  ],
+  [
+    {
+      "dia": "Lunes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Química"
+        },
+        {
+          "bloque": 2,
+          "curso": "Química"
+        },
+        {
+          "bloque": 3,
+          "curso": "Inglés"
+        },
+        {
+          "bloque": 4,
+          "curso": "Inglés"
+        },
+        {
+          "bloque": 5,
+          "curso": "Física"
+        },
+        {
+          "bloque": 6,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 7,
+          "curso": "Razonamiento Verbal"
+        }
+      ]
+    },
+    {
+      "dia": "Martes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 2,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 3,
+          "curso": "Biología"
+        },
+        {
+          "bloque": 4,
+          "curso": "Biología"
+        },
+        {
+          "bloque": 5,
+          "curso": "Psicología"
+        },
+        {
+          "bloque": 6,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 7,
+          "curso": "Razonamiento Matemático"
+        }
+      ]
+    },
+    {
+      "dia": "Miercoles",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Química"
+        },
+        {
+          "bloque": 2,
+          "curso": "Química"
+        },
+        {
+          "bloque": 3,
+          "curso": "Física"
+        },
+        {
+          "bloque": 4,
+          "curso": "Física"
+        },
+        {
+          "bloque": 5,
+          "curso": "Cívica"
+        },
+        {
+          "bloque": 6,
+          "curso": "Geografía"
+        },
+        {
+          "bloque": 7,
+          "curso": "Geografía"
+        }
+      ]
+    },
+    {
+      "dia": "Jueves",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 2,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 3,
+          "curso": "Psicología"
+        },
+        {
+          "bloque": 4,
+          "curso": "Psicología"
+        },
+        {
+          "bloque": 5,
+          "curso": "Biología"
+        },
+        {
+          "bloque": 6,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 7,
+          "curso": "Razonamiento Verbal"
+        }
+      ]
+    },
+    {
+      "dia": "Viernes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Química"
+        },
+        {
+          "bloque": 2,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 3,
+          "curso": "Física"
+        },
+        {
+          "bloque": 4,
+          "curso": "Física"
+        },
+        {
+          "bloque": 5,
+          "curso": "Filosofía"
+        },
+        {
+          "bloque": 6,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 7,
+          "curso": "Razonamiento Lógico"
+        }
+      ]
+    },
+    {
+      "dia": "Sabado",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 2,
+          "curso": "Matemática"
+        },
+        {
+          "bloque": 3,
+          "curso": "Lenguaje"
+        },
+        {
+          "bloque": 4,
+          "curso": "Lenguaje"
+        },
+        {
+          "bloque": 5,
+          "curso": "Literatura"
+        },
+        {
+          "bloque": 6,
+          "curso": "Historia"
+        },
+        {
+          "bloque": 7,
+          "curso": "Historia"
+        }
+      ]
+    }
+  ]
+]

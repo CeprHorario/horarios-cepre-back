@@ -3,12 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import { PrismaClientFactory } from './prisma-client.factory';
 import { AsyncLocalStorage } from 'async_hooks';
 
-import {
-  initialCourses,
-  initialUsers,
-  initalSedes,
-  initialAreas,
-} from './data/seed-data-initial';
+import { initialDataSchema } from './data/seed';
 
 @Injectable()
 export class PrismaService {
@@ -28,12 +23,8 @@ export class PrismaService {
 
   async migrationInitialSchema(schema: string): Promise<void> {
     const client: PrismaClient = await this.setMainClient(schema);
+
     // Realizamos las migraciones iniciales
-    await client.$transaction([
-      client.course.createMany({ data: initialCourses }),
-      client.user.createMany({ data: initialUsers }),
-      client.area.createMany({ data: initialAreas }),
-      client.sede.createMany({ data: initalSedes }),
-    ]);
+    await initialDataSchema(schema, client);
   }
 }
