@@ -26,13 +26,13 @@ export class TeacherUpdateDto {
   lastName: string;
 
   @ApiProperty({
-    description: 'Correo electrónico personal del profesor',
+    description: 'Correo electrónico institucional del profesor',
     nullable: true,
     example: 'jverde.dev@gmail.com',
   })
   @IsOptional()
   @IsString()
-  personalEmail: string | null;
+  email: string;
 
   @ApiProperty({
     description: 'Número de teléfono del profesor',
