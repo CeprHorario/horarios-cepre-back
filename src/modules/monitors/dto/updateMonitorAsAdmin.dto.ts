@@ -26,11 +26,11 @@ export class UpdateMonitorAsAdminDto {
   @IsEmail()
   @Expose()
   @ApiProperty({
-    description: 'Correo electrónico personal del monitor',
+    description: 'Correo electrónico institucional del monitor',
     nullable: true,
     example: 'luis.martinez@gmail.com',
   })
-  personalEmail?: string;
+  email?: string;
 
   @IsOptional()
   @IsString()
