@@ -21,22 +21,22 @@ export class AdmissionsService {
   // Metodo para crear un nuevo proceso de admisión
   async create(body: ProcessAdmissionDto) {
     const nameParsed = `${body.name.replace(/\s/g, '_').toLowerCase()}_${body.year}`;
-    const admission = await this.drizzle.db
-      .insert(admissionProcesses)
-      .values({
-        name: nameParsed,
-        year: body.year,
-        started: body.started,
-        finished: body.finished,
-      })
-      .returning();
+    // const admission = await this.drizzle.db
+    //   .insert(admissionProcesses)
+    //   .values({
+    //     name: nameParsed,
+    //     year: body.year,
+    //     started: body.started,
+    //     finished: body.finished,
+    //   })
+    //   .returning();
+
+    // // Establecer el nuevo proceso en mi prisma factory y la migracion de data inicial
+    // await this.schemaManager.setCurrentSchema(nameParsed, admission[0].year);
 
     // Establecer el nuevo proceso en mi prisma factory y la migracion de data inicial
-    await this.schemaManager.setCurrentSchema(nameParsed, admission[0].year);
-
-    // Establecer el nuevo proceso en mi prisma factory y la migracion de data inicial
-    await this.prisma.migrationInitialSchema(admission[0].name, body);
-    return admission;
+    await this.prisma.migrationInitialSchema(nameParsed /* admission[0].name */, body);
+    return body;
   }
 
   // Metodo para obtener todos los procesos de admisión con sus observaciones

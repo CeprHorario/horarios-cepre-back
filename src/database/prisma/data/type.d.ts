@@ -7,7 +7,7 @@ export interface DataInitial {
   sedes: Sede[];
   shifts: Shift[];
 }
-export interface AreaHours {
+export interface AreaCourseHours {
   area: string;
   hours: CourseHour[];
 }
@@ -54,4 +54,10 @@ export interface Shift extends Prisma.ShiftCreateInput {
 
 export interface Course extends Prisma.CourseCreateInput {
   id?: number;
+}
+
+export interface AreaCourse {
+  courseId: number;
+  areaId: number;
+  totalHours: number;
 }

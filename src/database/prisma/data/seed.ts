@@ -1,17 +1,20 @@
 import { PrismaClient } from '@prisma/client';
 import { Pool, PoolClient } from 'pg';
 
-import * as dataInitial from './initial.json';
-import * as dataCourses from './courses.json';
-//import * as areaCourseHr from './area-course-hrs.json';
+import * as rawData from './initial.json';
+import * as rawCourses from './courses.json';
+import * as areaCourseHr from './area-course-hrs.json';
 //import * as schedulesBio from './data/bio.json';
 //import * as schedulesIng from './data/ing.json';
 //import * as schedulesSoc from './data/soc.json';
 //import * as schema from '@database/drizzle/schema';
 //import { dataCorreos } from './utils';
-import { ProcessAdmissionDto } from '@modules/admissions/dto/create-admission.dto';
-import { Course, DataInitial } from './type';
-import { assignNumericIds, assignUuidIds } from './utils';
+import {
+  ProcessAdmissionDto,
+  ShiftDetailDto,
+} from '@modules/admissions/dto/create-admission.dto';
+import { AreaCourse, AreaCourseHours, Course, DataInitial } from './type';
+import { assignNumericIds, assignUuidIds, validateShiftTimes } from './utils';
 
 // type DataUsersClass = {
 //   sede: Sede;
@@ -35,30 +38,55 @@ export const initialDataSchema = async (
   const db = await pool(schema).connect();
   await client.$executeRaw`select 1`;
 
-  if (await createBasicData(db)) {
+  if (await createBasicData(db, body.configuration.shifts)) {
     console.log(body);
   } else {
     throw new Error('Error creating data');
   }
 };
 
-const createBasicData = async (pool: PoolClient): Promise<boolean> => {
-  const { users, areas, sedes } = dataInitial as DataInitial;
-  const courses = dataCourses as Course[];
+const createBasicData = async (
+  pool: PoolClient,
+  shiftsBody: ShiftDetailDto[],
+): Promise<boolean> => {
+  // Destructure the data from the JSON files
+  const { users, areas, sedes } = rawData as DataInitial;
+  const { courses } = rawCourses as { courses: Course[] };
+  const { areaCourse } = areaCourseHr as { areaCourse: AreaCourseHours[] };
 
   try {
     // asingIds(users, areas, sedes, courses);
-    assignUuidIds(users);
-    assignNumericIds(areas);
-    assignNumericIds(sedes);
-    assignNumericIds(courses);
+    // Assign IDs to all data entities
+    const usersWithIds = assignUuidIds(users);
+    const areasWithIds = assignNumericIds(areas);
+    const sedesWithIds = assignNumericIds(sedes);
+    const coursesWithIds = assignNumericIds(courses);
+
+    // Validate and assign IDs to shifts
+    const shiftsWithIds = shiftsBody.map((shift) => validateShiftTimes(shift));
+    // Assign hours to areas and courses
+    const areaCourseHours: AreaCourse[] = areaCourse.flatMap((area) => {
+      const areaId = areasWithIds.find((a) => a.name === area.area)?.id;
+      return area.hours.map((course) => {
+        const courseId = coursesWithIds.find(
+          (c) => c.name === course.course,
+        )?.id;
+        return {
+          areaId: areaId ?? 0,
+          courseId: courseId ?? 0,
+          totalHours: parseInt(course.total),
+        };
+      });
+    });
 
     // Crear consultas para todas las tablas de una forma más concisa
     const tablesToInsert = [
-      { table: 'users', data: users },
-      { table: 'areas', data: areas },
-      { table: 'sedes', data: sedes },
-      { table: 'courses', data: courses },
+      { table: 'users', data: usersWithIds },
+      { table: 'areas', data: areasWithIds },
+      { table: 'sedes', data: sedesWithIds },
+      { table: 'courses', data: coursesWithIds },
+      { table: 'shifts', data: shiftsWithIds },
+      { table: 'area_course_hours', data: areaCourseHours },
     ];
 
     // Crear consultas de inserción para cada tabla
@@ -71,12 +99,26 @@ const createBasicData = async (pool: PoolClient): Promise<boolean> => {
     );
 
     // Concatenar todas las consultas en una sola
-    await pool.query(concatQuery(queries));
-    return true;
+    //await pool.query(concatQuery(queries));
+    console.log(concatQuery(queries));
+
+    await pool.query('select 1');
+
+    /* await new Promise((resolve, reject) => {
+      pool.query(concatQuery(queries), (err) => {
+        if (err) {
+          console.error('Error executing query', err.stack);
+          reject(err);
+        } else {
+          resolve(true);
+        }
+      });
+    }); */
   } catch (error) {
-    console.error('Error creating basic data:', error);
+    console.error('Error creating data', error);
     return false;
   }
+  return true;
 };
 
 /**

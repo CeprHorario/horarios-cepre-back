@@ -46,13 +46,13 @@ export class ShiftDetailDto {
     message: 'Invalid hour format, HH:mm required',
   })
   @ApiProperty({ example: '08:00' })
-  hourInit: string;
+  startTime: string;
 
   @Matches(/^([01]\d|2[0-3]):([0-5]\d)$/, {
     message: 'Invalid hour format, HH:mm required',
   })
   @ApiProperty({ example: '12:30' })
-  hourFin: string;
+  endTime: string;
 
   @IsArray()
   @ArrayNotEmpty()
@@ -96,9 +96,11 @@ export class ProcessAdmissionDto {
   sede: string;
 
   @IsDate()
+  @Type(() => Date)
   started: Date;
 
   @IsDate()
+  @Type(() => Date)
   finished: Date;
 
   @ValidateNested()
