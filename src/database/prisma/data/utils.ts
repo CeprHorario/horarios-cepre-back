@@ -1,13 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
-import { Shift, ShiftStr } from './type';
+import { DataMonitor, InDataMonitors, Shift, ShiftStr } from './type';
 import { randomUUID, UUID } from 'crypto';
-
-export type DataCorreos = {
-  domain: string;
-  area: string;
-  shift: string;
-  quantity: number;
-};
 
 /**
  * Validates the shift times to ensure that the end time is after the start time
@@ -43,9 +36,9 @@ export const validateShiftTimes = (shift: ShiftStr): Shift => {
 /**
  * Generates email addresses based on the provided data.
  */
-export const generarCorreos = (data: DataCorreos): string[] => {
+export const generarCorreos = (data: InDataMonitors): DataMonitor[] => {
   // Extract the first letter of the area and the number from the shift
-  const { domain, area, shift, quantity } = data;
+  const { domain, area, areas, shift, shifts, sedes, quantity } = data;
 
   const letraArea = area.trim()[0].toLowerCase();
   const turnoNumero = numberShift(shift); // Extrae números del turno

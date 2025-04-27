@@ -38,17 +38,23 @@ export const initialDataSchema = async (
   const db = await pool(schema).connect();
   await client.$executeRaw`select 1`;
 
-  if (await createBasicData(db, body.configuration.shifts)) {
-    console.log(body);
-  } else {
-    throw new Error('Error creating data');
-  }
+  const { sedes, areas, shifts } = await createBasicData(
+    db,
+    body.configuration.shifts,
+  );
+
+
+
+  
 };
 
+/**
+ * Creates the initial data for the database.
+ */
 const createBasicData = async (
   pool: PoolClient,
   shiftsBody: ShiftDetailDto[],
-): Promise<boolean> => {
+) => {
   // Destructure the data from the JSON files
   const { users, areas, sedes } = rawData as DataInitial;
   const { courses } = rawCourses as { courses: Course[] };
@@ -114,11 +120,15 @@ const createBasicData = async (
         }
       });
     }); */
+    return {
+      sedes: sedesWithIds,
+      areas: areasWithIds,
+      shifts: shiftsWithIds,
+    };
   } catch (error) {
     console.error('Error creating data', error);
-    return false;
+    throw new Error('Error creating data');
   }
-  return true;
 };
 
 /**

@@ -7,6 +7,23 @@ export interface DataInitial {
   sedes: Sede[];
   shifts: Shift[];
 }
+
+export type InDataMonitors = {
+  domain: string;
+  area: string;
+  shift: string;
+  areas: Area[];
+  shifts: Shift[];
+  sedes: Sede[];
+  quantity: number;
+};
+
+export interface DataMonitor {
+  user: User;
+  monitor: Monitor;
+  classes: Class;
+}
+
 export interface AreaCourseHours {
   area: string;
   hours: CourseHour[];
@@ -54,6 +71,14 @@ export interface Shift extends Prisma.ShiftCreateInput {
 
 export interface Course extends Prisma.CourseCreateInput {
   id?: number;
+}
+
+export interface Monitor extends Prisma.MonitorCreateInput {
+  id?: UUID;
+}
+
+export interface Class extends Prisma.ClassCreateInput {
+  id?: UUID;
 }
 
 export interface AreaCourse {
