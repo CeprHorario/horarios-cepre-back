@@ -1,6 +1,16 @@
 import { BadRequestException } from '@nestjs/common';
-import { DataMonitor, InDataMonitors, Shift, ShiftStr } from './type';
+import {
+  Area,
+  DataMonitor,
+  HourSessionData,
+  InDataMonitors,
+  Sede,
+  Shift,
+  ShiftStr,
+} from './type';
 import { randomUUID, UUID } from 'crypto';
+import { Role } from '@modules/auth/decorators/authorization.decorator';
+import { ConfigurationDto } from '@modules/admissions/dto/create-admission.dto';
 
 /**
  * Validates the shift times to ensure that the end time is after the start time
@@ -28,30 +38,117 @@ export const validateShiftTimes = (shift: ShiftStr): Shift => {
   return {
     id,
     name: shift.name,
-    startTime,
-    endTime,
+    startTime: `${shift.startTime}:00`,
+    endTime: `${shift.endTime}:00`,
   };
+};
+
+export const generateHourSessions = (shift: Shift) => {
+  const hourSessionData: HourSessionData[] = [];
+  const sessionDuration = 40 * 60 * 1000; // 40 minutes in milliseconds
+  const breakDuration = 5 * 60 * 1000; // 5 minutes in milliseconds
+  const today = new Date().toISOString().split('T')[0];
+  let current = new Date(`${today}T${shift.startTime as string}Z`);
+  const endTime = new Date(`${today}T${shift.endTime as string}Z`);
+
+  for (let i = 1; current < endTime; i++) {
+    const sessionEnd = new Date(current.getTime() + sessionDuration);
+    hourSessionData.push({
+      shiftId: shift.id,
+      period: i,
+      startTime: current.toISOString(),
+      endTime: sessionEnd.toISOString(),
+    });
+    current = new Date(sessionEnd.getTime() + breakDuration);
+  }
+  return hourSessionData;
 };
 
 /**
  * Generates email addresses based on the provided data.
  */
-export const generarCorreos = (data: InDataMonitors): DataMonitor[] => {
-  // Extract the first letter of the area and the number from the shift
+export const generarDataMonitors = (data: InDataMonitors): DataMonitor[] => {
   const { domain, area, areas, shift, shifts, sedes, quantity } = data;
 
+  // Obtener los IDs necesarios
+  const areaId = areas.find((a) => a.name === area)?.id;
+  const shiftId = shifts.find((s) => s.name === shift)?.id;
+  const sedeId = sedes[0]?.id;
+
+  // Extraer la primera letra del área y el número del turno para generar correos
   const letraArea = area.trim()[0].toLowerCase();
-  const turnoNumero = numberShift(shift); // Extrae números del turno
-  const base = turnoNumero === 1 ? 100 : turnoNumero === 2 ? 200 : 300;
-  const inicio = base + 1;
+  const turnoNum = numberShift(shift);
+  const inicio = turnoNum * 100 + 1;
 
-  const correos = Array.from({ length: quantity }, (_, i) => {
-    return `${letraArea}-${inicio + i}@${domain}`;
+  // Generar los datos para cada monitor
+  return Array.from({ length: quantity }, (_, i) => {
+    // Generar IDs
+    const userId = randomUUID();
+    const monitorId = randomUUID();
+    const classId = randomUUID();
+    // Generar correo
+    const email = `${letraArea}-${inicio + i}@${domain}`;
+    const className = `${area[0].toUpperCase()}-${inicio} ${area}`;
+
+    return {
+      user: {
+        id: userId,
+        email,
+        role: Role.MONITOR,
+      },
+      monitor: {
+        id: monitorId,
+        userId,
+      },
+      classes: {
+        id: classId,
+        name: className,
+        capacity: 100,
+        monitorId: monitorId,
+        shiftId: shiftId ?? 0,
+        areaId: areaId ?? 0,
+        idSede: sedeId ?? 0,
+        urlClassroom: null,
+        urlMeet: null,
+      },
+    };
   });
-
-  return correos;
 };
 
+/**
+ * Generate data users, monitors and classes
+ */
+export const arrayMonitors = (
+  config: ConfigurationDto,
+  areas: Area[],
+  shifts: Shift[],
+  sedes: Sede[],
+) => {
+  const domain = config.emailDomain;
+  const dataMonitors: DataMonitor[] = [];
+
+  config.shifts.forEach((shift) => {
+    shift.classesToAreas.forEach((area) => {
+      const data = generarDataMonitors({
+        domain,
+        area: area.area,
+        shift: shift.name,
+        areas,
+        shifts,
+        sedes,
+        quantity: area.quantityClasses,
+      });
+      dataMonitors.push(...data);
+    });
+  });
+
+  return dataMonitors;
+};
+
+/**
+ * Extracts the numeric part from a shift string.
+
+ */
 const numberShift = (shift: string): number => {
   return parseInt(shift.replace(/\D/g, ''), 10);
 };

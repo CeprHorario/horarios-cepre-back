@@ -10,11 +10,23 @@ import * as areaCourseHr from './area-course-hrs.json';
 //import * as schema from '@database/drizzle/schema';
 //import { dataCorreos } from './utils';
 import {
-  ProcessAdmissionDto,
+  ConfigurationDto,
   ShiftDetailDto,
 } from '@modules/admissions/dto/create-admission.dto';
-import { AreaCourse, AreaCourseHours, Course, DataInitial } from './type';
-import { assignNumericIds, assignUuidIds, validateShiftTimes } from './utils';
+import {
+  AreaCourse,
+  AreaCourseHours,
+  Course,
+  DataInitial,
+  DataMonitor,
+} from './type';
+import {
+  arrayMonitors,
+  assignNumericIds,
+  assignUuidIds,
+  generateHourSessions,
+  validateShiftTimes,
+} from './utils';
 
 // type DataUsersClass = {
 //   sede: Sede;
@@ -32,20 +44,45 @@ const pool = (schema: string): Pool => {
 
 export const initialDataSchema = async (
   schema: string,
-  body: ProcessAdmissionDto,
+  config: ConfigurationDto,
   client: PrismaClient,
 ) => {
   const db = await pool(schema).connect();
   await client.$executeRaw`select 1`;
 
-  const { sedes, areas, shifts } = await createBasicData(
+  // Insert initial data into the database
+  const { sedes, areas, shifts } = await createBasicData(db, config.shifts);
+
+  // Insert monitors and classes into the database
+  // const dataMonitors =
+  createDataMonitors(
     db,
-    body.configuration.shifts,
+    arrayMonitors(config, areas, shifts, sedes),
+  );
+};
+
+/**
+ * Create data users, monitors and classes
+ */
+const createDataMonitors = async (pool: PoolClient, data: DataMonitor[]) => {
+  const tablesToInsert = [
+    { table: 'users', data: data.map((d) => d.user) },
+    { table: 'monitors', data: data.map((d) => d.monitor) },
+    { table: 'classes', data: data.map((d) => d.classes) },
+  ];
+
+  const queries = tablesToInsert.map((t) =>
+    createInsertQuery(
+      t.table,
+      extractColumnsSql(t.data as object[]),
+      extractValuesSql(t.data as object[]),
+    ),
   );
 
+  console.log(concatQuery(queries));
+  await pool.query('select 1');
 
-
-  
+  return data;
 };
 
 /**
@@ -68,8 +105,12 @@ const createBasicData = async (
     const sedesWithIds = assignNumericIds(sedes);
     const coursesWithIds = assignNumericIds(courses);
 
-    // Validate and assign IDs to shifts
+    // Validate and assign IDs to shifts and generate hour sessions
     const shiftsWithIds = shiftsBody.map((shift) => validateShiftTimes(shift));
+    const hoursSessionsWithIds = assignNumericIds(
+      shiftsWithIds.flatMap((shift) => generateHourSessions(shift)),
+    );
+
     // Assign hours to areas and courses
     const areaCourseHours: AreaCourse[] = areaCourse.flatMap((area) => {
       const areaId = areasWithIds.find((a) => a.name === area.area)?.id;
@@ -93,14 +134,15 @@ const createBasicData = async (
       { table: 'courses', data: coursesWithIds },
       { table: 'shifts', data: shiftsWithIds },
       { table: 'area_course_hours', data: areaCourseHours },
+      { table: 'hour_sessions', data: hoursSessionsWithIds },
     ];
 
     // Crear consultas de inserción para cada tabla
     const queries = tablesToInsert.map((t) =>
       createInsertQuery(
         t.table,
-        extractColumnsSql(t.data),
-        extractValuesSql(t.data),
+        extractColumnsSql(t.data as object[]),
+        extractValuesSql(t.data as object[]),
       ),
     );
 
@@ -124,6 +166,7 @@ const createBasicData = async (
       sedes: sedesWithIds,
       areas: areasWithIds,
       shifts: shiftsWithIds,
+      hourSessions: hoursSessionsWithIds,
     };
   } catch (error) {
     console.error('Error creating data', error);
@@ -154,8 +197,11 @@ const concatQuery = (queries: string[]): string => {
  */
 const extractColumnsSql = (obj: object[]): string => {
   return Object.keys(obj[0])
-    .map((col: string) => `"${col}"`)
+    .map((col: string) => `"${toSnakeCase(col)}"`)
     .join(', ');
+};
+const toSnakeCase = (str: string): string => {
+  return str.replace(/([A-Z])/g, '_$1').toLowerCase();
 };
 
 /**

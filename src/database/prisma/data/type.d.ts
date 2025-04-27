@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { UUID } from 'crypto';
+import { Class } from '@prisma/client';
 
 export interface DataInitial {
   users: User[];
@@ -48,6 +49,7 @@ export interface CourseHour {
 }
 
 export interface ShiftStr {
+  id?: number;
   name: string;
   startTime: string;
   endTime: string;
@@ -73,16 +75,21 @@ export interface Course extends Prisma.CourseCreateInput {
   id?: number;
 }
 
-export interface Monitor extends Prisma.MonitorCreateInput {
+export interface Monitor {
   id?: UUID;
-}
-
-export interface Class extends Prisma.ClassCreateInput {
-  id?: UUID;
+  userId: UUID;
 }
 
 export interface AreaCourse {
   courseId: number;
   areaId: number;
   totalHours: number;
+}
+
+export interface HourSessionData {
+  id?: number;
+  shiftId: number;
+  period: number;
+  startTime: string;
+  endTime: string;
 }
