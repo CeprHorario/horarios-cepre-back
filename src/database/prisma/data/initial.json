@@ -23,12 +23,12 @@
   ],
   "areas": [
     {
-      "name": "Ingenierías",
-      "description": "Área de Ingenierías"
-    },
-    {
       "name": "Biomédicas",
       "description": "Área de Biomédicas"
+    },
+    {
+      "name": "Ingenierías",
+      "description": "Área de Ingenierías"
     },
     {
       "name": "Sociales",

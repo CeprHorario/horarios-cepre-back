@@ -1,8 +1,8 @@
-import { PrismaClient, User } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 import { Pool, PoolClient } from 'pg';
 
-//import * as dataInitial from './initial.json';
-//import * as courses from './courses.json';
+import * as dataInitial from './initial.json';
+import * as dataCourses from './courses.json';
 //import * as areaCourseHr from './area-course-hrs.json';
 //import * as schedulesBio from './data/bio.json';
 //import * as schedulesIng from './data/ing.json';
@@ -10,15 +10,16 @@ import { Pool, PoolClient } from 'pg';
 //import * as schema from '@database/drizzle/schema';
 //import { dataCorreos } from './utils';
 import { ProcessAdmissionDto } from '@modules/admissions/dto/create-admission.dto';
-import { Area, Sede, ShiftTimes } from './type';
+import { Course, DataInitial } from './type';
+import { assignNumericIds, assignUuidIds } from './utils';
 
-type DataUsersClass = {
-  sede: Sede;
-  area: Area
-  shift: ShiftTimes;
-  users: User[];
-  monitors: string[];
-};
+// type DataUsersClass = {
+//   sede: Sede;
+//   area: Area;
+//   shift: Shift;
+//   users: User[];
+//   monitors: string[];
+// };
 
 const pool = (schema: string): Pool => {
   return new Pool({
@@ -33,48 +34,97 @@ export const initialDataSchema = async (
 ) => {
   const db = await pool(schema).connect();
   await client.$executeRaw`select 1`;
-  console.log(db);
-  console.log(body);
+
+  if (await createBasicData(db)) {
+    console.log(body);
+  } else {
+    throw new Error('Error creating data');
+  }
 };
 
-const createUsersClass = async (pool: PoolClient, data: DataUsersClass[]) => {
-  
-}
+const createBasicData = async (pool: PoolClient): Promise<boolean> => {
+  const { users, areas, sedes } = dataInitial as DataInitial;
+  const courses = dataCourses as Course[];
 
-const generateInsertQuery = (
+  try {
+    // asingIds(users, areas, sedes, courses);
+    assignUuidIds(users);
+    assignNumericIds(areas);
+    assignNumericIds(sedes);
+    assignNumericIds(courses);
+
+    // Crear consultas para todas las tablas de una forma más concisa
+    const tablesToInsert = [
+      { table: 'users', data: users },
+      { table: 'areas', data: areas },
+      { table: 'sedes', data: sedes },
+      { table: 'courses', data: courses },
+    ];
+
+    // Crear consultas de inserción para cada tabla
+    const queries = tablesToInsert.map((t) =>
+      createInsertQuery(
+        t.table,
+        extractColumnsSql(t.data),
+        extractValuesSql(t.data),
+      ),
+    );
+
+    // Concatenar todas las consultas en una sola
+    await pool.query(concatQuery(queries));
+    return true;
+  } catch (error) {
+    console.error('Error creating basic data:', error);
+    return false;
+  }
+};
+
+/**
+ * Generates an SQL insert query for a given table, columns, and values.
+ */
+const createInsertQuery = (
   table: string,
-  columns: string[],
-  values: Record<string, any>[],
+  columnsSQL: string,
+  valuesSQL: string,
 ): string => {
-  // Formatear el nombre de las columnas
-  const columnsSQL = columns.map((col: string) => `"${col}"`).join(', ');
-  
-  // Construir los valores con formato adecuado según el tipo de dato
-  const valueStrings = values
-    .map(
-      (row: Record<string, any>) =>
-      '(' +
-      columns
-          .map((col: string) => {
-            const value = row[col];
-            // Manejo de diferentes tipos de datos
-            if (value === null || value === undefined) {
-              return 'NULL';
-            } else if (typeof value === 'number') {
-              return value.toString();
-            } else if (typeof value === 'boolean') {
-              return value ? 'TRUE' : 'FALSE';
-            } else if (value instanceof Date) {
-              return `'${value.toISOString()}'`;
-            } else {
-              // Para strings, escapar comillas simples
-              return `'${String(value).replace(/'/g, "''")}'`;
-            }
-          })
-        .join(', ') +
-      ')'
-    )
+  return `INSERT INTO "${table}" (${columnsSQL}) VALUES\n${valuesSQL};`;
+};
+
+/**
+ * Concatenates multiple SQL queries into a single string.
+ */
+const concatQuery = (queries: string[]): string => {
+  return queries.filter((q) => q).join('\n\n');
+};
+
+/**
+ * Generates an SQL insert query for a given table, columns, and values.
+ */
+const extractColumnsSql = (obj: object[]): string => {
+  return Object.keys(obj[0])
+    .map((col: string) => `"${col}"`)
+    .join(', ');
+};
+
+/**
+ * Generates an SQL insert query for a given table, columns, and values.
+ */
+const extractValuesSql = (obj: object[]) => {
+  return obj
+    .map((row) => {
+      const values = Object.values(row).map(formatSqlValue).join(', ');
+      return `(${values})`;
+    })
     .join(',\n');
-  
-  return `INSERT INTO "${table}" (${columnsSQL}) VALUES\n${valueStrings};`;
+};
+
+/**
+ * Formatea un valor para su uso en una consulta SQL
+ */
+const formatSqlValue = (value: any): string => {
+  if (value === null || value === undefined) return 'NULL';
+  if (typeof value === 'number') return value.toString();
+  if (typeof value === 'boolean') return value ? 'TRUE' : 'FALSE';
+  if (value instanceof Date) return `'${value.toISOString()}'`;
+  return `'${String(value).replace(/'/g, "''")}'`; // para Strings
 };

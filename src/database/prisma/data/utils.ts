@@ -1,5 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
-import { Shift, ShiftTimes } from './type';
+import { Shift, ShiftStr } from './type';
+import { randomUUID, UUID } from 'crypto';
 
 export type DataCorreos = {
   domain: string;
@@ -11,7 +12,7 @@ export type DataCorreos = {
 /**
  * Validates the shift times to ensure that the end time is after the start time
  */
-export const validateShiftTimes = (shift: Shift): ShiftTimes => {
+export const validateShiftTimes = (shift: ShiftStr): Shift => {
   const id = numberShift(shift.name);
   const today = new Date().toISOString().split('T')[0];
   const startTime = new Date(`${today}T${shift.startTime}:00Z`);
@@ -60,4 +61,26 @@ export const generarCorreos = (data: DataCorreos): string[] => {
 
 const numberShift = (shift: string): number => {
   return parseInt(shift.replace(/\D/g, ''), 10);
+};
+
+/**
+ * Assigns numeric IDs to an array of objects.
+ */
+export const assignNumericIds = <T extends { id?: number }>(
+  items: T[],
+): T[] => {
+  return items.map((item, index) => ({
+    ...item,
+    id: index + 1,
+  }));
+};
+
+/**
+ * Assigns UUIDs to an array of objects.
+ */
+export const assignUuidIds = <T extends { id?: UUID }>(items: T[]): T[] => {
+  return items.map((item) => ({
+    ...item,
+    id: randomUUID(),
+  }));
 };

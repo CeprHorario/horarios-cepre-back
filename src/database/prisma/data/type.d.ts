@@ -1,4 +1,5 @@
-import { Role } from '@modules/auth/decorators/authorization.decorator';
+import { Prisma } from '@prisma/client';
+import { UUID } from 'crypto';
 
 export interface DataInitial {
   users: User[];
@@ -6,7 +7,6 @@ export interface DataInitial {
   sedes: Sede[];
   shifts: Shift[];
 }
-
 export interface AreaHours {
   area: string;
   hours: CourseHour[];
@@ -30,39 +30,28 @@ export interface CourseHour {
   total: string;
 }
 
-export interface User {
-  email: string;
-  role: Role;
+export interface ShiftStr {
+  name: string;
+  startTime: string;
+  endTime: string;
 }
 
-export interface Area {
+export interface User extends Prisma.UserCreateInput {
+  id: UUID;
+}
+
+export interface Area extends Prisma.AreaCreateInput {
   id?: number;
-  name: string;
-  description: string;
 }
 
-export interface Sede {
+export interface Sede extends Prisma.SedeCreateInput {
   id?: number;
-  name: string;
-  description: string;
 }
 
-export interface Shift {
-  name: string;
-  startTime?: string;
-  endTime?: string;
+export interface Shift extends Prisma.ShiftCreateInput {
+  id: number;
 }
 
-export interface ShiftTimes {
+export interface Course extends Prisma.CourseCreateInput {
   id?: number;
-  name: string;
-  startTime: Date;
-  endTime: Date;
-}
-
-export interface Course {
-  id?: number;
-  name: string;
-  color: string;
-  description: string;
 }
