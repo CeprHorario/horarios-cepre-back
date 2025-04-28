@@ -1,12 +1,12 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Class } from '@prisma/client';
 import { Pool, PoolClient } from 'pg';
 
 import * as rawData from './initial.json';
 import * as rawCourses from './courses.json';
 import * as areaCourseHr from './area-course-hrs.json';
-//import * as schedulesBio from './data/bio.json';
-//import * as schedulesIng from './data/ing.json';
-//import * as schedulesSoc from './data/soc.json';
+//import * as schedulesBio from './schedules/bio.json';
+//import * as schedulesIng from './schedules/ing.json';
+//import * as schedulesSoc from './schedules/soc.json';
 //import * as schema from '@database/drizzle/schema';
 //import { dataCorreos } from './utils';
 import {
@@ -25,6 +25,8 @@ import {
   assignNumericIds,
   assignUuidIds,
   generateHourSessions,
+  getMapAndSorted,
+  parseScheduleJson,
   validateShiftTimes,
 } from './utils';
 
@@ -55,10 +57,19 @@ export const initialDataSchema = async (
 
   // Insert monitors and classes into the database
   // const dataMonitors =
-  createDataMonitors(
+  const { classes } = await createDataMonitors(
     db,
     arrayMonitors(config, areas, shifts, sedes),
   );
+
+  if (config.createSchedules) {
+    // Get map of classes to areas and shifts
+    const classMap = getMapAndSorted(classes, shifts, areas);
+    // Generate schedules for each area and shift
+    await createSchedules(db, config, classMap);
+  }
+
+  return 'data created';
 };
 
 /**
@@ -82,7 +93,9 @@ const createDataMonitors = async (pool: PoolClient, data: DataMonitor[]) => {
   console.log(concatQuery(queries));
   await pool.query('select 1');
 
-  return data;
+  return {
+    classes: data.map((d) => d.classes),
+  };
 };
 
 /**
@@ -166,6 +179,7 @@ const createBasicData = async (
       sedes: sedesWithIds,
       areas: areasWithIds,
       shifts: shiftsWithIds,
+      courses: coursesWithIds,
       hourSessions: hoursSessionsWithIds,
     };
   } catch (error) {
@@ -225,4 +239,21 @@ const formatSqlValue = (value: any): string => {
   if (typeof value === 'boolean') return value ? 'TRUE' : 'FALSE';
   if (value instanceof Date) return `'${value.toISOString()}'`;
   return `'${String(value).replace(/'/g, "''")}'`; // para Strings
+};
+
+/**
+ * Create Schedules in the database
+ */
+const createSchedules = async (
+  pool: PoolClient,
+  config: ConfigurationDto,
+  classes: Record<string, Record<string, Class[]>>,
+) => {
+  const dataSchedules = {
+    bio: parseScheduleJson('schedules/bio.json'),
+    ing: parseScheduleJson('schedules/ing.json'),
+    soc: parseScheduleJson('schedules/soc.json'),
+  };
+
+  return null;
 };

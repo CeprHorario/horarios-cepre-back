@@ -7,10 +7,14 @@ import {
   Sede,
   Shift,
   ShiftStr,
+  ScheduleWeek,
 } from './type';
 import { randomUUID, UUID } from 'crypto';
 import { Role } from '@modules/auth/decorators/authorization.decorator';
 import { ConfigurationDto } from '@modules/admissions/dto/create-admission.dto';
+import { Class } from '@prisma/client';
+import * as fs from 'fs';
+import * as path from 'path';
 
 /**
  * Validates the shift times to ensure that the end time is after the start time
@@ -62,6 +66,45 @@ export const generateHourSessions = (shift: Shift) => {
     current = new Date(sessionEnd.getTime() + breakDuration);
   }
   return hourSessionData;
+};
+
+/**
+ * Groups classes by shift and area, and sorts them randomly.
+ */
+export const getMapAndSorted = (
+  classes: Class[],
+  shifts: Shift[],
+  areas: Area[],
+): Record<string, Record<string, Class[]>> => {
+  const result = classes.reduce<Record<string, Record<string, Class[]>>>(
+    (acc, cls) => {
+      const shiftName =
+        shifts.find((s) => s.id === cls.shiftId)?.name ?? 'Unknown Shift';
+      const areaName =
+        areas.find((a) => a.id === cls.areaId)?.name ?? 'Unknown Area';
+
+      // Inicializar y agregar la clase en una sola operación
+      if (!acc[shiftName]) acc[shiftName] = {};
+      if (!acc[shiftName][areaName]) acc[shiftName][areaName] = [];
+      acc[shiftName][areaName].push(cls);
+
+      return acc;
+    },
+    {},
+  );
+
+  // Realizar una única pasada de mezcla después de agrupar todo
+  Object.values(result).forEach((shift) => {
+    Object.values(shift).forEach((classes) => {
+      // Fisher-Yates shuffle (más eficiente que sort con random)
+      for (let i = classes.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [classes[i], classes[j]] = [classes[j], classes[i]];
+      }
+    });
+  });
+
+  return result;
 };
 
 /**
@@ -173,4 +216,13 @@ export const assignUuidIds = <T extends { id?: UUID }>(items: T[]): T[] => {
     ...item,
     id: randomUUID(),
   }));
+};
+
+/**
+ *  Parsed Schedule JSON
+ */
+export const parseScheduleJson = (filePath: string): ScheduleWeek[] => {
+  const bioJsonPath = path.resolve(__dirname, filePath);
+  const bioJsonContent = fs.readFileSync(bioJsonPath, 'utf-8');
+  return JSON.parse(bioJsonContent) as ScheduleWeek[];
 };

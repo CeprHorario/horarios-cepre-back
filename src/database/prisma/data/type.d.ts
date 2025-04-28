@@ -30,7 +30,6 @@ export interface AreaCourseHours {
   hours: CourseHour[];
 }
 
-export type TodosLosHorarios = ScheduleWeek[];
 export type ScheduleWeek = ScheduleDay[];
 
 export interface Bloque {
