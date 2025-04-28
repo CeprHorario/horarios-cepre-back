@@ -21,14 +21,13 @@ import {
   DataMonitor,
   HourSessionData,
   ScheduleData,
-  ScheduleWeek,
-  weekdayData,
 } from './type';
 import {
   arrayMonitors,
   assignNumericIds,
   assignUuidIds,
   generateHourSessions,
+  generateScheduleData,
   getMapAndSorted,
   parseScheduleJson,
   validateShiftTimes,
@@ -333,34 +332,3 @@ const createSchedules = async (
 
   return null;
 };
-
-function generateScheduleData(
-  dataSchedules: ScheduleWeek[],
-  classes: Record<string, Class[]>,
-  courseMap: Map<string, number>,
-  hourSessions: HourSessionData[],
-) {
-  let index = 0;
-
-  const scheduleData: ScheduleData[] = [];
-  Object.values(classes).flatMap((classGroup) =>
-    classGroup.flatMap((c) => {
-      dataSchedules[index].flatMap((d) =>
-        d.clases.map((cl) =>
-          scheduleData.push({
-            courseId: courseMap.get(cl.curso) ?? 0,
-            hourSesionId:
-              hourSessions.find(
-                (h) => h.shiftId === c.shiftId && h.period === cl.bloque,
-              )?.id ?? 0,
-            classId: c.id,
-            weekday: weekdayData[d.dia],
-          }),
-        ),
-      );
-      index = index === dataSchedules.length - 1 ? 0 : index + 1;
-    }),
-  );
-
-  return scheduleData;
-}

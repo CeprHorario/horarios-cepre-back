@@ -8,6 +8,8 @@ import {
   Shift,
   ShiftStr,
   ScheduleWeek,
+  ScheduleData,
+  weekdayData,
 } from './type';
 import { randomUUID, UUID } from 'crypto';
 import { Role } from '@modules/auth/decorators/authorization.decorator';
@@ -230,4 +232,38 @@ export const parseScheduleJson = (filePath: string): ScheduleWeek[] => {
   const bioJsonPath = path.resolve(__dirname, filePath);
   const bioJsonContent = fs.readFileSync(bioJsonPath, 'utf-8');
   return JSON.parse(bioJsonContent) as ScheduleWeek[];
+};
+
+/**
+ * Generates schedule data based on the provided schedules, classes, course map, and hour sessions.
+ */
+export const generateScheduleData = (
+  dataSchedules: ScheduleWeek[],
+  classes: Record<string, Class[]>,
+  courseMap: Map<string, number>,
+  hourSessions: HourSessionData[],
+) => {
+  let index = 0;
+
+  const scheduleData: ScheduleData[] = [];
+  Object.values(classes).flatMap((classGroup) =>
+    classGroup.flatMap((c) => {
+      dataSchedules[index].flatMap((d) =>
+        d.clases.map((cl) =>
+          scheduleData.push({
+            courseId: courseMap.get(cl.curso) ?? 0,
+            hourSesionId:
+              hourSessions.find(
+                (h) => h.shiftId === c.shiftId && h.period === cl.bloque,
+              )?.id ?? 0,
+            classId: c.id,
+            weekday: weekdayData[d.dia],
+          }),
+        ),
+      );
+      index = index === dataSchedules.length - 1 ? 0 : index + 1;
+    }),
+  );
+
+  return scheduleData;
 };
