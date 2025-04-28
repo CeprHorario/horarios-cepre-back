@@ -92,3 +92,20 @@ export interface HourSessionData {
   startTime: string;
   endTime: string;
 }
+
+export interface ScheduleData {
+  classId: string;
+  courseId: number;
+  hourSesionId: number;
+  weekday: string;
+}
+
+export const weekdayData: Record<string, string> = {
+  lunes: 'MONDAY',
+  martes: 'TUESDAY',
+  miercoles: 'WEDNESDAY',
+  jueves: 'THURSDAY',
+  viernes: 'FRIDAY',
+  sabado: 'SATURDAY',
+  domingo: 'SUNDAY',
+};

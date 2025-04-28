@@ -19,6 +19,10 @@ import {
   Course,
   DataInitial,
   DataMonitor,
+  HourSessionData,
+  ScheduleData,
+  ScheduleWeek,
+  weekdayData,
 } from './type';
 import {
   arrayMonitors,
@@ -53,7 +57,10 @@ export const initialDataSchema = async (
   await client.$executeRaw`select 1`;
 
   // Insert initial data into the database
-  const { sedes, areas, shifts } = await createBasicData(db, config.shifts);
+  const { sedes, areas, shifts, hourSessions, courses } = await createBasicData(
+    db,
+    config.shifts,
+  );
 
   // Insert monitors and classes into the database
   // const dataMonitors =
@@ -66,7 +73,7 @@ export const initialDataSchema = async (
     // Get map of classes to areas and shifts
     const classMap = getMapAndSorted(classes, shifts, areas);
     // Generate schedules for each area and shift
-    await createSchedules(db, config, classMap);
+    await createSchedules(db, config.shifts, classMap, hourSessions, courses);
   }
 
   return 'data created';
@@ -246,8 +253,10 @@ const formatSqlValue = (value: any): string => {
  */
 const createSchedules = async (
   pool: PoolClient,
-  config: ConfigurationDto,
+  shifts: ShiftDetailDto[],
   classes: Record<string, Record<string, Class[]>>,
+  hourSessions: HourSessionData[],
+  courses: Course[],
 ) => {
   const dataSchedules = {
     bio: parseScheduleJson('schedules/bio.json'),
@@ -255,5 +264,103 @@ const createSchedules = async (
     soc: parseScheduleJson('schedules/soc.json'),
   };
 
+  shifts.map((s) => {
+    s.classesToAreas.map((c) => {
+      if (c.quantityClasses !== classes[s.name][c.area].length) {
+        throw new Error(
+          `Error: The number of classes for area ${c.area} in shift ${s.name} does not match the number of classes in the database.`,
+        );
+      }
+    });
+  });
+
+  const scheduleData: ScheduleData[] = [];
+  // Corrigelo para usar courses los campos que tiene son name y id
+  const courseMap = new Map(courses.map((c) => [c.name, c.id ?? 0]));
+
+  // add schedules to bio
+  scheduleData.push(
+    ...generateScheduleData(
+      dataSchedules.bio,
+      classes['Biomédicas'],
+      courseMap,
+      hourSessions,
+    ),
+  );
+
+  // add schedules to ing
+  scheduleData.push(
+    ...generateScheduleData(
+      dataSchedules.ing,
+      classes['Ingenierías'],
+      courseMap,
+      hourSessions,
+    ),
+  );
+
+  // add schedules to soc
+  scheduleData.push(
+    ...generateScheduleData(
+      dataSchedules.soc,
+      classes['Sociales'],
+      courseMap,
+      hourSessions,
+    ),
+  );
+
+  // add schedules to bio
+  /* let i = 0;
+  for (const value of Object.values(classes['Biomédicas'])) {
+    value.map((c) => {
+      dataSchedules.bio[i].map((d) => {
+        d.clases.map((cl) => {
+          scheduleData.push({
+            courseId: courseMap.get(cl.curso) ?? 0,
+            hourSesionId:
+              hourSessions.find(
+                (h) => h.shiftId === c.shiftId && h.period === cl.bloque,
+              )?.id ?? 0,
+            classId: c.id,
+            weekday: weekdayData[d.dia],
+          });
+        });
+      });
+      i = i === dataSchedules.bio.length - 1 ? 0 : i + 1;
+    });
+  } */
+
+  await pool.query('select 1');
+
   return null;
 };
+
+function generateScheduleData(
+  dataSchedules: ScheduleWeek[],
+  classes: Record<string, Class[]>,
+  courseMap: Map<string, number>,
+  hourSessions: HourSessionData[],
+) {
+  let index = 0;
+
+  const scheduleData: ScheduleData[] = [];
+  Object.values(classes).flatMap((classGroup) =>
+    classGroup.flatMap((c) => {
+      dataSchedules[index].flatMap((d) =>
+        d.clases.map((cl) =>
+          scheduleData.push({
+            courseId: courseMap.get(cl.curso) ?? 0,
+            hourSesionId:
+              hourSessions.find(
+                (h) => h.shiftId === c.shiftId && h.period === cl.bloque,
+              )?.id ?? 0,
+            classId: c.id,
+            weekday: weekdayData[d.dia],
+          }),
+        ),
+      );
+      index = index === dataSchedules.length - 1 ? 0 : index + 1;
+    }),
+  );
+
+  return scheduleData;
+}

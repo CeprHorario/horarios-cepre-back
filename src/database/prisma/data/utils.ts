@@ -83,10 +83,15 @@ export const getMapAndSorted = (
       const areaName =
         areas.find((a) => a.id === cls.areaId)?.name ?? 'Unknown Area';
 
-      // Inicializar y agregar la clase en una sola operación
+      /* // Inicializar y agregar la clase en una sola operación
       if (!acc[shiftName]) acc[shiftName] = {};
       if (!acc[shiftName][areaName]) acc[shiftName][areaName] = [];
-      acc[shiftName][areaName].push(cls);
+      acc[shiftName][areaName].push(cls); */
+
+      // Inicializar y agregar la clase en una sola operación
+      if (!acc[areaName]) acc[areaName] = {};
+      if (!acc[areaName][shiftName]) acc[areaName][shiftName] = [];
+      acc[areaName][shiftName].push(cls);
 
       return acc;
     },
