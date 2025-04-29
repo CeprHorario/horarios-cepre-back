@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '@database/prisma/prisma.service';
 
 import {
@@ -227,5 +231,73 @@ export class ClassService {
       email: teacher.teacher?.user.email || 'no asignado',
       courseName: teacher.course.name || 'no asignado',
     }));
+  }
+
+  async updateMeetLink(id: string, urlMeet: string) {
+    try {
+      const classObj = await this.prisma.getClient().class.findUnique({
+        where: { id },
+      });
+
+      if (!classObj) {
+        throw new NotFoundException(`Clase con ID ${id} no encontrada`);
+      }
+
+      const updatedClass = await this.prisma.getClient().class.update({
+        where: { id },
+        data: { urlMeet },
+        select: {
+          id: true,
+          name: true,
+          urlMeet: true,
+        },
+      });
+
+      return {
+        message: 'Enlace de Meet actualizado correctamente',
+        class: updatedClass,
+      };
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      console.error('Error al actualizar enlace de Meet:', error);
+      throw new BadRequestException('Error al actualizar el enlace de Meet');
+    }
+  }
+
+  async updateClassroomLink(id: string, urlClassroom: string) {
+    try {
+      const classObj = await this.prisma.getClient().class.findUnique({
+        where: { id },
+      });
+
+      if (!classObj) {
+        throw new NotFoundException(`Clase con ID ${id} no encontrada`);
+      }
+
+      const updatedClass = await this.prisma.getClient().class.update({
+        where: { id },
+        data: { urlClassroom },
+        select: {
+          id: true,
+          name: true,
+          urlClassroom: true,
+        },
+      });
+
+      return {
+        message: 'Enlace de Classroom actualizado correctamente',
+        class: updatedClass,
+      };
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      console.error('Error al actualizar enlace de Classroom:', error);
+      throw new BadRequestException(
+        'Error al actualizar el enlace de Classroom',
+      );
+    }
   }
 }
