@@ -14,7 +14,7 @@ import { TeacherGetSummaryDto } from './dto/teacher-get-summary.dto';
 import { TeacherUpdateDto } from './dto/teacher-update.dto';
 import { TeacherGetByIdDto } from './dto/teacher-get-by-id.dto';
 //import { Teacher } from '@prisma/client';
-
+import { Prisma } from '@prisma/client';
 import { ScheduleTeacherDto } from './dto/schedule-teacher.dto';
 import { TeacherFilteredDto } from '@modules/teachers/dto/teacherFiltered.dto';
 import { JobStatus } from '@prisma/client';
@@ -91,11 +91,11 @@ export class TeacherService {
   }> {
     const offset = (page - 1) * limit;
 
-    const activeFilter = {
+    const where:Prisma.TeacherWhereInput = {
       user: {
         isActive: true,
       },
-      ...(courseId ? { courseId: Number(courseId) } : {}),
+        ...(courseId !== undefined && { courses: { id: courseId } }),
     };
 
     const [teachers, total] = await this.prisma.getClient().$transaction([
@@ -103,13 +103,14 @@ export class TeacherService {
         skip: limit > 0 ? offset : undefined,
         take: limit > 0 ? limit : undefined,
         relationLoadStrategy: 'join',
-        where: activeFilter,
+        where: where,
         select: {
           id: true,
           jobStatus: true,
           isCoordinator: true,
           courses: {
             select: {
+              id: true,
               name: true,
             },
           },
@@ -128,13 +129,14 @@ export class TeacherService {
         },
       }),
       this.prisma.getClient().teacher.count({
-        where: activeFilter,
+        where: where,
       }),
     ]);
 
     const data = teachers.map((teacher) =>
       plainToInstance(TeacherGetSummaryDto, {
         id: teacher.id,
+        courseId: teacher.courses?.id || '',
         courseName: teacher.courses?.name || '',
         firstName: teacher.user?.userProfile?.firstName || '',
         lastName: teacher.user?.userProfile?.lastName || '',

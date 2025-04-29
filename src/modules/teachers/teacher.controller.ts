@@ -92,14 +92,14 @@ export class TeacherController {
   findAll(
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 20,
-    @Query('course_id') courseId?: number,
+    @Query('courseId') courseId?: number,
   ): Promise<{
     data: TeacherGetSummaryDto[];
     total: number;
     page: number;
     limit: number;
   }> {
-    return this.teacherService.findAll(Number(page), Number(limit), Number(courseId));
+    return this.teacherService.findAll(page, limit, courseId);
   }
 
   @Get('search')
