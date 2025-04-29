@@ -469,6 +469,135 @@ export class MonitorService {
     return { data, total, page, limit };
   }
 
+  async search(
+    query: string,
+    page: number = 1,
+    limit: number = 20,
+  ): Promise<{
+    data: MonitorGetSummaryDto[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    const offset = (page - 1) * limit;
+
+    const [monitors, total] = await this.prisma.getClient().$transaction([
+      this.prisma.getClient().monitor.findMany({
+        skip: limit > 0 ? offset : undefined,
+        take: limit > 0 ? limit : undefined,
+        where: {
+          OR: [
+            {
+              user: {
+                userProfile: {
+                  firstName: { contains: query, mode: 'insensitive' },
+                },
+              },
+            },
+            {
+              user: {
+                userProfile: {
+                  lastName: { contains: query, mode: 'insensitive' },
+                },
+              },
+            },
+            {
+              user: {
+                email: { contains: query, mode: 'insensitive' },
+              },
+            },
+            {
+              user: {
+                userProfile: {
+                  phone: { contains: query, mode: 'insensitive' },
+                },
+              },
+            },
+            {
+              classes: {
+                name: { contains: query, mode: 'insensitive' },
+              },
+            },
+          ],
+          user: {
+            isActive: true,
+          },
+        },
+        include: {
+          user: {
+            include: {
+              userProfile: true,
+            },
+          },
+          classes: {
+            select: {
+              name: true,
+              shift: {
+                select: {
+                  name: true
+                }
+              }
+            },
+          },
+        },
+      }),
+      this.prisma.getClient().monitor.count({
+        where: {
+          OR: [
+            {
+              user: {
+                userProfile: {
+                  firstName: { contains: query, mode: 'insensitive' },
+                },
+              },
+            },
+            {
+              user: {
+                userProfile: {
+                  lastName: { contains: query, mode: 'insensitive' },
+                },
+              },
+            },
+            {
+              user: {
+                email: { contains: query, mode: 'insensitive' },
+              },
+            },
+            {
+              user: {
+                userProfile: {
+                  phone: { contains: query, mode: 'insensitive' },
+                },
+              },
+            },
+            {
+              classes: {
+                name: { contains: query, mode: 'insensitive' },
+              },
+            },
+          ],
+          user: {
+            isActive: true,
+          },
+        },
+      }),
+    ]);
+
+    const data = monitors.map((monitor) =>
+      plainToInstance(MonitorGetSummaryDto, {
+        id: monitor.id,
+        firstName: monitor.user?.userProfile?.firstName || '',
+        lastName: monitor.user?.userProfile?.lastName || '',
+        email: monitor.user?.email || '',
+        phone: monitor.user?.userProfile?.phone || '',
+        className: monitor.classes?.name || '',
+        shift: monitor.classes?.shift?.name || '',
+      }),
+    );
+
+    return { data, total, page, limit };
+  }
+
   // ─────── Métodos auxiliares ───────
 
   private mapToMonitorDto(obj: any): MonitorBaseDto {
