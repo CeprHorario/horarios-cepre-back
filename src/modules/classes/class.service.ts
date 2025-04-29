@@ -4,6 +4,10 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '@database/prisma/prisma.service';
+//Si algun dia borran el domingo para que sea mas mantenible este codigo xd
+//import { Weekday } from '@prisma/client'; // Importamos el enum Weekday
+
+const WEEKDAYS_COUNT = 6;
 
 import {
   CreateClassDto,
@@ -34,21 +38,123 @@ export class ClassService {
   }
 
   async findAll(): Promise<ClassBaseDto[]> {
-    const classs = await this.prisma.getClient().class.findMany({
-      include: { sede: true, area: true, shift: true, monitor: true },
+    const classes = await this.prisma.getClient().class.findMany({
+      include: {
+        sede: true,
+        area: true,
+        monitor: true,
+        schedules: true,
+        // Incluimos la relación shift con hourSession para calcular el número total de períodos
+        shift: {
+          include: {
+            hourSessions: true,
+          },
+        },
+      },
     });
-    return classs.map((clas) => this.mapToClassDto(clas));
+
+    const classesWithStatus = await Promise.all(
+      classes.map(async (clas) => {
+        // Para cada clase, calculamos el número esperado de horarios
+        const totalPeriods = clas.shift?.hourSessions?.length || 0;
+        const expectedSchedulesCount = totalPeriods * WEEKDAYS_COUNT;
+
+        // Verificamos que existan todos los registros de horarios esperados
+        const totalSchedules = clas.schedules?.length || 0;
+
+        // Contamos los horarios asignados con profesor
+        const schedulesWithTeacherCount =
+          clas.schedules?.filter((s) => s.teacherId !== null)?.length || 0;
+
+        // Determinamos el estado:
+        // - Si hay menos registros que los esperados: FALTAN_REGISTROS
+        // - Si hay suficientes registros pero faltan profesores: FALTAN_DOCENTES
+        // - Si todos los horarios tienen profesor asignado: COMPLETO
+        let status = 'FALTAN_DOCENTES';
+        if (totalSchedules < expectedSchedulesCount) {
+          status = 'FALTAN_REGISTROS';
+        } else if (
+          schedulesWithTeacherCount === expectedSchedulesCount &&
+          expectedSchedulesCount > 0
+        ) {
+          status = 'COMPLETO';
+        }
+
+        // Creamos un nuevo objeto sin incluir schedules ni hourSessions
+        const classWithoutSchedules = {
+          ...clas,
+          status,
+          schedules: undefined,
+          shift: {
+            ...clas.shift,
+            hourSessions: undefined,
+          },
+        };
+
+        return classWithoutSchedules;
+      }),
+    );
+
+    return classesWithStatus.map((clas) => this.mapToClassDto(clas));
   }
 
   async findOne(id: string): Promise<ClassBaseDto> {
     const obj = await this.prisma.getClient().class.findUnique({
       where: { id },
-      include: { sede: true, area: true, shift: true, monitor: true },
+      include: {
+        sede: true,
+        area: true,
+        shift: {
+          include: {
+            hourSessions: true,
+          },
+        },
+        monitor: true,
+        schedules: true,
+      },
     });
+
     if (!obj) {
       throw new NotFoundException(`Class with ID ${id} not found`);
     }
-    return this.mapToClassDto(obj);
+
+    // Calculamos el número esperado de horarios
+    const totalPeriods = obj.shift?.hourSessions?.length || 0;
+    const expectedSchedulesCount = totalPeriods * WEEKDAYS_COUNT;
+
+    // Verificamos que existan todos los registros de horarios esperados
+    const totalSchedules = obj.schedules?.length || 0;
+
+    // Contamos los horarios asignados con profesor
+    const schedulesWithTeacherCount =
+      obj.schedules?.filter((s) => s.teacherId !== null)?.length || 0;
+
+    // Determinamos el estado:
+    // - Si hay menos registros que los esperados: FALTAN_REGISTROS
+    // - Si hay suficientes registros pero faltan profesores: FALTAN_DOCENTES
+    // - Si todos los horarios tienen profesor asignado: COMPLETO
+    let status = 'FALTAN_DOCENTES';
+    if (totalSchedules < expectedSchedulesCount) {
+      status = 'FALTAN_REGISTROS';
+    } else if (
+      schedulesWithTeacherCount === expectedSchedulesCount &&
+      expectedSchedulesCount > 0
+    ) {
+      status = 'COMPLETO';
+    }
+
+    // Creamos un nuevo objeto sin incluir schedules ni hourSessions
+    const objWithoutSchedules = {
+      ...obj,
+      status,
+      schedules: undefined,
+      shift: {
+        ...obj.shift,
+        hourSessions: undefined,
+      },
+    };
+
+    return this.mapToClassDto(objWithoutSchedules);
   }
 
   async update(
@@ -73,7 +179,11 @@ export class ClassService {
 
   // Metodo para mapear un objeto de tipo Class a un objeto de tipo ClassDto
   private mapToClassDto(obj: any): ClassBaseDto {
-    return plainToInstance(ClassBaseDto, obj);
+    return plainToInstance(ClassBaseDto, {
+      ...obj,
+      // Aseguramos que el estado se mantenga en la transformación
+      status: obj.status || 'FALTAN_DOCENTES',
+    });
   }
 
   async findClassesOfTeacher(userId: string): Promise<ClassForTeacherDto[]> {
