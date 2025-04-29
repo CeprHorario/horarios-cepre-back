@@ -53,8 +53,16 @@ export class MonitorService {
       user: {
         isActive: true,
       },
-      ...(areaId ? { areaId  } : {}),
-      ...(shiftId ? {  shiftId  } : {}),
+      ...(areaId || shiftId
+        ? {
+            classes:{
+              is:{
+                ...(areaId ? { areaId } : {}),
+                ...(shiftId ? { shiftId } : {}),
+              },
+            } 
+          }
+        : {}),
     };
 
     const [monitors, total] = await this.prisma.getClient().$transaction([
@@ -73,6 +81,7 @@ export class MonitorService {
               name: true,
               shift: {
                 select: {
+                  id: true,
                   name: true
                 }
               }
