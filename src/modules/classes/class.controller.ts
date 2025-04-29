@@ -12,6 +12,7 @@ import {
   UseGuards,
   Req,
   BadRequestException,
+  Patch,
 } from '@nestjs/common';
 import { ClassService } from './class.service';
 //import { Prisma } from '@prisma/client';
@@ -144,6 +145,42 @@ export class ClassController {
     @Body() updateClassDto: UpdateClassDto,
   ): Promise<ClassBaseDto> {
     return await this.classService.update(id, updateClassDto);
+  }
+
+  @Patch(':id/meet-link')
+  @HttpCode(HttpStatus.OK)
+  @Authorization({
+    roles: [Role.MONITOR, Role.SUPERVISOR, Role.ADMIN],
+    permission: 'class.updateMeetLink',
+    description: 'Actualizar el enlace de Google Meet para una clase',
+  })
+  @ApiOperation({
+    summary: 'Actualizar el enlace de Google Meet para una clase',
+    description: 'Update Google Meet link for a class',
+  })
+  async updateMeetLink(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body('urlMeet') urlMeet: string,
+  ) {
+    return await this.classService.updateMeetLink(id, urlMeet);
+  }
+
+  @Patch(':id/classroom-link')
+  @HttpCode(HttpStatus.OK)
+  @Authorization({
+    roles: [Role.MONITOR, Role.SUPERVISOR, Role.ADMIN],
+    permission: 'class.updateClassroomLink',
+    description: 'Actualizar el enlace de Google Classroom para una clase',
+  })
+  @ApiOperation({
+    summary: 'Actualizar el enlace de Google Classroom para una clase',
+    description: 'Update Google Classroom link for a class',
+  })
+  async updateClassroomLink(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body('urlClassroom') urlClassroom: string,
+  ) {
+    return await this.classService.updateClassroomLink(id, urlClassroom);
   }
 
   @Delete(':id')
