@@ -67,6 +67,11 @@ export class MonitorService {
           classes: {
             select: {
               name: true,
+              shift: {
+                select: {
+                  name: true
+                }
+              }
             },
           },
         },
@@ -84,6 +89,7 @@ export class MonitorService {
         email: monitor.user?.email || '',
         phone: monitor.user?.userProfile?.phone || '',
         className: monitor.classes?.name || '',
+        shift: monitor.classes?.shift?.name || '',
       }),
     );
 
