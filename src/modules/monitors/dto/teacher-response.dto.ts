@@ -45,5 +45,5 @@ export class TeacherResponseDto {
     description: 'Número de teléfono del docente',
    
   })
-  phone: string; 
+  phone?: string; 
 }
