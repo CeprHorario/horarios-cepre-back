@@ -3,7 +3,7 @@ import { PrismaService } from '@database/prisma/prisma.service';
 import { ScheduleBaseDto, CreateScheduleDto, UpdateScheduleDto } from './dto';
 import { plainToInstance } from 'class-transformer';
 import { LoadScheduleDto } from './dto';
-import {Weekday } from '@prisma/client';
+import { Weekday } from '@prisma/client';
 
 @Injectable()
 export class ScheduleService {
@@ -77,78 +77,145 @@ export class ScheduleService {
     return plainToInstance(ScheduleBaseDto, obj);
   }
 
-
-  async assignTeacherToSchedules(
-    classroomIds: string[], 
-    teacherId: string 
-  ) {
+  async assignTeacherToSchedules(classroomIds: string[], teacherId: string) {
     const teacher = await this.prisma.getClient().teacher.findUnique({
       where: { id: teacherId },
-      include: { schedules: true, courses: true }
+      include: { schedules: true, courses: true },
     });
-  
+
     if (!teacher) {
       throw new Error('Profesor no encontrado');
     }
-  
+
     const { scheduledHours, maxHours, courseId } = teacher;
-  
+
     if (maxHours === null || scheduledHours >= maxHours) {
       throw new Error('El profesor ha alcanzado su límite de horas');
     }
-  
+
     const schedulesToAssign = await this.prisma.getClient().schedule.findMany({
       where: {
-        classId: { in: classroomIds }, 
+        classId: { in: classroomIds },
         courseId: courseId,
-        teacherId: null, 
+        teacherId: null,
       },
     });
-  
+
     if (schedulesToAssign.length === 0) {
-      throw new Error('No hay horarios disponibles para este curso y estos salones');
+      throw new Error(
+        'No hay horarios disponibles para este curso y estos salones',
+      );
     }
-  
+
     const totalHoursToAdd = schedulesToAssign.length;
     const newTotalScheduledHours = scheduledHours + totalHoursToAdd;
-  
+
     if (newTotalScheduledHours > maxHours) {
-      throw new Error('El profesor no tiene suficiente capacidad para asumir estos horarios');
+      throw new Error(
+        'El profesor no tiene suficiente capacidad para asumir estos horarios',
+      );
     }
-  
-    const updatedSchedules = await this.prisma.getClient().$transaction(async (prisma) => {
-      const updatedSchedules = await prisma.schedule.updateMany({
-        where: {
-          id: { in: schedulesToAssign.map(schedule => schedule.id) }
-        },
-        data: { teacherId: teacher.id }
+
+    const updatedSchedules = await this.prisma
+      .getClient()
+      .$transaction(async (prisma) => {
+        const updatedSchedules = await prisma.schedule.updateMany({
+          where: {
+            id: { in: schedulesToAssign.map((schedule) => schedule.id) },
+          },
+          data: { teacherId: teacher.id },
+        });
+
+        await prisma.teacher.update({
+          where: { id: teacher.id },
+          data: {
+            scheduledHours: newTotalScheduledHours,
+          },
+        });
+
+        return updatedSchedules;
       });
-  
-      await prisma.teacher.update({
-        where: { id: teacher.id },
-        data: {
-          scheduledHours: newTotalScheduledHours
-        }
-      });
-  
-      return updatedSchedules;
-    });
-  
+
     return updatedSchedules;
   }
-  
-  
+
+  async unassignTeacherFromSchedules(
+    classroomIds: string[],
+    teacherId: string,
+  ) {
+    // Primero verificamos que el profesor exista
+    const teacher = await this.prisma.getClient().teacher.findUnique({
+      where: { id: teacherId },
+    });
+
+    if (!teacher) {
+      throw new Error('Profesor no encontrado');
+    }
+
+    // Obtenemos los horarios que coinciden con los IDs de clase y el profesor especificado
+    const schedulesToUnassign = await this.prisma
+      .getClient()
+      .schedule.findMany({
+        where: {
+          classId: { in: classroomIds },
+          teacherId: teacherId, // Solo los horarios del profesor especificado
+        },
+      });
+
+    if (schedulesToUnassign.length === 0) {
+      throw new Error(
+        'No hay horarios asignados a este profesor en los salones especificados',
+      );
+    }
+
+    const totalHoursToRemove = schedulesToUnassign.length;
+
+    // Realizamos las actualizaciones en una transacción
+    const updatedSchedules = await this.prisma
+      .getClient()
+      .$transaction(async (prisma) => {
+        // Actualizamos los horarios para quitar el profesor
+        const updatedSchedules = await prisma.schedule.updateMany({
+          where: {
+            id: { in: schedulesToUnassign.map((schedule) => schedule.id) },
+            teacherId: teacherId, // Aseguramos que solo se desasignen los del profesor indicado
+          },
+          data: { teacherId: null },
+        });
+
+        // Actualizamos las horas programadas del profesor
+        const currentTeacher = await prisma.teacher.findUnique({
+          where: { id: teacherId },
+          select: { scheduledHours: true },
+        });
+
+        if (currentTeacher) {
+          const newScheduledHours = Math.max(
+            0,
+            currentTeacher.scheduledHours - totalHoursToRemove,
+          );
+          await prisma.teacher.update({
+            where: { id: teacherId },
+            data: { scheduledHours: newScheduledHours },
+          });
+        }
+
+        return updatedSchedules;
+      });
+
+    return updatedSchedules;
+  }
 
   async findAvailableClassrooms(
     id_course: number,
     horario: Array<{ id_hour_session: number; weekday: Weekday }>,
     page: number = 1,
-    pageSize: number = 10
+    pageSize: number = 10,
   ) {
-    const availableTimeSlots = new Set(horario.map(
-      slot => `${slot.id_hour_session}-${slot.weekday}`
-    ));
-  
+    const availableTimeSlots = new Set(
+      horario.map((slot) => `${slot.id_hour_session}-${slot.weekday}`),
+    );
+
     const allClassroomsInAreas = await this.prisma.getClient().class.findMany({
       where: {
         schedules: {
@@ -159,13 +226,13 @@ export class ScheduleService {
       },
       select: { id: true },
     });
-  
-    const allClassroomIds = allClassroomsInAreas.map(c => c.id);
-  
+
+    const allClassroomIds = allClassroomsInAreas.map((c) => c.id);
+
     if (allClassroomIds.length === 0) {
       return [];
     }
-  
+
     // Traemos todos los schedules del curso en esos salones
     const courseSchedules = await this.prisma.getClient().schedule.findMany({
       where: {
@@ -180,10 +247,13 @@ export class ScheduleService {
         weekday: true,
       },
     });
-  
+
     // AGRUPAMOS POR classId (que es string)
-    const schedulesByClassroom = new Map<string, { hourSessionId: number; weekday: Weekday }[]>();
-  
+    const schedulesByClassroom = new Map<
+      string,
+      { hourSessionId: number; weekday: Weekday }[]
+    >();
+
     for (const schedule of courseSchedules) {
       if (!schedulesByClassroom.has(schedule.classId)) {
         schedulesByClassroom.set(schedule.classId, []);
@@ -193,28 +263,31 @@ export class ScheduleService {
         weekday: schedule.weekday,
       });
     }
-  
+
     // VERIFICAMOS
     const matchingClassroomIds: string[] = [];
-  
+
     for (const [classId, slots] of schedulesByClassroom.entries()) {
-      const allSlotsAvailable = slots.every(slot => 
-        availableTimeSlots.has(`${slot.hourSessionId}-${slot.weekday}`)
+      const allSlotsAvailable = slots.every((slot) =>
+        availableTimeSlots.has(`${slot.hourSessionId}-${slot.weekday}`),
       );
-  
+
       if (allSlotsAvailable) {
         matchingClassroomIds.push(classId);
       }
     }
-  
+
     // PAGINAMOS
     const startIndex = (page - 1) * pageSize;
-    const paginatedClassroomIds = matchingClassroomIds.slice(startIndex, startIndex + pageSize);
-  
+    const paginatedClassroomIds = matchingClassroomIds.slice(
+      startIndex,
+      startIndex + pageSize,
+    );
+
     if (paginatedClassroomIds.length === 0) {
       return [];
     }
-  
+
     const classrooms = await this.prisma.getClient().class.findMany({
       where: {
         id: { in: paginatedClassroomIds },
@@ -240,9 +313,7 @@ export class ScheduleService {
         },
       },
     });
-  
+
     return classrooms;
   }
-  
-
 }
