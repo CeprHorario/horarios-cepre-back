@@ -26,6 +26,7 @@ import { UpdateMonitorAsAdminDto } from './dto/updateMonitorAsAdmin.dto';
 import { MonitorGetSummaryDto } from './dto/monitor-get-summary.dto';
 import { ApiResponse,ApiOperation } from '@nestjs/swagger';
 import { MonitorWithoutSupervisorDto } from './dto/monitorWithoutSupervisor.dto';
+import { Unauthenticated } from '@modules/auth/decorators/unauthenticated.decorator';
 @Controller('monitors')
 export class MonitorController {
   constructor(private readonly monitorService: MonitorService) {}
@@ -83,7 +84,7 @@ export class MonitorController {
       limit,
     );
   }
-
+  @Unauthenticated()
   @Get()
   @Authorization({
     permission: 'monitor.list',
@@ -107,7 +108,10 @@ export class MonitorController {
     page: number;
     limit: number;
   }> {
-    return this.monitorService.findAllBasicInfo(Number(page), Number(limit), Number(shiftId), Number(areaId));
+    return this.monitorService.findAllBasicInfo(Number(page), Number(limit), 
+    areaId !== undefined ? Number(areaId) : undefined,
+    shiftId !== undefined ? Number(shiftId) : undefined,
+    );
   }
 
   @Get(':id/')

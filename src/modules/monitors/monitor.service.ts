@@ -52,12 +52,15 @@ export class MonitorService {
     const activeFilter: Prisma.MonitorWhereInput = {
       user: {
         isActive: true,
-      },...(areaId || shiftId
+      },
+      ...(areaId || shiftId
         ? {
-            classes: {
-              ...(areaId ? { areaId } : {}),
-              ...(shiftId ? { shiftId } : {}),
-            },
+            classes:{
+              is:{
+                ...(areaId ? { areaId } : {}),
+                ...(shiftId ? { shiftId } : {}),
+              },
+            } 
           }
         : {}),
     };
@@ -78,6 +81,7 @@ export class MonitorService {
               name: true,
               shift: {
                 select: {
+                  id: true,
                   name: true
                 }
               }
