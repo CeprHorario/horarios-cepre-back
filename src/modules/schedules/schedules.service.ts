@@ -211,19 +211,25 @@ export class ScheduleService {
     horario: Array<{ id_hour_session: number; weekday: Weekday }>,
     page: number = 1,
     pageSize: number = 10,
+    areaId?: number,
+    shiftId?: number,
   ) {
     const availableTimeSlots = new Set(
       horario.map((slot) => `${slot.id_hour_session}-${slot.weekday}`),
     );
 
-    const allClassroomsInAreas = await this.prisma.getClient().class.findMany({
-      where: {
-        schedules: {
-          some: {
-            courseId: id_course,
-          },
+    const classroomFilter: any = {
+      schedules: {
+        some: {
+          courseId: id_course,
         },
       },
+      ...(areaId ? { areaId } : {}),
+      ...(shiftId ? { shiftId } : {}),
+    };
+
+    const allClassroomsInAreas = await this.prisma.getClient().class.findMany({
+      where: classroomFilter,
       select: { id: true },
     });
 
@@ -233,7 +239,6 @@ export class ScheduleService {
       return [];
     }
 
-    // Traemos todos los schedules del curso en esos salones
     const courseSchedules = await this.prisma.getClient().schedule.findMany({
       where: {
         classId: { in: allClassroomIds },
@@ -248,7 +253,6 @@ export class ScheduleService {
       },
     });
 
-    // AGRUPAMOS POR classId (que es string)
     const schedulesByClassroom = new Map<
       string,
       { hourSessionId: number; weekday: Weekday }[]
@@ -264,7 +268,6 @@ export class ScheduleService {
       });
     }
 
-    // VERIFICAMOS
     const matchingClassroomIds: string[] = [];
 
     for (const [classId, slots] of schedulesByClassroom.entries()) {
@@ -277,7 +280,6 @@ export class ScheduleService {
       }
     }
 
-    // PAGINAMOS
     const startIndex = (page - 1) * pageSize;
     const paginatedClassroomIds = matchingClassroomIds.slice(
       startIndex,

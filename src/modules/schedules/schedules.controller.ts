@@ -199,6 +199,8 @@ export class ScheduleController {
     @Query('horario') horario: string,
     @Query('page', ParseIntPipe) page: number = 1,
     @Query('pageSize', ParseIntPipe) pageSize: number = 10,
+    @Query('area_id') areaId?: number,
+    @Query('shift_id') shiftId?: number,
   ) {
     try {
       const parsedHorario = JSON.parse(horario) as Array<{
@@ -215,6 +217,8 @@ export class ScheduleController {
         parsedHorario,
         page,
         pageSize,
+        areaId ? Number(areaId) : undefined,
+        shiftId ? Number(shiftId) : undefined,
       );
     } catch (error) {
       if (error instanceof SyntaxError) {
@@ -225,4 +229,5 @@ export class ScheduleController {
       throw error;
     }
   }
+
 }
