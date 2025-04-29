@@ -82,6 +82,7 @@ export class TeacherService {
   async findAll(
     page: number = 1,
     limit: number = 20,
+    courseId?: number,
   ): Promise<{
     data: TeacherGetSummaryDto[];
     total: number;
@@ -94,6 +95,7 @@ export class TeacherService {
       user: {
         isActive: true,
       },
+      ...(courseId ? { courseId: Number(courseId) } : {}),
     };
 
     const [teachers, total] = await this.prisma.getClient().$transaction([
