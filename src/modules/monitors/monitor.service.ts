@@ -346,7 +346,7 @@ export class MonitorService {
         userProfile: { select: { firstName: true, lastName: true } },
         monitor: {
           include: {
-            classes: { select: { id: true, name: true, urlMeet: true } },
+            classes: { select: { id: true, name: true, urlMeet: true ,urlClassroom:true} },
           },
         },
       },
