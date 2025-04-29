@@ -99,13 +99,15 @@ export class MonitorController {
   findAll(
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 20,
+    @Query('shift_id') shiftId?: number,
+    @Query('area_id') areaId?: number,
   ): Promise<{
     data: MonitorGetSummaryDto[];
     total: number;
     page: number;
     limit: number;
   }> {
-    return this.monitorService.findAllBasicInfo(Number(page), Number(limit));
+    return this.monitorService.findAllBasicInfo(Number(page), Number(limit), Number(shiftId), Number(areaId));
   }
 
   @Get(':id/')

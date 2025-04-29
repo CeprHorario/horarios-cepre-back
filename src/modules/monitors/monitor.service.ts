@@ -39,6 +39,8 @@ export class MonitorService {
   async findAllBasicInfo(
     page: number = 1,
     limit: number = 20,
+    areaId?: number,
+    shiftId?: number,
   ): Promise<{
     data: MonitorGetSummaryDto[];
     total: number;
@@ -47,10 +49,12 @@ export class MonitorService {
   }> {
     const offset = (page - 1) * limit;
 
-    const activeFilter = {
+    const activeFilter: Prisma.MonitorWhereInput = {
       user: {
         isActive: true,
       },
+      ...(areaId ? { classes: { areaId } } : {}),
+      ...(shiftId ? { classes: { shiftId } } : {}),
     };
 
     const [monitors, total] = await this.prisma.getClient().$transaction([
