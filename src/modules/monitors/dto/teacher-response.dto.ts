@@ -39,4 +39,11 @@ export class TeacherResponseDto {
   @IsString({ message: 'El nombre del curso debe ser un texto' })
   @Length(2, 48, { message: 'El nombre del curso debe tener entre 2 y 48 caracteres' })
   courseName: string;
+
+  @ApiProperty({
+    example: '987654321',
+    description: 'Número de teléfono del docente',
+   
+  })
+  phone: string; 
 }

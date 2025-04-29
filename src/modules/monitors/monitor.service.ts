@@ -292,6 +292,7 @@ export class MonitorService {
       lastName: teacher.user.userProfile?.lastName || 'N/A',
       email: teacher.user.email,
       courseName: teacher.courses?.name || 'Sin asignar',
+      phone: teacher.user.userProfile?.phone || 'N/A',
     }));
   }
 
