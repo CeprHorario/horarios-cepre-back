@@ -26,7 +26,7 @@ import { UpdateMonitorAsAdminDto } from './dto/updateMonitorAsAdmin.dto';
 import { MonitorGetSummaryDto } from './dto/monitor-get-summary.dto';
 import { ApiResponse,ApiOperation } from '@nestjs/swagger';
 import { MonitorWithoutSupervisorDto } from './dto/monitorWithoutSupervisor.dto';
-import { Unauthenticated } from '@modules/auth/decorators/unauthenticated.decorator';
+
 @Controller('monitors')
 export class MonitorController {
   constructor(private readonly monitorService: MonitorService) {}
@@ -84,7 +84,7 @@ export class MonitorController {
       limit,
     );
   }
-  @Unauthenticated()
+
   @Get()
   @Authorization({
     permission: 'monitor.list',
