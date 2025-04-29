@@ -1,5 +1,5 @@
 /* eslint-disable prettier/prettier */
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ConflictException} from '@nestjs/common';
 import { PrismaService } from '@database/prisma/prisma.service';
 import {
   CreateMonitorDto,
@@ -13,6 +13,7 @@ import { TeacherResponseDto } from './dto/teacher-response.dto';
 import { UpdateMonitorAsAdminDto } from './dto/updateMonitorAsAdmin.dto';
 import { MonitorGetSummaryDto } from './dto/monitor-get-summary.dto';
 import { MonitorWithoutSupervisorDto } from './dto/monitorWithoutSupervisor.dto';
+import { MonitorGetByIdDto } from './dto/monitor-get-by-id.dto';
 import { Prisma } from '@prisma/client';
 
 @Injectable()
@@ -66,6 +67,11 @@ export class MonitorService {
           classes: {
             select: {
               name: true,
+              shift: {
+                select: {
+                  name: true
+                }
+              }
             },
           },
         },
@@ -83,21 +89,62 @@ export class MonitorService {
         email: monitor.user?.email || '',
         phone: monitor.user?.userProfile?.phone || '',
         className: monitor.classes?.name || '',
+        shift: monitor.classes?.shift?.name || '',
       }),
     );
 
     return { data, total, page, limit };
   }
 
-  async findOne(id: string): Promise<MonitorBaseDto> {
-    const monitor = await this.prisma.getClient().monitor.findUnique({
-      where: { id },
-      include: { user: true, supervisors: true }, // Incluye la relación con el usuario
-    });
-    if (!monitor) {
-      throw new NotFoundException(`Monitor with ID ${id} not found`);
+  async findOne(id: string): Promise<MonitorGetByIdDto> {
+    try{
+      const monitor = await this.prisma.getClient().monitor.findUnique({
+        where: { id },
+        include: {
+          classes: {
+            select: {
+              name: true,
+              urlMeet: true,
+            },
+          },
+          user: {
+            select: {
+              email: true,
+              userProfile: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                  phone: true,
+                },
+            },
+          },
+        },
+        },});
+
+      if (!monitor) {
+        throw new NotFoundException(`Monitor with ID ${id} not found`);
+      }
+
+      return plainToInstance(MonitorGetByIdDto, {
+        monitorId: monitor.id,
+        supervisorId: monitor.supervisorId,
+        className: monitor.classes?.name || null,
+        urlMeet: monitor.classes?.urlMeet || null,
+        firstName: monitor.user?.userProfile?.firstName || '',
+        lastName: monitor.user?.userProfile?.lastName || '',
+        email: monitor.user?.email || '',
+        phone: monitor.user?.userProfile?.phone || null,
+      });
+    } catch (error) {if (
+            error instanceof NotFoundException ||
+            error instanceof BadRequestException
+          ) {
+            throw error;
+          }
+          console.error('Error en findOne:', error); // Agregar un log para depuración
+          throw new Error('Ocurrió un error inesperado al buscar el monitor');
     }
-    return this.mapToMonitorDto(monitor);
+
   }
 
   async update(
@@ -135,23 +182,37 @@ export class MonitorService {
           userId: existingMonitor.user.id,
           firstName: updateMonitorDto.firstName || '',
           lastName: updateMonitorDto.lastName || '',
-          personalEmail: updateMonitorDto.personalEmail || '',
           phone: updateMonitorDto.phone || '',
           dni: updateMonitorDto.dni || null,
         },
       });
     }
-
+    if (updateMonitorDto.email) {
+        const existingUser = await this.prisma.getClient().user.findFirst({
+          where: {
+            email: updateMonitorDto.email,
+            NOT: {
+              monitor: {
+                id: id 
+              }
+            }
+          }
+        });
+    
+        if (existingUser) {
+          throw new ConflictException('El correo electrónico ya está en uso por otro usuario');
+        }
+      }
     const monitor = await this.prisma.getClient().monitor.update({
       where: { id },
       data: {
         user: {
           update: {
+            email: updateMonitorDto.email,
             userProfile: {
               update: {
                 firstName: updateMonitorDto.firstName,
                 lastName: updateMonitorDto.lastName,
-                personalEmail: updateMonitorDto.personalEmail,
                 phone: updateMonitorDto.phone,
               },
             },
@@ -179,9 +240,9 @@ export class MonitorService {
 
     return plainToInstance(UpdateMonitorAsAdminDto, {
       id: monitor.id,
+      email: monitor.user.email,
       firstName: monitor.user.userProfile?.firstName || '',
       lastName: monitor.user.userProfile?.lastName || '',
-      personalEmail: monitor.user.userProfile?.personalEmail || '',
       phone: monitor.user.userProfile?.phone || '',
       className: monitor.classes?.name || '',
     });

@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from '@database/prisma/prisma.service';
 import { TeacherBaseDto } from './dto';
@@ -202,6 +203,22 @@ export class TeacherService {
     id: string,
     updateTeacherDto: TeacherUpdateDto,
   ): Promise<TeacherGetSummaryDto> {
+      // 1. Verificar si el email ya existe en otro usuario
+      if (updateTeacherDto.email) {
+        const existingUser = await this.prisma.getClient().user.findFirst({
+          where: {
+            email: updateTeacherDto.email,
+            NOT: {
+              teacher: {
+                id: id 
+              }
+            }
+          }
+        });
+        if (existingUser) {
+          throw new ConflictException('El correo electrónico ya está en uso por otro usuario');
+        }
+      }
     const teacher = await this.prisma.getClient().teacher.update({
       where: { id },
       data: {

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '@database/prisma/prisma.service';
 import { SupervisorBaseDto } from './dto';
 import { plainToInstance } from 'class-transformer';
@@ -9,6 +9,7 @@ import { Role } from '@modules/auth/decorators/authorization.decorator';
 import { UpdateSupervisorWithProfileDto } from './dto/update-supervisor-with-profile.dto';
 import { SupervisorGetSummaryDto } from './dto/supervisor-get-summary.dto';
 import { AssignMonitorDto } from './dto/assign-monitor.dto';
+import { SupervisorGetByIdDto } from './dto/supervisor-get-by-id.dto';
 
 @Injectable()
 export class SupervisorService {
@@ -109,31 +110,92 @@ export class SupervisorService {
     return { data, total, page, limit };
   }
 
-  async findOne(id: string): Promise<SupervisorBaseDto> {
-    const supervisor = await this.prisma.getClient().supervisor.findUnique({
-      where: { id },
-      include: { users: true }, // Incluye la relación con el usuario
-    });
-    if (!supervisor) {
-      throw new NotFoundException(`Supervisor with ID ${id} not found`);
+  async findOne(id: string): Promise<SupervisorGetByIdDto> {
+    try {
+      const supervisor = await this.prisma.getClient().supervisor.findUnique({
+        where: { id },
+        include: {
+          shift: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          users: {
+            select: {
+              email: true,
+              userProfile: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                  personalEmail: true,
+                  phone: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (!supervisor) {
+        throw new NotFoundException('Supervisor no encontrado');
+      }
+
+      return plainToInstance(SupervisorGetByIdDto, {
+        supervisorId: supervisor.id,
+        shiftId: supervisor.shiftId || null,
+        shiftName: supervisor.shift?.name || null,
+        firstName: supervisor.users?.userProfile?.firstName || '',
+        lastName: supervisor.users?.userProfile?.lastName || '',
+        email: supervisor.users?.email || null,
+        personalEmail: supervisor.users?.userProfile?.personalEmail || null,
+        phone: supervisor.users?.userProfile?.phone || null,
+      });
+
+
+    } catch (error) {
+      if (
+          error instanceof NotFoundException ||
+          error instanceof BadRequestException
+        ) {
+            throw error;
+        }
+        console.error('Error en findOne:', error); // Agregar un log para depuración
+        throw new Error('Ocurrió un error inesperado al buscar el profesor');
     }
-    return this.mapToSupervisorDto(supervisor);
   }
 
   async update(
     id: string,
     updateSupervisorDto: UpdateSupervisorWithProfileDto,
   ): Promise<SupervisorGetSummaryDto> {
+    // 1. Verificar si el email ya existe en otro usuario
+  if (updateSupervisorDto.email) {
+    const existingUser = await this.prisma.getClient().user.findFirst({
+      where: {
+        email: updateSupervisorDto.email,
+        NOT: {
+          supervisor: {
+            id: id // Excluye al propio supervisor que se está actualizando
+          }
+        }
+      }
+    });
+
+    if (existingUser) {
+      throw new ConflictException('El correo electrónico ya está en uso por otro usuario');
+    }
+  }
     const supervisor = await this.prisma.getClient().supervisor.update({
       where: { id },
       data: {
         users: {
           update: {
+            email: updateSupervisorDto.email,
             userProfile: {
               update: {
                 firstName: updateSupervisorDto.firstName,
                 lastName: updateSupervisorDto.lastName,
-                personalEmail: updateSupervisorDto.personalEmail,
                 phone: updateSupervisorDto.phone,
               },
             },
@@ -143,6 +205,7 @@ export class SupervisorService {
       include: {
         users: {
           select: {
+            email: true,
             userProfile: {
               select: {
                 firstName: true,
@@ -158,9 +221,9 @@ export class SupervisorService {
 
     return plainToInstance(SupervisorGetSummaryDto, {
       id: supervisor.id,
+      email: supervisor.users?.email || null,
       firstName: supervisor.users?.userProfile?.firstName || '',
       lastName: supervisor.users?.userProfile?.lastName || '',
-      personalEmail: supervisor.users?.userProfile?.personalEmail || null,
       phone: supervisor.users?.userProfile?.phone || null,
     });
   }
@@ -197,6 +260,7 @@ export class SupervisorService {
           select: {
             name: true,
             urlMeet: true,
+            urlClassroom: true,
           },
         },
       },

@@ -45,4 +45,12 @@ export class MonitorGetSummaryDto {
   })
   @Expose()
   className: string | null;
+
+  @ApiProperty({
+    description: 'Turno del monitor',
+    example: 'Mañana',
+    required: false,
+  })
+  @Expose()
+  shift: string;
 }

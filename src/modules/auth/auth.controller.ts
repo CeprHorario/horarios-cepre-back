@@ -60,7 +60,7 @@ export class AuthController {
   }
 
   @Authorization({
-    roles: [Role.SUPERVISOR, Role.MONITOR, Role.ADMIN],
+    roles: [Role.SUPERVISOR, Role.MONITOR, Role.TEACHER, Role.ADMIN],
     permission: 'supervisor.monitors',
     description: 'Obtiene los monitores de este supervisor',
   })
