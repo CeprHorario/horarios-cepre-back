@@ -260,6 +260,7 @@ export class SupervisorService {
           select: {
             name: true,
             urlMeet: true,
+            urlClassroom: true,
           },
         },
       },
