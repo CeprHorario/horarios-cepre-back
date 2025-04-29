@@ -15,6 +15,7 @@ import { MonitorGetSummaryDto } from './dto/monitor-get-summary.dto';
 import { MonitorWithoutSupervisorDto } from './dto/monitorWithoutSupervisor.dto';
 import { MonitorGetByIdDto } from './dto/monitor-get-by-id.dto';
 import { Prisma } from '@prisma/client';
+import { url } from 'inspector';
 
 @Injectable()
 export class MonitorService {
@@ -361,6 +362,7 @@ export class MonitorService {
       salon: obj.monitor?.classes?.name,
       salon_id: obj.monitor?.classes?.id,
       urlMeet: obj.monitor?.classes?.urlMeet,
+      urlClassroom: obj.monitor?.classes?.urlClassroom,
     });
   }
 
