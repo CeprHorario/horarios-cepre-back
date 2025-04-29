@@ -79,6 +79,11 @@ export class ClassDto {
   urlClassroom?: string;
 
   @IsOptional()
+  @IsString()
+  @ApiProperty({ example: 'COMPLETO', enum: ['COMPLETO', 'FALTAN_DOCENTES'] })
+  status?: string;
+
+  @IsOptional()
   @ApiProperty({ type: [ScheduleDto] })
   schedules?: ScheduleDto[];
 }
