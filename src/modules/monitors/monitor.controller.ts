@@ -70,6 +70,7 @@ export class MonitorController {
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 20,
     @Query('shiftId') shiftId?: number,
+    @Query('areaId') areaId?: number,
   ): Promise<{
     data: MonitorWithoutSupervisorDto[];
     total: number;
@@ -81,6 +82,7 @@ export class MonitorController {
       shiftId,
       page,
       limit,
+      areaId,
     );
   }
 

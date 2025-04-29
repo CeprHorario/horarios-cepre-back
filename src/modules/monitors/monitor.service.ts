@@ -403,6 +403,7 @@ export class MonitorService {
     shiftId?: number,
     page: number = 1,
     limit: number = 20,
+    areaId?: number,
   ): Promise<{
     data: MonitorWithoutSupervisorDto[];
     total: number;
@@ -415,6 +416,7 @@ export class MonitorService {
       supervisorId: hasSupervisor ? { not: null } : null,
       classes: {
         ...(shiftId !== undefined ? { shiftId } : {}),
+        ...(areaId !== undefined && { area: { id: areaId } }), // Corrección importante aquí
       },
     };
   
