@@ -24,7 +24,7 @@ export class DrizzleService implements OnModuleInit, OnModuleDestroy {
       //ssl: {
       //  rejectUnauthorized: false, // Ignora verificación de certificado (opcional según el proveedor)
       //},
-      max: 20,
+      max: 2,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 2000,
     });
