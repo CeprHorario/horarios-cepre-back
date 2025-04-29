@@ -52,9 +52,14 @@ export class MonitorService {
     const activeFilter: Prisma.MonitorWhereInput = {
       user: {
         isActive: true,
-      },
-      ...(areaId ? { areaId  } : {}),
-      ...(shiftId ? {  shiftId  } : {}),
+      },...(areaId || shiftId
+        ? {
+            classes: {
+              ...(areaId ? { areaId } : {}),
+              ...(shiftId ? { shiftId } : {}),
+            },
+          }
+        : {}),
     };
 
     const [monitors, total] = await this.prisma.getClient().$transaction([
