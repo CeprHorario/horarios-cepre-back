@@ -25,7 +25,7 @@ export class DrizzleService implements OnModuleInit, OnModuleDestroy {
       //  rejectUnauthorized: false, // Ignora verificación de certificado (opcional según el proveedor)
       //},
       max: 20,
-      idleTimeoutMillis: 2000000,
+      idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 2000,
     });
 
@@ -46,6 +46,14 @@ export class DrizzleService implements OnModuleInit, OnModuleDestroy {
     } catch (error) {
       this.logger.error(`
         \nDrizzle: Failed to connect to the database: ${error}`);
+        setTimeout(async () => {
+          try {
+            await this.pool.query('SELECT 1');
+            this.logger.debug('Drizzle: reconnected successfully');
+          } catch (err) {
+            this.logger.error('Drizzle: reconnection failed');
+          }
+        }, 5000);
     }
   }
 
