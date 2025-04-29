@@ -274,7 +274,7 @@ export class TeacherService {
 
   async createManyTeachers(dtos: CreateTeacherDto[]) {
     const prisma = this.prisma.getClient();
-
+  
     const existingUsers = await prisma.user.findMany({
       where: {
         email: {
@@ -283,61 +283,68 @@ export class TeacherService {
       },
       select: { email: true },
     });
-
+  
     const existingEmails = new Set(existingUsers.map((u) => u.email));
-
+  
     const duplicated = dtos.filter((dto) => existingEmails.has(dto.email));
     const toCreate = dtos.filter((dto) => !existingEmails.has(dto.email));
-
+  
     if (toCreate.length === 0) {
       return {
         creados: [],
         noCreados: duplicated.map((d) => ({ email: d.email, dni: d.dni })),
       };
     }
-
-    const result = await prisma.$transaction(
-      toCreate.map((dto) =>
-        prisma.user.create({
-          data: {
-            email: dto.email,
-            role: Role.TEACHER,
-            userProfile: {
-              create: {
-                dni: dto.dni,
-                firstName: dto.firstName,
-                lastName: dto.lastName,
-                phone: dto.phone,
-                phonesAdditional: dto.phonesAdditional ?? [],
-                personalEmail: dto.personalEmail || null,
+  
+    try {
+      const result = await prisma.$transaction(
+        toCreate.map((dto) =>
+          prisma.user.create({
+            data: {
+              email: dto.email,
+              role: Role.TEACHER,
+              userProfile: {
+                create: {
+                  dni: dto.dni,
+                  firstName: dto.firstName,
+                  lastName: dto.lastName,
+                  phone: dto.phone,
+                  phonesAdditional: dto.phonesAdditional ?? [],
+                  personalEmail: dto.personalEmail || null,
+                },
+              },
+              teacher: {
+                create: {
+                  courseId: dto.courseId,
+                  maxHours: dto.maxHours,
+                  scheduledHours: 0,
+                  jobStatus: dto.jobStatus,
+                },
               },
             },
-            teacher: {
-              create: {
-                courseId: dto.courseId,
-                maxHours: dto.maxHours,
-                scheduledHours: 0,
-                jobStatus: dto.jobStatus,
-              },
+            include: {
+              teacher: true,
+              userProfile: true,
             },
-          },
-          include: {
-            teacher: true,
-            userProfile: true,
-          },
-        }),
-      ),
-    );
+          }),
+        ),
+      );
+  
+      return {
+        creados: result.map((r) => ({
+          email: r.email,
+          dni: r.userProfile?.dni,
+          
+        })),
+        noCreados: duplicated.map((d) => ({ email: d.email, dni: d.dni })),
+      };
+    } catch (error) {
+      console.error('Error al crear usuarios:', error);
 
-    return {
-      creados: result.map((r) => ({
-        email: r.email,
-        dni: r.userProfile?.dni,
-      })),
-      noCreados: duplicated.map((d) => ({ email: d.email, dni: d.dni })),
-    };
+      throw new Error('Error creando profesores. No se creó ningún profesor.');
+    }
   }
-
+  
   async deactivate(id: string) {
     const teacher = await this.prisma.getClient().teacher.findUnique({
       where: { id },
