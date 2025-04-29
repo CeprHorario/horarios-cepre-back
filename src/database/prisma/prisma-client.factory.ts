@@ -20,7 +20,7 @@ export class PrismaClientFactory implements OnModuleInit, OnModuleDestroy {
   private readonly cache: NodeCache;
 
   constructor(private readonly schemaManager: SchemaManagerService) {
-    this.cache = new NodeCache({ stdTTL: 3600, checkperiod: 600 }); // 1 hour cache with 10 minute check period
+    this.cache = new NodeCache({ stdTTL: 3600, checkperiod: 60 }); 
 
     // Configurar el evento para manejar la expiración de clientes en la caché
     this.cache.on('expired', (key, client: PrismaClient) => {
