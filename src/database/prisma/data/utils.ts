@@ -15,8 +15,8 @@ import { randomUUID, UUID } from 'crypto';
 import { Role } from '@modules/auth/decorators/authorization.decorator';
 import { ConfigurationDto } from '@modules/admissions/dto/create-admission.dto';
 import { Class } from '@prisma/client';
+import path from 'path';
 import * as fs from 'fs';
-import * as path from 'path';
 
 /**
  * Validates the shift times to ensure that the end time is after the start time
