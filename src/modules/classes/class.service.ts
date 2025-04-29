@@ -97,11 +97,12 @@ export class ClassService {
         area: true,
         shift: true,
         monitor: { include: { user: { include: { userProfile: true } } } },
-        schedules: { include: { hourSession: true } },
+        schedules: {
+          where: { teacherId: teacher.id },
+          include: { hourSession: true },
+        },
       },
     });
-
-    console.log('Datos obtenidos de la BD:', classs); // Debugging
 
     return classs.map((clas) =>
       plainToInstance(
