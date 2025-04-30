@@ -211,6 +211,7 @@ export class SupervisorService {
       include: {
         users: {
           select: {
+            email: true,
             userProfile: {
               select: {
                 firstName: true,
@@ -225,6 +226,7 @@ export class SupervisorService {
     });
     return plainToInstance(SupervisorGetSummaryDto, {
       id: supervisor.id,
+      email: supervisor.users?.email || null,
       emailPersonal: supervisor.users?.userProfile?.personalEmail || null,
       firstName: supervisor.users?.userProfile?.firstName || '',
       lastName: supervisor.users?.userProfile?.lastName || '',

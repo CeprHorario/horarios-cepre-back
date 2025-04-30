@@ -217,6 +217,7 @@ export class MonitorService {
       await this.prisma.getClient().userProfile.create({
         data: {
           userId: existingMonitor.user.id,
+
           firstName: updateMonitorDto.firstName || '',
           lastName: updateMonitorDto.lastName || '',
           phone: updateMonitorDto.phone || '',
@@ -262,6 +263,7 @@ export class MonitorService {
     });
     return plainToInstance(UpdateMonitorAsAdminDto, {
       id: monitor.id,
+      email: monitor.user.email,
       firstName: monitor.user.userProfile?.firstName || '',
       lastName: monitor.user.userProfile?.lastName || '',
       phone: monitor.user.userProfile?.phone || '',
