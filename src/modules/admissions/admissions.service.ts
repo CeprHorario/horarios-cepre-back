@@ -1,4 +1,8 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+} from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 
 import { admissionProcesses } from '@database/drizzle/schema';
@@ -20,30 +24,50 @@ export class AdmissionsService {
 
   // Metodo para crear un nuevo proceso de admisión
   async create(body: ProcessAdmissionDto) {
-    const nameParsed = `${body.name.replace(/\s/g, '_').toLowerCase()}_${body.year}`;
-    const admission = await this.drizzle.db
-      .insert(admissionProcesses)
-      .values({
-        name: nameParsed,
-        year: body.year,
-        started: body.started,
-        finished: body.finished,
-      })
-      .returning()
-      .catch(() => {
-        throw new ConflictException(
-          `Admission process already exists with name: ${nameParsed}`,
+    await this.drizzle.db
+      .transaction(async (tx) => {
+        // 1: Insertar el nuevo proceso de admisión
+        const result = await tx
+          .insert(admissionProcesses)
+          .values({
+            name: this.parseSchemaName(body.name, body.year),
+            year: body.year,
+            description: body.name,
+            started: body.started,
+            finished: body.finished,
+          })
+          .returning()
+          .catch(() => {
+            throw new ConflictException(
+              `Admission process already exists with name: ${body.name}`,
+            );
+          });
+        const admission = result[0];
+
+        // 2: Establecer el nuevo proceso en mi prisma factory y la migracion de data inicial
+        await this.prisma.migrationInitialSchema(
+          admission.name,
+          body.configuration,
         );
+
+        // 3: Establecer el nuevo proceso en mi schema manager y en cache
+        await this.schemaManager.setCurrentSchema(
+          admission.name,
+          admission.year,
+        );
+      })
+      .catch((error) => {
+        // Manejo específico de errores
+        if (error instanceof Error && error.message.includes('unique')) {
+          throw new ConflictException(
+            `Admission process already exists with name: ${body.name}`,
+          );
+        }
+
+        // Otros errores
+        console.error('***Error*** ', error);
+        throw new BadRequestException('Error while creating admission process');
       });
-
-    // Establecer el nuevo proceso en mi prisma factory y la migracion de data inicial
-    await this.schemaManager.setCurrentSchema(nameParsed, admission[0].year);
-
-    // Establecer el nuevo proceso en mi prisma factory y la migracion de data inicial
-    await this.prisma.migrationInitialSchema(
-      admission[0].name,
-      body.configuration,
-    );
 
     return {
       message: 'Data created successfully',
@@ -85,11 +109,44 @@ export class AdmissionsService {
     return plainToInstance(AdmissionBaseDto, obj);
   }
 
+  async setCurrent(nameSchema: string) {
+    const result = await this.drizzle.db
+      .update(admissionProcesses)
+      .set({
+        isCurrent: true,
+      })
+      .where(eq(admissionProcesses.name, nameSchema))
+      .returning();
+
+    if (!result.length) {
+      throw new ConflictException(
+        `Admission process not found with name: ${nameSchema}`,
+      );
+    }
+
+    const admission = result[0];
+    // Establecer el nuevo proceso en mi prisma factory y en cache
+    await this.prisma.setMainClient(nameSchema);
+    await this.schemaManager.setCurrentSchema(nameSchema, admission.year);
+  }
+
   async getAllWithCache() {
     return await this.schemaManager.getAllWithCache();
   }
 
   async getCurrent() {
     return await this.schemaManager.getCurrent();
+  }
+
+  private parseSchemaName(name: string, year: number | string): string {
+    const sanitized = name
+      .trim()
+      .normalize('NFD') // elimina acentos
+      .replace(/[\u0300-\u036f]/g, '') // elimina diacríticos residuales
+      .replace(/[^a-zA-Z0-9]+/g, '_') // reemplaza cualquier cosa no alfanumérica por guión bajo
+      .replace(/^_+|_+$/g, '') // elimina guiones bajos al inicio o final
+      .toLowerCase();
+
+    return `${sanitized}_${year}`;
   }
 }

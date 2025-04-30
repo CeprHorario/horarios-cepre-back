@@ -1,4 +1,3 @@
-import { BadRequestException } from '@nestjs/common';
 import {
   Area,
   DataMonitor,
@@ -28,7 +27,7 @@ export const validateShiftTimes = (shift: ShiftStr): Shift => {
   const endTime = new Date(`${today}T${shift.endTime}:00Z`);
 
   if (endTime <= startTime) {
-    throw new BadRequestException(
+    throw new Error(
       `Shift: end time must be after start time in ${shift.name}`,
     );
   }
@@ -36,8 +35,8 @@ export const validateShiftTimes = (shift: ShiftStr): Shift => {
   const diffMinutes =
     (endTime.getTime() - startTime.getTime() + 300000) / (1000 * 60);
   if (diffMinutes % 45 !== 0) {
-    throw new BadRequestException(
-      `Shift: invalid time difference in ${shift.name}`,
+    throw new Error(
+      `Shift: invalid time difference of 45 minutes in ${shift.name}`,
     );
   }
 
@@ -49,6 +48,9 @@ export const validateShiftTimes = (shift: ShiftStr): Shift => {
   };
 };
 
+/**
+ * Generates hour sessions based on the provided shift data.
+ */
 export const generateHourSessions = (shift: Shift) => {
   const hourSessionData: HourSessionData[] = [];
   const sessionDuration = 40 * 60 * 1000; // 40 minutes in milliseconds
@@ -78,7 +80,7 @@ export const generateHourSessions = (shift: Shift) => {
 
 /**
  * Groups classes by shift and area, and sorts them randomly.
- */
+ */ // turno, area y clases
 export const getMapAndSorted = (
   classes: Class[],
   shifts: Shift[],
@@ -90,12 +92,6 @@ export const getMapAndSorted = (
         shifts.find((s) => s.id === cls.shiftId)?.name ?? 'Unknown Shift';
       const areaName =
         areas.find((a) => a.id === cls.areaId)?.name ?? 'Unknown Area';
-
-      /* // Inicializar y agregar la clase en una sola operación
-      if (!acc[shiftName]) acc[shiftName] = {};
-      if (!acc[shiftName][areaName]) acc[shiftName][areaName] = [];
-      acc[shiftName][areaName].push(cls); */
-
       // Inicializar y agregar la clase en una sola operación
       if (!acc[areaName]) acc[areaName] = {};
       if (!acc[areaName][shiftName]) acc[areaName][shiftName] = [];
@@ -232,6 +228,18 @@ export const assignUuidIds = <T extends { id?: UUID }>(items: T[]): T[] => {
 };
 
 /**
+ * Assigns either numeric or UUID IDs to an array of objects based on the existing ID type.
+ * If the ID is a number, it assigns a sequential number starting from 1.
+ * If the ID is a string, it assigns a random UUID.
+ */
+export function assignIds<T extends { id?: number | string }>(items: T[]): T[] {
+  return items.map((item, index) => ({
+    ...item,
+    id: typeof item.id === 'number' ? index + 1 : randomUUID(),
+  }));
+}
+
+/**
  *  Parsed Schedule JSON
  */
 export const parseScheduleJson = (filePath: string): ScheduleWeek[] => {
@@ -271,7 +279,7 @@ export const generateScheduleData = (
           });
 
           if (hourSessionId === 0) {
-            throw new BadRequestException(
+            throw new Error(
               `Error: No se encontró la sesión horaria para el bloque ${cl.bloque} y el turno ${c.shiftId} En el salon ${c.name} del curso ${cl.curso}`,
             );
           }

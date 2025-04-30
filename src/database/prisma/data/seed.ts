@@ -1,4 +1,4 @@
-import { PrismaClient, Class } from '@prisma/client';
+import { Class } from '@prisma/client';
 import { Pool, PoolClient } from 'pg';
 
 import * as rawData from './initial.json';
@@ -32,7 +32,6 @@ import {
   parsedScheduleJson,
   validateShiftTimes,
 } from './utils';
-import { BadRequestException } from '@nestjs/common';
 
 const pool = (schema: string): Pool => {
   return new Pool({
@@ -44,33 +43,30 @@ const pool = (schema: string): Pool => {
 export const initialDataSchema = async (
   schema: string,
   config: ConfigurationDto,
-  client: PrismaClient,
-) => {
+): Promise<boolean> => {
   const db = await pool(schema).connect();
-
-  await client.$executeRaw`select 1`;
-
-  const sql = await fs.readFile(
-    './src/database/drizzle/sql/schema.sql',
-    'utf8',
-  );
-  await db.query(sql);
+  // Start a transaction
+  await db.query('BEGIN');
 
   try {
-    // Start a transaction
-    await db.query('BEGIN');
+    // Create data in schema new
+    const sql = await fs.readFile(
+      './src/database/drizzle/sql/schema.sql',
+      'utf8',
+    );
+    await db.query(sql);
 
-    // Create the basic data in the database
+    // 1: Create the basic data in the database
     const { areas, shifts, sedes, hourSessions, courses } =
       await createBasicData(db, config.shifts);
 
-    // Insert monitors and classes into the database
+    // 2: Insert monitors and classes into the database
     const { classes } = await createDataMonitors(
       db,
       arrayMonitors(config, areas, shifts, sedes),
     );
 
-    // Create the schedules in the database
+    // 3: Create the schedules in the database
     if (config.createSchedules) {
       // Get map of classes to areas and shifts
       const classMap = getMapAndSorted(classes, shifts, areas);
@@ -84,46 +80,16 @@ export const initialDataSchema = async (
     await db.query('COMMIT');
   } catch (error) {
     await db.query('ROLLBACK');
-    console.error('Error creating data', error);
-    throw new BadRequestException('Error creating data');
+    console.log('***ROLLBACK***');
+    throw new Error(error as string);
   } finally {
     db.release();
   }
 
-  return 'data created';
+  return true;
 };
 
-/**
- * Create data users, monitors and classes
- */
-export const createDataMonitors = async (
-  pool: PoolClient,
-  data: DataMonitor[],
-) => {
-  // Destructure the data from the JSON files
-  const tablesToInsert = [
-    { table: 'users', data: data.map((d) => d.user) },
-    { table: 'monitors', data: data.map((d) => d.monitor) },
-    { table: 'classes', data: data.map((d) => d.classes) },
-  ];
-
-  // Create insert queries for each table
-  const queries = tablesToInsert.map((t) =>
-    createInsertQuery(
-      t.table,
-      extractColumnsSql(t.data as object[]),
-      extractValuesSql(t.data as object[]),
-    ),
-  );
-
-  // Concatenate all queries into a single string
-  await pool.query(concatQuery(queries));
-  return {
-    classes: data.map((d) => d.classes),
-  };
-};
-
-/**
+/** 1-
  * Creates the initial data for the database.
  */
 const createBasicData = async (
@@ -192,60 +158,37 @@ const createBasicData = async (
   };
 };
 
-/**
- * Generates an SQL insert query for a given table, columns, and values.
+/** 2-
+ * Create data users, monitors and classes
  */
-const createInsertQuery = (
-  table: string,
-  columnsSQL: string,
-  valuesSQL: string,
-): string => {
-  return `INSERT INTO "${table}" (${columnsSQL}) VALUES\n${valuesSQL};`;
+export const createDataMonitors = async (
+  pool: PoolClient,
+  data: DataMonitor[],
+) => {
+  // Destructure the data from the JSON files
+  const tablesToInsert = [
+    { table: 'users', data: data.map((d) => d.user) },
+    { table: 'monitors', data: data.map((d) => d.monitor) },
+    { table: 'classes', data: data.map((d) => d.classes) },
+  ];
+
+  // Create insert queries for each table
+  const queries = tablesToInsert.map((t) =>
+    createInsertQuery(
+      t.table,
+      extractColumnsSql(t.data as object[]),
+      extractValuesSql(t.data as object[]),
+    ),
+  );
+
+  // Concatenate all queries into a single string
+  await pool.query(concatQuery(queries));
+  return {
+    classes: data.map((d) => d.classes),
+  };
 };
 
-/**
- * Concatenates multiple SQL queries into a single string.
- */
-const concatQuery = (queries: string[]): string => {
-  return queries.filter((q) => q).join('\n\n');
-};
-
-/**
- * Generates an SQL insert query for a given table, columns, and values.
- */
-const extractColumnsSql = (obj: object[]): string => {
-  return Object.keys(obj[0])
-    .map((col: string) => `"${toSnakeCase(col)}"`)
-    .join(', ');
-};
-const toSnakeCase = (str: string): string => {
-  return str.replace(/([A-Z])/g, '_$1').toLowerCase();
-};
-
-/**
- * Generates an SQL insert query for a given table, columns, and values.
- */
-const extractValuesSql = (obj: object[]) => {
-  return obj
-    .map((row) => {
-      const values = Object.values(row).map(formatSqlValue).join(', ');
-      return `(${values})`;
-    })
-    .join(',\n');
-};
-
-/**
- * Formatea un valor para su uso en una consulta SQL
- */
-const formatSqlValue = (value: any): string => {
-  if (value === null || value === undefined) return 'NULL';
-  if (typeof value === 'number') return value.toString();
-  if (typeof value === 'boolean') return value ? 'TRUE' : 'FALSE';
-  if (value instanceof Date) return `'${value.toISOString()}'`;
-  return `'${String(value).replace(/'/g, "''")}'`; // para Strings
-};
-
-/**
+/** 3-
  * Create Schedules in the database
  */
 export const createSchedules = async (
@@ -340,4 +283,61 @@ export const createSchedules = async (
   // Insert the schedule data into the database
   await pool.query('select 1');
   return null;
+};
+
+/**
+ * METODOS DE AYUDA
+ */
+
+/**
+ * Generates an SQL insert query for a given table, columns, and values.
+ */
+const createInsertQuery = (
+  table: string,
+  columnsSQL: string,
+  valuesSQL: string,
+): string => {
+  return `INSERT INTO "${table}" (${columnsSQL}) VALUES\n${valuesSQL};`;
+};
+
+/**
+ * Concatenates multiple SQL queries into a single string.
+ */
+const concatQuery = (queries: string[]): string => {
+  return queries.filter((q) => q).join('\n\n');
+};
+
+/**
+ * Generates an SQL insert query for a given table, columns, and values.
+ */
+const extractColumnsSql = (obj: object[]): string => {
+  return Object.keys(obj[0])
+    .map((col: string) => `"${toSnakeCase(col)}"`)
+    .join(', ');
+};
+const toSnakeCase = (str: string): string => {
+  return str.replace(/([A-Z])/g, '_$1').toLowerCase();
+};
+
+/**
+ * Generates an SQL insert query for a given table, columns, and values.
+ */
+const extractValuesSql = (obj: object[]) => {
+  return obj
+    .map((row) => {
+      const values = Object.values(row).map(formatSqlValue).join(', ');
+      return `(${values})`;
+    })
+    .join(',\n');
+};
+
+/**
+ * Formatea un valor para su uso en una consulta SQL
+ */
+const formatSqlValue = (value: any): string => {
+  if (value === null || value === undefined) return 'NULL';
+  if (typeof value === 'number') return value.toString();
+  if (typeof value === 'boolean') return value ? 'TRUE' : 'FALSE';
+  if (value instanceof Date) return `'${value.toISOString()}'`;
+  return `'${String(value).replace(/'/g, "''")}'`; // para Strings
 };

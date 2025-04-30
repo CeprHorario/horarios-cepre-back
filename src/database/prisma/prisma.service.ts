@@ -26,9 +26,9 @@ export class PrismaService {
     schema: string,
     conf: ConfigurationDto,
   ): Promise<void> {
-    //const client: PrismaClient = await this.setMainClient(schema);
-
-    // Realizamos las migraciones iniciales
-    await initialDataSchema(schema, conf, this.getClient() /* client */);
+    // 1: Realizamos las migraciones iniciales
+    const success = await initialDataSchema(schema, conf);
+    // 2: Establecemos el cliente principal para el nuevo esquema
+    if (success) await this.setMainClient(schema);
   }
 }
