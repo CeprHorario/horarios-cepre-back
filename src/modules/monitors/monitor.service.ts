@@ -99,7 +99,7 @@ export class MonitorService {
         id: monitor.id,
         firstName: monitor.user?.userProfile?.firstName || '',
         lastName: monitor.user?.userProfile?.lastName || '',
-        email: monitor.user?.email || '',
+        personalEmail: monitor.user?.userProfile?.personalEmail || '',
         phone: monitor.user?.userProfile?.phone || '',
         className: monitor.classes?.name || '',
         shift: monitor.classes?.shift?.name || '',
