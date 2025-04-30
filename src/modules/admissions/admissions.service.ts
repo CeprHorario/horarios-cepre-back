@@ -24,7 +24,13 @@ export class AdmissionsService {
 
   // Metodo para crear un nuevo proceso de admisión
   async create(body: ProcessAdmissionDto) {
-    await this.drizzle.db
+    if (body.started < body.finished) {
+      throw new BadRequestException(
+        'The start date must be less than the end date',
+      );
+    }
+
+    const result = await this.drizzle.db
       .transaction(async (tx) => {
         // 0: Marcar los procesos de admisión anteriores como no actuales
         await tx.update(admissionProcesses).set({
@@ -37,7 +43,7 @@ export class AdmissionsService {
           .values({
             name: this.parseSchemaName(body.name, body.year),
             year: body.year,
-            description: body.name,
+            description: body.name + ' ' + body.year,
             started: body.started,
             finished: body.finished,
           })
@@ -60,6 +66,8 @@ export class AdmissionsService {
           admission.name,
           admission.year,
         );
+
+        return admission;
       })
       .catch((error) => {
         // Manejo específico de errores
@@ -75,7 +83,11 @@ export class AdmissionsService {
       });
 
     return {
+      success: true,
       message: `Schema created and data migrated successfully in ${body.name} ${body.year}`,
+      data: plainToInstance(AdmissionBaseDto, result, {
+        excludePrefixes: ['id', 'isCurrent', 'createdAt'],
+      }),
     };
   }
 
@@ -92,7 +104,7 @@ export class AdmissionsService {
     });
     return obj.map((item) =>
       plainToInstance(AdmissionBaseDto, item, {
-        excludePrefixes: ['id', 'description', 'isCurrent', 'createdAt'],
+        excludePrefixes: ['id', 'isCurrent', 'createdAt'],
       }),
     );
   }
@@ -145,6 +157,23 @@ export class AdmissionsService {
 
   async getCurrent() {
     return await this.schemaManager.getCurrent();
+  }
+
+  async getCurrentWithObservations() {
+    const obj = await this.drizzle.db.query.admissionProcesses.findFirst({
+      where: eq(admissionProcesses.isCurrent, true),
+      with: {
+        observations: {
+          columns: {
+            description: true,
+            createdAt: true,
+          },
+        },
+      },
+    });
+    return plainToInstance(AdmissionBaseDto, obj, {
+      excludePrefixes: ['id', 'isCurrent', 'createdAt'],
+    });
   }
 
   private parseSchemaName(name: string, year: number | string): string {

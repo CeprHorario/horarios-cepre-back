@@ -22,6 +22,11 @@ export class AdmissionDto {
   @MaxLength(64)
   name: string;
 
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  description?: string;
+
   @IsBoolean()
   @IsOptional()
   isCurrent?: boolean;
@@ -41,11 +46,6 @@ export class AdmissionDto {
   @IsNotEmpty()
   @Type(() => Date)
   finished: Date;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(255)
-  description?: string;
 
   @IsDate()
   @Type(() => Date)
