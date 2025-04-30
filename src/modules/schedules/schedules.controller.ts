@@ -40,10 +40,10 @@ export class ScheduleController {
   @Get('public/teachers')
   @HttpCode(HttpStatus.OK)
   @Unauthenticated()
-  /*@Authorization({
-    permission: 'schedule.public.getTeachers',
-    description: 'Obtener el horario de un profesor - publico',
-  })*/
+  @ApiOperation({
+    summary: 'Obtener horarios públicos por profesor',
+    description: 'Get public schedules by teacher',
+  })
   async getPublicScheduleByTeacher(
     @Query('email') email: string,
     @Query('dni') dni: string,
