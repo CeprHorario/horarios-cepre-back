@@ -171,25 +171,49 @@ export class MonitorService {
     });
     return this.mapToMonitorDto(monitor);
   }
-
+  
   async updateMonitorAsAdmin(
     id: string,
     updateMonitorDto: UpdateMonitorAsAdminDto,
   ): Promise<UpdateMonitorAsAdminDto> {
+    // 1. Verificar si el monitor existe
     const existingMonitor = await this.prisma.getClient().monitor.findUnique({
       where: { id },
-      include: { user: { include: { userProfile: true } } },
+      include: { 
+        user: { 
+          include: { 
+            userProfile: true 
+          } 
+        } 
+      },
     });
-
-    console.log('Monitor encontrado antes de la actualización:', existingMonitor);
-
     if (!existingMonitor) {
-      throw new NotFoundException(`Monitor with ID ${id} not found`);
+      throw new NotFoundException(`Monitor con ID ${id} no encontrado`);
     }
-
-    // Verificar si el usuario tiene un perfil, si no, crearlo
+    if (updateMonitorDto.personalEmail) {
+      const existingUser = await this.prisma.getClient().user.findFirst({
+        where: {
+          userProfile: {
+            personalEmail: updateMonitorDto.personalEmail
+          },
+          NOT: {
+            monitor: {
+              id: id // Excluye al propio monitor que se está actualizando
+            }
+          }
+        },
+        include: {
+          userProfile: true
+        }
+      });
+  
+      if (existingUser) {
+        throw new ConflictException('El correo electrónico personal ya está en uso por otro usuario');
+      }
+    }
+  
+    // 3. Crear perfil si no existe
     if (!existingMonitor.user.userProfile) {
-      console.log('El usuario no tiene un perfil, creando uno...');
       await this.prisma.getClient().userProfile.create({
         data: {
           userId: existingMonitor.user.id,
@@ -197,41 +221,26 @@ export class MonitorService {
           lastName: updateMonitorDto.lastName || '',
           phone: updateMonitorDto.phone || '',
           dni: updateMonitorDto.dni || null,
+          personalEmail: updateMonitorDto.personalEmail || null,
         },
       });
     }
-    if (updateMonitorDto.email) {
-        const existingUser = await this.prisma.getClient().user.findFirst({
-          where: {
-            email: updateMonitorDto.email,
-            NOT: {
-              monitor: {
-                id: id 
-              }
-            }
-          }
-        });
-    
-        if (existingUser) {
-          throw new ConflictException('El correo electrónico ya está en uso por otro usuario');
-        }
-      }
-    const monitor = await this.prisma.getClient().monitor.update({
+      const monitor = await this.prisma.getClient().monitor.update({
       where: { id },
       data: {
         user: {
           update: {
-            email: updateMonitorDto.email,
             userProfile: {
               update: {
                 firstName: updateMonitorDto.firstName,
                 lastName: updateMonitorDto.lastName,
                 phone: updateMonitorDto.phone,
+                personalEmail: updateMonitorDto.personalEmail,
               },
             },
           },
         },
-        classes: updateMonitorDto.className
+        classes: updateMonitorDto.classId
           ? {
               connect: { id: updateMonitorDto.classId },
             }
@@ -245,18 +254,19 @@ export class MonitorService {
         },
         classes: {
           select: {
+            id: true,
             name: true,
           },
         },
       },
     });
-
     return plainToInstance(UpdateMonitorAsAdminDto, {
       id: monitor.id,
-      email: monitor.user.email,
       firstName: monitor.user.userProfile?.firstName || '',
       lastName: monitor.user.userProfile?.lastName || '',
       phone: monitor.user.userProfile?.phone || '',
+      personalEmail: monitor.user.userProfile?.personalEmail || null,
+      classId: monitor.classes?.id || null,
       className: monitor.classes?.name || '',
     });
   }

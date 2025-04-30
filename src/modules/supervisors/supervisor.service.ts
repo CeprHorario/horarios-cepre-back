@@ -169,34 +169,40 @@ export class SupervisorService {
     id: string,
     updateSupervisorDto: UpdateSupervisorWithProfileDto,
   ): Promise<SupervisorGetSummaryDto> {
-    // 1. Verificar si el email ya existe en otro usuario
-  if (updateSupervisorDto.email) {
-    const existingUser = await this.prisma.getClient().user.findFirst({
-      where: {
-        email: updateSupervisorDto.email,
-        NOT: {
-          supervisor: {
-            id: id // Excluye al propio supervisor que se está actualizando
+    // 1. Verificar solo el email personal si está presente
+    if (updateSupervisorDto.personalEmail) {
+      const existingUser = await this.prisma.getClient().user.findFirst({
+        where: {
+          userProfile: {
+            personalEmail: updateSupervisorDto.personalEmail
+          },
+          NOT: {
+            supervisor: {
+              id: id // Excluye al propio supervisor que se está actualizando
+            }
           }
+        },
+        include: {
+          userProfile: true
         }
+      });
+  
+      if (existingUser) {
+        throw new ConflictException('El correo electrónico personal ya está en uso por otro usuario');
       }
-    });
-
-    if (existingUser) {
-      throw new ConflictException('El correo electrónico ya está en uso por otro usuario');
     }
-  }
+    // 2. Actualizar el supervisor
     const supervisor = await this.prisma.getClient().supervisor.update({
       where: { id },
       data: {
         users: {
           update: {
-            email: updateSupervisorDto.email,
             userProfile: {
               update: {
                 firstName: updateSupervisorDto.firstName,
                 lastName: updateSupervisorDto.lastName,
                 phone: updateSupervisorDto.phone,
+                personalEmail: updateSupervisorDto.personalEmail,
               },
             },
           },
@@ -205,7 +211,6 @@ export class SupervisorService {
       include: {
         users: {
           select: {
-            email: true,
             userProfile: {
               select: {
                 firstName: true,
@@ -218,10 +223,9 @@ export class SupervisorService {
         },
       },
     });
-
     return plainToInstance(SupervisorGetSummaryDto, {
       id: supervisor.id,
-      email: supervisor.users?.email || null,
+      emailPersonal: supervisor.users?.userProfile?.personalEmail || null,
       firstName: supervisor.users?.userProfile?.firstName || '',
       lastName: supervisor.users?.userProfile?.lastName || '',
       phone: supervisor.users?.userProfile?.phone || null,

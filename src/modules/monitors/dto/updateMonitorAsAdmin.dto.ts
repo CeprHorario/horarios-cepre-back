@@ -30,7 +30,7 @@ export class UpdateMonitorAsAdminDto {
     nullable: true,
     example: 'luis.martinez@gmail.com',
   })
-  email?: string;
+  personalEmail?: string;
 
   @IsOptional()
   @IsString()

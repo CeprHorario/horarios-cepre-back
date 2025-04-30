@@ -21,7 +21,7 @@ export class UpdateSupervisorWithProfileDto {
     nullable: true,
     example: 'luis.martinez@gmail.com',
   })
-  email?: string;
+  personalEmail?: string;
 
   @IsString()
   @IsOptional()
