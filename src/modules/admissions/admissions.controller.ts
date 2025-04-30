@@ -9,9 +9,9 @@ import {
 } from '@nestjs/common';
 import { AdmissionsService } from './admissions.service';
 import { ApiOperation } from '@nestjs/swagger';
-//import { Authorization } from '@modules/auth/decorators/authorization.decorator';
+import { Authorization } from '@modules/auth/decorators/authorization.decorator';
 import { ProcessAdmissionDto } from './dto/create-admission.dto';
-import { Unauthenticated } from '@modules/auth/decorators/unauthenticated.decorator';
+//import { Unauthenticated } from '@modules/auth/decorators/unauthenticated.decorator';
 
 @Controller('admissions')
 export class AdmissionsController {
@@ -19,14 +19,13 @@ export class AdmissionsController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  @Unauthenticated()
-  // @Authorization({
-  //   permission: 'admission.create',
-  //   description: 'Crear un nuevo proceso de admisión',
-  // })
+  @Authorization({
+    permission: 'admission.create-with-data',
+    description: 'Crear un nuevo proceso de admisión con datos iniciales',
+  })
   @ApiOperation({
-    summary: 'Crear un nuevo proceso de admisión',
-    description: 'Create a new process admision',
+    summary: 'Crear un nuevo proceso de admisión con datos iniciales',
+    description: 'Create a new process admision with initial data',
   })
   async create(@Body() body: ProcessAdmissionDto) {
     return await this.service.create(body);
@@ -34,11 +33,10 @@ export class AdmissionsController {
 
   @Get()
   @HttpCode(HttpStatus.OK)
-  @Unauthenticated()
-  /* @Authorization({
+  @Authorization({
     permission: 'admission.getAll',
-    description: 'Obtener todos los procesos de admisión',
-  }) */
+    description: 'Obtener todos los procesos de admisión con sus observaciones',
+  })
   @ApiOperation({
     summary: 'Obtener todos los procesos de admisión',
     description: 'Get all admission processes',
@@ -63,14 +61,13 @@ export class AdmissionsController {
 
   @Get('current')
   @HttpCode(HttpStatus.OK)
-  @Unauthenticated()
-  /* @Authorization({
+  @Authorization({
     permission: 'admission.getCurrent',
-    description: 'Obtener el proceso de admisión actual',
-  }) */
+    description: 'Obtener el proceso de admisión actual con sus observaciones',
+  })
   @ApiOperation({
-    summary: 'Obtener el proceso de admisión actual',
-    description: 'Get the current admission process',
+    summary: 'Obtener el proceso de admisión actual con sus observaciones',
+    description: 'Get the current admission process with its observations',
   })
   async getCurrent() {
     return await this.service.getCurrentWithObservations();
@@ -78,11 +75,10 @@ export class AdmissionsController {
 
   @Post('current')
   @HttpCode(HttpStatus.OK)
-  @Unauthenticated()
-  /* @Authorization({
+  @Authorization({
     permission: 'admission.setCurrent',
     description: 'Establecer el proceso de admisión actual',
-  }) */
+  })
   @ApiOperation({
     summary: 'Establecer el proceso de admisión actual',
     description: 'Establecer the current admission process',
@@ -93,11 +89,10 @@ export class AdmissionsController {
 
   @Get(':name')
   @HttpCode(HttpStatus.OK)
-  @Unauthenticated()
-  /* @Authorization({
+  @Authorization({
     permission: 'admission.getOneByName',
     description: 'Obtener un proceso de admisión por nombre',
-  }) */
+  })
   @ApiOperation({
     summary: 'Obtener un proceso de admisión por nombre',
     description: 'Get an admission process by name',

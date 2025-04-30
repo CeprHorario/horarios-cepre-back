@@ -71,7 +71,7 @@ export class AdmissionsService {
       })
       .catch((error) => {
         // Manejo específico de errores
-        if (error instanceof Error && error.message.includes('unique')) {
+        if (error instanceof Error && error.message.includes('exists')) {
           throw new ConflictException(
             `Admission process already exists with name: ${body.name} ${body.year}`,
           );
@@ -152,6 +152,14 @@ export class AdmissionsService {
     // Establecer el nuevo proceso en mi prisma factory y en cache
     await this.prisma.setMainClient(nameSchema);
     await this.schemaManager.setCurrentSchema(nameSchema, admission.year);
+
+    return {
+      success: true,
+      message: `Process admissions set as current successfully in ${admission.description}`,
+      data: plainToInstance(AdmissionBaseDto, admission, {
+        excludePrefixes: ['id', 'isCurrent', 'createdAt'],
+      }),
+    };
   }
 
   async getAllWithCache() {
