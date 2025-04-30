@@ -260,8 +260,6 @@ export const generateScheduleData = (
 ) => {
   let index = 0;
 
-  console.log(hourSessions);
-
   const scheduleData: ScheduleData[] = [];
   Object.values(classes).flatMap((classGroup) =>
     classGroup.flatMap((c) => {

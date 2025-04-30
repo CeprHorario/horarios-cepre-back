@@ -53,8 +53,9 @@ export const initialDataSchema = async (
     // Start a transaction
     await db.query('BEGIN');
 
-    // 0: Set the search path to the new schema and migrate the database
+    // 0: Create and set the search path to the new schema and migrate the database
     await db.query(`
+      CREATE SCHEMA IF NOT EXISTS ${schema};
       SET search_path TO ${schema};
       ${sql}
       `);
@@ -75,7 +76,6 @@ export const initialDataSchema = async (
       const classMap = getMapAndSorted(classes, shifts, areas);
 
       // Generate schedules for each area and shift
-      console.log('Schedules created*********************************');
       await createSchedules(db, config.shifts, classMap, hourSessions, courses);
     }
 
@@ -231,7 +231,6 @@ export const createSchedules = async (
 
   // Process the schedules for each area
   if (areas.includes('Biomédicas')) {
-    console.log('areas', areas);
     scheduleData.push(
       ...generateScheduleData(
         dataSchedules.bio,

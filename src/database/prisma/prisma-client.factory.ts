@@ -74,6 +74,9 @@ export class PrismaClientFactory implements OnModuleInit, OnModuleDestroy {
       name: schema,
       client: this.createClient(schema),
     };
+    this.logger.debug(
+      `Prisma: set main client for schema: ${this.mainClient.name}`,
+    );
     return this.mainClient.client;
   }
 

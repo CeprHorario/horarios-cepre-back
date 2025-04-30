@@ -1,4 +1,4 @@
--- Trigger para asegurar que solo un proceso de admisión puede ser actual y crear un nuevo schema solo en INSERT
+-- Trigger para asegurar que solo un proceso de admisión puede ser actual
 CREATE OR REPLACE FUNCTION trigger_process_admission() 
 RETURNS TRIGGER AS $$
 DECLARE
@@ -8,11 +8,6 @@ BEGIN
     UPDATE admission_processes
     SET is_current = FALSE
     WHERE is_current = TRUE AND id IS DISTINCT FROM NEW.id;
-  END IF;
-
-  -- Crear un nuevo esquema solo si es un INSERT
-  IF TG_OP = 'INSERT' THEN
-    EXECUTE format('CREATE SCHEMA IF NOT EXISTS %I', NEW.name);
   END IF;
 
   RETURN NEW;

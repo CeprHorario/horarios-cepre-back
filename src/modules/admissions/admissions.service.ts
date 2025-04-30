@@ -26,6 +26,11 @@ export class AdmissionsService {
   async create(body: ProcessAdmissionDto) {
     await this.drizzle.db
       .transaction(async (tx) => {
+        // 0: Marcar los procesos de admisión anteriores como no actuales
+        await tx.update(admissionProcesses).set({
+          isCurrent: false,
+        });
+
         // 1: Insertar el nuevo proceso de admisión
         const result = await tx
           .insert(admissionProcesses)
@@ -60,7 +65,7 @@ export class AdmissionsService {
         // Manejo específico de errores
         if (error instanceof Error && error.message.includes('unique')) {
           throw new ConflictException(
-            `Admission process already exists with name: ${body.name}`,
+            `Admission process already exists with name: ${body.name} ${body.year}`,
           );
         }
 
@@ -70,8 +75,7 @@ export class AdmissionsService {
       });
 
     return {
-      message: 'Data created successfully',
-      status: 'ok',
+      message: `Schema created and data migrated successfully in ${body.name} ${body.year}`,
     };
   }
 
@@ -110,13 +114,18 @@ export class AdmissionsService {
   }
 
   async setCurrent(nameSchema: string) {
-    const result = await this.drizzle.db
-      .update(admissionProcesses)
-      .set({
-        isCurrent: true,
-      })
-      .where(eq(admissionProcesses.name, nameSchema))
-      .returning();
+    const result = await this.drizzle.db.transaction(async (tx) => {
+      await tx.update(admissionProcesses).set({
+        isCurrent: false,
+      });
+      return await tx
+        .update(admissionProcesses)
+        .set({
+          isCurrent: true,
+        })
+        .where(eq(admissionProcesses.name, nameSchema))
+        .returning();
+    });
 
     if (!result.length) {
       throw new ConflictException(
