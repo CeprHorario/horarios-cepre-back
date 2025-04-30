@@ -24,7 +24,7 @@ export class AdmissionsService {
 
   // Metodo para crear un nuevo proceso de admisión
   async create(body: ProcessAdmissionDto) {
-    if (body.started < body.finished) {
+    if (body.started >= body.finished) {
       throw new BadRequestException(
         'The start date must be less than the end date',
       );
