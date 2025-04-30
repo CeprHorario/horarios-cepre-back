@@ -1,7 +1,7 @@
 import { Client } from 'pg';
 import * as dotenv from 'dotenv';
-import { readFileSync, existsSync } from 'fs';
-import { join } from 'path';
+/* import { readFileSync, existsSync } from 'fs';
+import { join } from 'path'; */
 import { execSync } from 'child_process';
 
 dotenv.config();
