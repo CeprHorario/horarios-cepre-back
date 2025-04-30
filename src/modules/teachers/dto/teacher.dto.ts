@@ -50,23 +50,25 @@ export class TeacherDto {
 
   @IsNotEmpty()
   @IsBoolean()
-  @ApiProperty({ example: true })
+  @ApiProperty({ example: false })
   isCoordinator: boolean;
 
   @ApiProperty({
-    description: 'Fecha de creación del teacher',
+    description: 'Fecha de creación del supervisor',
     example: '2023-10-01T12:00:00Z',
+    readOnly: true, // Marcar como solo lectura en Swagger
   })
   @IsDateString(
     {},
     { message: 'La fecha de creación debe ser una cadena de fecha válida.' },
   )
-  @IsNotEmpty({ message: 'La fecha de creación no puede estar vacía.' })
-  createdAt: string;
+  @IsOptional() // Cambiado a Optional ya que será manejado por el servicio
+  createdAt?: string;
 
   @ApiProperty({
-    description: 'Fecha de última actualización del teacher',
+    description: 'Fecha de última actualización del supervisor',
     example: '2023-10-01T12:00:00Z',
+    readOnly: true, // Marcar como solo lectura en Swagger
   })
   @IsDateString(
     {},
@@ -74,21 +76,11 @@ export class TeacherDto {
       message: 'La fecha de actualización debe ser una cadena de fecha válida.',
     },
   )
-  @IsNotEmpty({ message: 'La fecha de actualización no puede estar vacía.' })
-  updatedAt: string;
-
-  @ApiProperty({
-    description: 'inidica el docente esta activo',
-    example: true,
-  })
-  @IsBoolean({ message: 'El campo isActive debe ser un valor booleano.' })
-  @IsNotEmpty({ message: 'El campo isActive no puede estar vacío.' })
-  isActive: boolean;
+  @IsOptional() // Cambiado a Optional ya que será manejado por el servicio
+  updatedAt?: string;
 
   @IsOptional()
-  @IsString()
   @IsNotEmpty()
   @IsEnum(JobStatus)
-  @ApiProperty({ example: 'FullTime' })
   jobStatus!: JobStatus;
 }

@@ -1,9 +1,20 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+/* eslint-disable prettier/prettier */
+import { Injectable, NotFoundException, BadRequestException, ConflictException} from '@nestjs/common';
 import { PrismaService } from '@database/prisma/prisma.service';
-import { CreateMonitorDto, UpdateMonitorDto, MonitorBaseDto } from './dto';
+import {
+  CreateMonitorDto,
+  UpdateMonitorDto,
+  MonitorBaseDto,
+  MonitorInformationDto,
+} from './dto';
 import { plainToInstance } from 'class-transformer';
 import { ScheduleDto, Weekday } from './dto/schedule.dto';
 import { TeacherResponseDto } from './dto/teacher-response.dto';
+import { UpdateMonitorAsAdminDto } from './dto/updateMonitorAsAdmin.dto';
+import { MonitorGetSummaryDto } from './dto/monitor-get-summary.dto';
+import { MonitorWithoutSupervisorDto } from './dto/monitorWithoutSupervisor.dto';
+import { MonitorGetByIdDto } from './dto/monitor-get-by-id.dto';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class MonitorService {
@@ -25,15 +36,128 @@ export class MonitorService {
     return monitors.map((monitor) => this.mapToMonitorDto(monitor));
   }
 
-  async findOne(id: string): Promise<MonitorBaseDto> {
-    const monitor = await this.prisma.getClient().monitor.findUnique({
-      where: { id },
-      include: { user: true, supervisors: true }, // Incluye la relación con el usuario
-    });
-    if (!monitor) {
-      throw new NotFoundException(`Monitor with ID ${id} not found`);
+  async findAllBasicInfo(
+    page: number = 1,
+    limit: number = 20,
+    areaId?: number,
+    shiftId?: number,
+  ): Promise<{
+    data: MonitorGetSummaryDto[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    const offset = (page - 1) * limit;
+
+    const activeFilter: Prisma.MonitorWhereInput = {
+      user: {
+        isActive: true,
+      },
+      ...(areaId || shiftId
+        ? {
+            classes:{
+              is:{
+                ...(areaId ? { areaId } : {}),
+                ...(shiftId ? { shiftId } : {}),
+              },
+            } 
+          }
+        : {}),
+    };
+
+    const [monitors, total] = await this.prisma.getClient().$transaction([
+      this.prisma.getClient().monitor.findMany({
+        skip: offset,
+        take: limit,
+        where: activeFilter,
+        include: {
+          user: {
+            include: {
+              userProfile: true,
+            },
+          },
+          classes: {
+            select: {
+              name: true,
+              shift: {
+                select: {
+                  id: true,
+                  name: true
+                }
+              }
+            },
+          },
+        },
+      }),
+      this.prisma.getClient().monitor.count({
+        where: activeFilter,
+      }),
+    ]);
+
+    const data = monitors.map((monitor) =>
+      plainToInstance(MonitorGetSummaryDto, {
+        id: monitor.id,
+        firstName: monitor.user?.userProfile?.firstName || '',
+        lastName: monitor.user?.userProfile?.lastName || '',
+        personalEmail: monitor.user?.userProfile?.personalEmail || '',
+        phone: monitor.user?.userProfile?.phone || '',
+        className: monitor.classes?.name || '',
+        shift: monitor.classes?.shift?.name || '',
+      }),
+    );
+
+    return { data, total, page, limit };
+  }
+
+  async findOne(id: string): Promise<MonitorGetByIdDto> {
+    try{
+      const monitor = await this.prisma.getClient().monitor.findUnique({
+        where: { id },
+        include: {
+          classes: {
+            select: {
+              name: true,
+              urlMeet: true,
+            },
+          },
+          user: {
+            select: {
+              email: true,
+              userProfile: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                  phone: true,
+                },
+            },
+          },
+        },
+        },});
+
+      if (!monitor) {
+        throw new NotFoundException(`Monitor with ID ${id} not found`);
+      }
+
+      return plainToInstance(MonitorGetByIdDto, {
+        monitorId: monitor.id,
+        supervisorId: monitor.supervisorId,
+        className: monitor.classes?.name || null,
+        urlMeet: monitor.classes?.urlMeet || null,
+        firstName: monitor.user?.userProfile?.firstName || '',
+        lastName: monitor.user?.userProfile?.lastName || '',
+        email: monitor.user?.email || '',
+        phone: monitor.user?.userProfile?.phone || null,
+      });
+    } catch (error) {if (
+            error instanceof NotFoundException ||
+            error instanceof BadRequestException
+          ) {
+            throw error;
+          }
+          console.error('Error en findOne:', error); // Agregar un log para depuración
+          throw new Error('Ocurrió un error inesperado al buscar el monitor');
     }
-    return this.mapToMonitorDto(monitor);
+
   }
 
   async update(
@@ -47,6 +171,105 @@ export class MonitorService {
     });
     return this.mapToMonitorDto(monitor);
   }
+  
+  async updateMonitorAsAdmin(
+    id: string,
+    updateMonitorDto: UpdateMonitorAsAdminDto,
+  ): Promise<UpdateMonitorAsAdminDto> {
+    // 1. Verificar si el monitor existe
+    const existingMonitor = await this.prisma.getClient().monitor.findUnique({
+      where: { id },
+      include: { 
+        user: { 
+          include: { 
+            userProfile: true 
+          } 
+        } 
+      },
+    });
+    if (!existingMonitor) {
+      throw new NotFoundException(`Monitor con ID ${id} no encontrado`);
+    }
+    if (updateMonitorDto.personalEmail) {
+      const existingUser = await this.prisma.getClient().user.findFirst({
+        where: {
+          userProfile: {
+            personalEmail: updateMonitorDto.personalEmail
+          },
+          NOT: {
+            monitor: {
+              id: id // Excluye al propio monitor que se está actualizando
+            }
+          }
+        },
+        include: {
+          userProfile: true
+        }
+      });
+  
+      if (existingUser) {
+        throw new ConflictException('El correo electrónico personal ya está en uso por otro usuario');
+      }
+    }
+  
+    // 3. Crear perfil si no existe
+    if (!existingMonitor.user.userProfile) {
+      await this.prisma.getClient().userProfile.create({
+        data: {
+          userId: existingMonitor.user.id,
+          firstName: updateMonitorDto.firstName || '',
+          lastName: updateMonitorDto.lastName || '',
+          phone: updateMonitorDto.phone || '',
+          dni: updateMonitorDto.dni || null,
+          personalEmail: updateMonitorDto.personalEmail || null,
+        },
+      });
+    }
+      const monitor = await this.prisma.getClient().monitor.update({
+      where: { id },
+      data: {
+        user: {
+          update: {
+            userProfile: {
+              update: {
+                firstName: updateMonitorDto.firstName,
+                lastName: updateMonitorDto.lastName,
+                phone: updateMonitorDto.phone,
+                personalEmail: updateMonitorDto.personalEmail,
+              },
+            },
+          },
+        },
+        classes: updateMonitorDto.classId
+          ? {
+              connect: { id: updateMonitorDto.classId },
+            }
+          : undefined,
+      },
+      include: {
+        user: {
+          include: {
+            userProfile: true,
+          },
+        },
+        classes: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    });
+    return plainToInstance(UpdateMonitorAsAdminDto, {
+      id: monitor.id,
+      firstName: monitor.user.userProfile?.firstName || '',
+      lastName: monitor.user.userProfile?.lastName || '',
+      phone: monitor.user.userProfile?.phone || '',
+      personalEmail: monitor.user.userProfile?.personalEmail || null,
+      classId: monitor.classes?.id || null,
+      className: monitor.classes?.name || '',
+    });
+  }
 
   async delete(id: string): Promise<MonitorBaseDto> {
     const monitor = await this.prisma.getClient().monitor.delete({
@@ -57,74 +280,68 @@ export class MonitorService {
   }
 
   async getTeachersByMonitor(userId: string): Promise<TeacherResponseDto[]> {
-    const monitor = await this.prisma.getClient().monitor.findUnique({
-      where: { userId },
-      include: {
-        classes: {
-          include: {
-            schedules: {
-              include: {
-                teacher: {
-                  include: {
-                    user: {
-                      include: { userProfile: true },
-                    },
-                    courses: true,
-                  },
-                },
+    const teachers = await this.prisma.getClient().teacher.findMany({
+      where: {
+        schedules: {
+          some: {
+            clas: {
+              monitor: {
+                userId,
               },
             },
           },
         },
       },
+      include: {
+        user: {
+          include: {
+            userProfile: true,
+          },
+        },
+        courses: true,
+      },
+      distinct: ['id'], // Asegura teachers únicos
     });
 
-    if (!monitor || !monitor.classes) {
-      throw new NotFoundException('No se encontraron clases asignadas al monitor');
+    if (!teachers.length) {
+      throw new NotFoundException(
+        'No se encontraron docentes asociados al monitor',
+      );
     }
 
-    // Extraer los docentes únicos de los horarios
-    const teachersMap = new Map();
-    monitor.classes.schedules.forEach((s) => {
-      if (s.teacher) {
-        teachersMap.set(s.teacher.id, {
-          teacherId: s.teacher.id,
-          firstName: s.teacher.user.userProfile?.firstName || 'N/A',
-          lastName: s.teacher.user.userProfile?.lastName || 'N/A',
-          email: s.teacher.user.email,
-          courseName: s.teacher.courses.name,
-        });
-      }
-    });
-
-    return Array.from(teachersMap.values());
+    return teachers.map((teacher) => ({
+      teacherId: teacher.id,
+      firstName: teacher.user.userProfile?.firstName || 'N/A',
+      lastName: teacher.user.userProfile?.lastName || 'N/A',
+      email: teacher.user.email,
+      courseName: teacher.courses?.name || 'Sin asignar',
+      phone: teacher.user.userProfile?.phone || 'N/A',
+    }));
   }
 
-  
   async getSchedule(userId: string): Promise<ScheduleDto[]> {
-    const monitor = await this.prisma.getClient().monitor.findUnique({
-      where: { userId },
+    const schedules = await this.prisma.getClient().schedule.findMany({
+      relationLoadStrategy: 'join', // or 'query'
+      where: {
+        clas: {
+          monitor: {
+            userId,
+          },
+        },
+      },
       select: {
-        classes: {
+        weekday: true,
+        hourSession: {
           select: {
-            schedules: {
+            startTime: true,
+            endTime: true,
+          },
+        },
+        teacher: {
+          select: {
+            courses: {
               select: {
-                weekday: true,
-                hourSession: {
-                  select: {
-                    startTime: true,
-                    endTime: true,
-                  },
-                },
-                teacher: {
-                  select: {
-                    courses: {
-                      select: {
-                        name: true,
-                      },
-                    },
-                  },
-                },
+                name: true,
               },
             },
           },
@@ -132,25 +349,274 @@ export class MonitorService {
       },
     });
 
-    if (!monitor || !monitor.classes) {
-      throw new NotFoundException('Monitor o clases no encontradas');
+    if (!schedules.length) {
+      throw new NotFoundException(
+        'No se encontraron horarios para este monitor',
+      );
     }
 
-    // Convertimos el objeto en un array antes de mapear
-    const schedulesArray = Array.isArray(monitor.classes)
-      ? monitor.classes
-      : [monitor.classes];
+    return schedules.map((schedule) => ({
+      weekday: schedule.weekday as Weekday,
+      startTime: schedule.hourSession.startTime,
+      endTime: schedule.hourSession.endTime,
+      courseName: schedule.teacher?.courses?.name || 'Sin asignar',
+    }));
+  }
 
-    const schedules: ScheduleDto[] = schedulesArray.flatMap(clas =>
-      clas.schedules.map(schedule => ({
-        weekday: schedule.weekday as Weekday,
-        startTime: schedule.hourSession.startTime,
-        endTime: schedule.hourSession.endTime,
-        courseName: schedule.teacher?.courses?.name || 'Sin asignar',
-      })),
+  async getInformationByMonitor(id: string): Promise<MonitorInformationDto> {
+    const obj = await this.prisma.getClient().user.findUnique({
+      where: { id },
+      include: {
+        userProfile: { select: { firstName: true, lastName: true } },
+        monitor: {
+          include: {
+            classes: { select: { id: true, name: true, urlMeet: true ,urlClassroom:true} },
+          },
+        },
+      },
+    });
+
+    if (!obj) throw new NotFoundException('Monitor no encontrado');
+
+    return plainToInstance(MonitorInformationDto, {
+      monitorId: obj.monitor?.id,
+      nombres: obj.userProfile?.firstName,
+      apellidos: obj.userProfile?.lastName,
+      salon: obj.monitor?.classes?.name,
+      salon_id: obj.monitor?.classes?.id,
+      urlMeet: obj.monitor?.classes?.urlMeet,
+      urlClassroom: obj.monitor?.classes?.urlClassroom,
+    });
+  }
+
+  async deactivate(id: string) {
+    const monitor = await this.prisma.getClient().monitor.findUnique({ 
+      where: { id },
+      include: { 
+        user: {
+          include: { 
+            userProfile: 
+              { select: { firstName: true, lastName: true } } 
+            } 
+      }
+      } 
+    });
+    if (!monitor) {
+      throw new NotFoundException('Monitor not found');
+    }
+    if (!monitor.user) {
+      throw new NotFoundException('Associated user not found');
+    }
+    await this.prisma.getClient().user.update({
+      where: { id: monitor.user.id },
+      data: { isActive: false }
+    });
+    return plainToInstance(MonitorBaseDto, {
+      firstName: monitor.user?.userProfile?.firstName || '',
+      lastName: monitor.user?.userProfile?.lastName || ''
+    });
+  }
+
+  async findAllWithSupervisor(
+    hasSupervisor: boolean,
+    shiftId?: number,
+    page: number = 1,
+    limit: number = 20,
+    areaId?: number,
+  ): Promise<{
+    data: MonitorWithoutSupervisorDto[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    const offset = (page - 1) * limit;
+  
+    const where: Prisma.MonitorWhereInput = {
+      supervisorId: hasSupervisor ? { not: null } : null,
+      classes: {
+        ...(shiftId !== undefined ? { shiftId } : {}),
+        ...(areaId !== undefined && { area: { id: areaId } }), // Corrección importante aquí
+      },
+    };
+  
+    const [monitors, total] = await this.prisma.getClient().$transaction([
+      this.prisma.getClient().monitor.findMany({
+        skip: offset,
+        take: limit,
+        where,
+        select: {
+          id: true,
+          classes: {
+            select: {
+              id: true,
+              name: true,
+              shift: {
+                select: { id: true, name: true },
+              },
+              area: {
+                select: { id: true, name: true },
+              },
+            },
+          },
+          user: {
+            select: {
+              userProfile: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                },
+              },
+              email: true
+            }
+          }
+        },
+        orderBy: { classes: { name: 'asc' } },
+      }),
+      this.prisma.getClient().monitor.count({ where }),
+    ]);
+  
+    const data = monitors.map((monitor) => ({
+      monitorId: monitor.id,
+      className: monitor.classes?.name || 'no asignado',
+      shiftId: monitor.classes?.shift?.id || 0,
+      shiftName: monitor.classes?.shift?.name || 'no asignado',
+      areaId: monitor.classes?.area?.id || 0,
+      areaName: monitor.classes?.area?.name || 'no asignado',
+      firstName: monitor.user?.userProfile?.firstName || 'no asignado',
+      lastName: monitor.user?.userProfile?.lastName || 'no asignado',
+      email: monitor.user?.email,
+    }));
+  
+    return { data, total, page, limit };
+  }
+
+  async search(
+    query: string,
+    page: number = 1,
+    limit: number = 20,
+  ): Promise<{
+    data: MonitorGetSummaryDto[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    const offset = (page - 1) * limit;
+
+    const [monitors, total] = await this.prisma.getClient().$transaction([
+      this.prisma.getClient().monitor.findMany({
+        skip: limit > 0 ? offset : undefined,
+        take: limit > 0 ? limit : undefined,
+        where: {
+          OR: [
+            {
+              user: {
+                userProfile: {
+                  firstName: { contains: query, mode: 'insensitive' },
+                },
+              },
+            },
+            {
+              user: {
+                userProfile: {
+                  lastName: { contains: query, mode: 'insensitive' },
+                },
+              },
+            },
+            {
+              user: {
+                email: { contains: query, mode: 'insensitive' },
+              },
+            },
+            {
+              user: {
+                userProfile: {
+                  phone: { contains: query, mode: 'insensitive' },
+                },
+              },
+            },
+            {
+              classes: {
+                name: { contains: query, mode: 'insensitive' },
+              },
+            },
+          ],
+          user: {
+            isActive: true,
+          },
+        },
+        include: {
+          user: {
+            include: {
+              userProfile: true,
+            },
+          },
+          classes: {
+            select: {
+              name: true,
+              shift: {
+                select: {
+                  name: true
+                }
+              }
+            },
+          },
+        },
+      }),
+      this.prisma.getClient().monitor.count({
+        where: {
+          OR: [
+            {
+              user: {
+                userProfile: {
+                  firstName: { contains: query, mode: 'insensitive' },
+                },
+              },
+            },
+            {
+              user: {
+                userProfile: {
+                  lastName: { contains: query, mode: 'insensitive' },
+                },
+              },
+            },
+            {
+              user: {
+                email: { contains: query, mode: 'insensitive' },
+              },
+            },
+            {
+              user: {
+                userProfile: {
+                  phone: { contains: query, mode: 'insensitive' },
+                },
+              },
+            },
+            {
+              classes: {
+                name: { contains: query, mode: 'insensitive' },
+              },
+            },
+          ],
+          user: {
+            isActive: true,
+          },
+        },
+      }),
+    ]);
+
+    const data = monitors.map((monitor) =>
+      plainToInstance(MonitorGetSummaryDto, {
+        id: monitor.id,
+        firstName: monitor.user?.userProfile?.firstName || '',
+        lastName: monitor.user?.userProfile?.lastName || '',
+        email: monitor.user?.email || '',
+        phone: monitor.user?.userProfile?.phone || '',
+        className: monitor.classes?.name || '',
+        shift: monitor.classes?.shift?.name || '',
+      }),
     );
 
-    return schedules;
+    return { data, total, page, limit };
   }
 
   // ─────── Métodos auxiliares ───────

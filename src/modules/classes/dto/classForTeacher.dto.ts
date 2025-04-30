@@ -35,6 +35,13 @@ export class ClassForTeacherDto {
 
   @Expose()
   @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  @ApiProperty({ example: 'https://meet.google.com/abc-123-def-zzz' })
+  urlClassroom?: string;
+
+  @Expose()
+  @IsOptional()
   @ApiProperty({ type: [ScheduleForTeacherDto] })
   schedules?: ScheduleForTeacherDto[];
 }

@@ -73,6 +73,17 @@ export class ClassDto {
   urlMeet?: string;
 
   @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  @ApiProperty({ example: 'https://google.com/classroom/abc-123-def-zzz' })
+  urlClassroom?: string;
+
+  @IsOptional()
+  @IsString()
+  @ApiProperty({ example: 'COMPLETO', enum: ['COMPLETO', 'FALTAN_DOCENTES'] })
+  status?: string;
+
+  @IsOptional()
   @ApiProperty({ type: [ScheduleDto] })
   schedules?: ScheduleDto[];
 }

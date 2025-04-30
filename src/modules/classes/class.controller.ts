@@ -12,6 +12,7 @@ import {
   UseGuards,
   Req,
   BadRequestException,
+  Patch,
 } from '@nestjs/common';
 import { ClassService } from './class.service';
 //import { Prisma } from '@prisma/client';
@@ -24,12 +25,46 @@ import {
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Authorization, Role } from '@modules/auth/decorators/authorization.decorator';
 import { JwtAuthGuard } from '@modules/auth/guards/jwt-auth.guard';
+import { ScheduleForClass } from './dto/scheduleForClass.dto';
+import { TeacherResponseDto } from '@modules/monitors/dto/teacher-response.dto';
 
 @Controller('classes')
 @ApiTags('Classes')
 @UseGuards(JwtAuthGuard)
 export class ClassController {
   constructor(private readonly classService: ClassService) {}
+
+  @Get(':classId/schedules')
+  @HttpCode(HttpStatus.OK)
+  @Authorization({
+    permission: 'class.getSchedulesByClassId',
+    description: 'Obtener horarios de una clase por su ID',
+  })
+  @ApiOperation({
+    summary: 'Obtener horarios de una clase por su ID',
+    description: 'Get schedules of a class by its ID',
+  })
+  async getSchedulesByClassId(
+    @Param('classId', ParseUUIDPipe) classId: string,
+  ): Promise<ScheduleForClass[]> {
+    return await this.classService.getSchedulesByClassId(classId);
+  }
+
+  @Get(':classId/teachers')
+  @HttpCode(HttpStatus.OK)
+  @Authorization({
+    permission: 'class.getTeachersByClassId',
+    description: 'Obtener docentes de una clase por su ID',
+  })
+  @ApiOperation({
+    summary: 'Obtener docentes de una clase por su ID',
+    description: 'Get teachers of a class by its ID',
+  })
+  async getTeachersByClassId(
+    @Param('classId', ParseUUIDPipe) classId: string,
+  ): Promise<TeacherResponseDto[]> {
+    return await this.classService.getTeachersByClassId(classId);
+  }
 
   // ─────── CRUD ───────
   @Post()
@@ -110,6 +145,42 @@ export class ClassController {
     @Body() updateClassDto: UpdateClassDto,
   ): Promise<ClassBaseDto> {
     return await this.classService.update(id, updateClassDto);
+  }
+
+  @Patch(':id/meet-link')
+  @HttpCode(HttpStatus.OK)
+  @Authorization({
+    roles: [Role.MONITOR, Role.SUPERVISOR, Role.ADMIN],
+    permission: 'class.updateMeetLink',
+    description: 'Actualizar el enlace de Google Meet para una clase',
+  })
+  @ApiOperation({
+    summary: 'Actualizar el enlace de Google Meet para una clase',
+    description: 'Update Google Meet link for a class',
+  })
+  async updateMeetLink(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body('urlMeet') urlMeet: string,
+  ) {
+    return await this.classService.updateMeetLink(id, urlMeet);
+  }
+
+  @Patch(':id/classroom-link')
+  @HttpCode(HttpStatus.OK)
+  @Authorization({
+    roles: [Role.MONITOR, Role.SUPERVISOR, Role.ADMIN],
+    permission: 'class.updateClassroomLink',
+    description: 'Actualizar el enlace de Google Classroom para una clase',
+  })
+  @ApiOperation({
+    summary: 'Actualizar el enlace de Google Classroom para una clase',
+    description: 'Update Google Classroom link for a class',
+  })
+  async updateClassroomLink(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body('urlClassroom') urlClassroom: string,
+  ) {
+    return await this.classService.updateClassroomLink(id, urlClassroom);
   }
 
   @Delete(':id')
