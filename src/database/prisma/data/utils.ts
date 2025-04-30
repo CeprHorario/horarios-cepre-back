@@ -53,20 +53,26 @@ export const generateHourSessions = (shift: Shift) => {
   const hourSessionData: HourSessionData[] = [];
   const sessionDuration = 40 * 60 * 1000; // 40 minutes in milliseconds
   const breakDuration = 5 * 60 * 1000; // 5 minutes in milliseconds
+
   const today = new Date().toISOString().split('T')[0];
-  let current = new Date(`${today}T${shift.startTime as string}Z`);
-  const endTime = new Date(`${today}T${shift.endTime as string}Z`);
+  let current = new Date(`${today}T${shift.startTime}Z`);
+  const endTime = new Date(`${today}T${shift.endTime}Z`);
+
+  const formatTime6 = (date: Date): string => {
+    return date.toISOString().split('T')[1].replace('Z', '').padEnd(15, '0');
+  };
 
   for (let i = 1; current < endTime; i++) {
     const sessionEnd = new Date(current.getTime() + sessionDuration);
     hourSessionData.push({
       shiftId: shift.id,
       period: i,
-      startTime: current.toISOString(),
-      endTime: sessionEnd.toISOString(),
+      startTime: formatTime6(current), // only time with precision
+      endTime: formatTime6(sessionEnd),
     });
     current = new Date(sessionEnd.getTime() + breakDuration);
   }
+
   return hourSessionData;
 };
 
@@ -230,6 +236,7 @@ export const assignUuidIds = <T extends { id?: UUID }>(items: T[]): T[] => {
  */
 export const parseScheduleJson = (filePath: string): ScheduleWeek[] => {
   const bioJsonPath = path.resolve(__dirname, filePath);
+
   const bioJsonContent = fs.readFileSync(bioJsonPath, 'utf-8');
   return JSON.parse(bioJsonContent) as ScheduleWeek[];
 };
@@ -245,25 +252,41 @@ export const generateScheduleData = (
 ) => {
   let index = 0;
 
+  console.log(hourSessions);
+
   const scheduleData: ScheduleData[] = [];
   Object.values(classes).flatMap((classGroup) =>
     classGroup.flatMap((c) => {
       dataSchedules[index].flatMap((d) =>
-        d.clases.map((cl) =>
+        d.clases.map((cl) => {
+          const hourSessionId =
+            hourSessions.find(
+              (h) => h.shiftId === c.shiftId && h.period === cl.bloque,
+            )?.id ?? 0;
           scheduleData.push({
             courseId: courseMap.get(cl.curso) ?? 0,
-            hourSesionId:
-              hourSessions.find(
-                (h) => h.shiftId === c.shiftId && h.period === cl.bloque,
-              )?.id ?? 0,
+            hourSessionId,
             classId: c.id,
             weekday: weekdayData[d.dia],
-          }),
-        ),
+          });
+
+          if (hourSessionId === 0) {
+            throw new BadRequestException(
+              `Error: No se encontró la sesión horaria para el bloque ${cl.bloque} y el turno ${c.shiftId} En el salon ${c.name} del curso ${cl.curso}`,
+            );
+          }
+        }),
       );
       index = index === dataSchedules.length - 1 ? 0 : index + 1;
     }),
   );
-
   return scheduleData;
 };
+
+/**
+ * Validate schedules json
+ */
+export function parsedScheduleJson(data: any): ScheduleWeek[] {
+  // Aquí podrías agregar validaciones adicionales si lo necesitas
+  return data as ScheduleWeek[];
+}

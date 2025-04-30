@@ -66,8 +66,11 @@ export interface Sede extends Prisma.SedeCreateInput {
   id?: number;
 }
 
-export interface Shift extends Prisma.ShiftCreateInput {
+export interface Shift {
   id: number;
+  name: string;
+  startTime: string;
+  endTime: string;
 }
 
 export interface Course extends Prisma.CourseCreateInput {
@@ -96,16 +99,16 @@ export interface HourSessionData {
 export interface ScheduleData {
   classId: string;
   courseId: number;
-  hourSesionId: number;
+  hourSessionId: number;
   weekday: string;
 }
 
 export const weekdayData: Record<string, string> = {
-  lunes: 'MONDAY',
-  martes: 'TUESDAY',
-  miercoles: 'WEDNESDAY',
-  jueves: 'THURSDAY',
-  viernes: 'FRIDAY',
-  sabado: 'SATURDAY',
-  domingo: 'SUNDAY',
+  Lunes: 'MONDAY',
+  Martes: 'TUESDAY',
+  Miercoles: 'WEDNESDAY',
+  Jueves: 'THURSDAY',
+  Viernes: 'FRIDAY',
+  Sabado: 'SATURDAY',
+  Domingo: 'SUNDAY',
 };

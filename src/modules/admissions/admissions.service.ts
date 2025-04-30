@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 
 import { admissionProcesses } from '@database/drizzle/schema';
@@ -21,22 +21,34 @@ export class AdmissionsService {
   // Metodo para crear un nuevo proceso de admisión
   async create(body: ProcessAdmissionDto) {
     const nameParsed = `${body.name.replace(/\s/g, '_').toLowerCase()}_${body.year}`;
-    // const admission = await this.drizzle.db
-    //   .insert(admissionProcesses)
-    //   .values({
-    //     name: nameParsed,
-    //     year: body.year,
-    //     started: body.started,
-    //     finished: body.finished,
-    //   })
-    //   .returning();
-
-    // // Establecer el nuevo proceso en mi prisma factory y la migracion de data inicial
-    // await this.schemaManager.setCurrentSchema(nameParsed, admission[0].year);
+    const admission = await this.drizzle.db
+      .insert(admissionProcesses)
+      .values({
+        name: nameParsed,
+        year: body.year,
+        started: body.started,
+        finished: body.finished,
+      })
+      .returning()
+      .catch(() => {
+        throw new ConflictException(
+          `Admission process already exists with name: ${nameParsed}`,
+        );
+      });
 
     // Establecer el nuevo proceso en mi prisma factory y la migracion de data inicial
-    await this.prisma.migrationInitialSchema(nameParsed /* admission[0].name */, body.configuration);
-    return body;
+    await this.schemaManager.setCurrentSchema(nameParsed, admission[0].year);
+
+    // Establecer el nuevo proceso en mi prisma factory y la migracion de data inicial
+    await this.prisma.migrationInitialSchema(
+      admission[0].name,
+      body.configuration,
+    );
+
+    return {
+      message: 'Data created successfully',
+      status: 'ok',
+    };
   }
 
   // Metodo para obtener todos los procesos de admisión con sus observaciones
