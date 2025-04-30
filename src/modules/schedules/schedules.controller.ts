@@ -48,15 +48,6 @@ export class ScheduleController {
     @Query('email') email: string,
     @Query('dni') dni: string,
   ) {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const isEmailValid = email ? emailRegex.test(email) : false;
-    const isDniValid = dni ? dni.length >= 8 : false;
-
-    if (!isEmailValid && !isDniValid) {
-      throw new BadRequestException(
-        'Se debe proporcionar un email válido o un DNI con al menos 8 caracteres',
-      );
-    }
     return await this.scheduleService.getPublicScheduleByTeacher(email, dni);
   }
 
