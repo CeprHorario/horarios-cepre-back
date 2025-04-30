@@ -23,4 +23,8 @@ export class MonitorInformationDto {
   @IsString()
   @ApiProperty({ example: 'https://meet.google.com/abc-defg-hij' })
   urlMeet: string;
+
+  @IsString()
+  @ApiProperty({example: 'https://classroom.google.com/c/abc-defg-hij' })
+  urlClassroom: string;
 }

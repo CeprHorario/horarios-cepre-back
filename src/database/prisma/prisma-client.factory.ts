@@ -20,7 +20,7 @@ export class PrismaClientFactory implements OnModuleInit, OnModuleDestroy {
   private readonly cache: NodeCache;
 
   constructor(private readonly schemaManager: SchemaManagerService) {
-    this.cache = new NodeCache({ stdTTL: 3600, checkperiod: 600 }); // 1 hour cache with 10 minute check period
+    this.cache = new NodeCache({ stdTTL: 3600, checkperiod: 60 });
 
     // Configurar el evento para manejar la expiración de clientes en la caché
     this.cache.on('expired', (key, client: PrismaClient) => {
@@ -45,7 +45,7 @@ export class PrismaClientFactory implements OnModuleInit, OnModuleDestroy {
   async onModuleInit() {
     try {
       const { name } = await this.schemaManager.getCurrent();
-      this.mainClient = { name, client: this.createClient(name) };
+      await this.setMainClient(name);
       this.logger.debug(
         `Prisma: connected successfully for schema: ${this.mainClient.name}`,
       );
@@ -69,20 +69,38 @@ export class PrismaClientFactory implements OnModuleInit, OnModuleDestroy {
   }
 
   async setMainClient(schema: string) {
-    await this.mainClient.client.$disconnect();
+    if (this.mainClient) await this.mainClient.client.$disconnect(); // Desconectar el cliente principal si ya existe
+
+    // Limite de conexiones, 30 para desarrollo y 4 para producción
+    const limitConnections = this.isDev() ? 4 : 30;
+    // Timeout de conexión, 5 minutos para desarrollo y 10 segundos para producción
+    const timeOut = this.isDev() ? 10 : 300;
+
     this.mainClient = {
       name: schema,
-      client: this.createClient(schema),
+      client: new PrismaClient({
+        ...(this.isDev() && { log: ['query'] }),
+        datasources: {
+          db: {
+            url: `${process.env.DATABASE_URL}?schema=${schema}&connection_limit=${limitConnections}&pool_timeout=${timeOut}`,
+          },
+        },
+      }),
     };
     return this.mainClient.client;
   }
 
   private createClient(schema: string): PrismaClient {
+    // Limite de conexiones, 30 para desarrollo y 4 para producción
+    const limitConnections = this.isDev() ? 2 : 5;
+    // Timeout de conexión, 5 minutos para desarrollo y 10 segundos para producción
+    const timeOut = this.isDev() ? 5 : 60;
+
     return new PrismaClient({
-      log: ['query'],
+      ...(this.isDev() && { log: ['query'] }),
       datasources: {
         db: {
-          url: `${process.env.DATABASE_URL}?schema=${schema}`,
+          url: `${process.env.DATABASE_URL}?schema=${schema}&connection_limit=${limitConnections}&pool_timeout=${timeOut}`,
         },
       },
     });
@@ -111,5 +129,9 @@ export class PrismaClientFactory implements OnModuleInit, OnModuleDestroy {
 
     this.cache.flushAll(); // Limpiar la caché
     this.logger.log('Prisma: all Prisma clients disconnected');
+  }
+
+  private isDev(): boolean {
+    return process.env.NODE_ENV === 'development';
   }
 }

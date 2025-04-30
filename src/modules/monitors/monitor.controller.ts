@@ -24,8 +24,9 @@ import {
 import { TeacherResponseDto } from './dto/teacher-response.dto';
 import { UpdateMonitorAsAdminDto } from './dto/updateMonitorAsAdmin.dto';
 import { MonitorGetSummaryDto } from './dto/monitor-get-summary.dto';
-import { ApiResponse,ApiOperation } from '@nestjs/swagger';
+import { ApiResponse, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { MonitorWithoutSupervisorDto } from './dto/monitorWithoutSupervisor.dto';
+
 @Controller('monitors')
 export class MonitorController {
   constructor(private readonly monitorService: MonitorService) {}
@@ -70,6 +71,7 @@ export class MonitorController {
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 20,
     @Query('shiftId') shiftId?: number,
+    @Query('areaId') areaId?: number,
   ): Promise<{
     data: MonitorWithoutSupervisorDto[];
     total: number;
@@ -81,6 +83,7 @@ export class MonitorController {
       shiftId,
       page,
       limit,
+      areaId,
     );
   }
 
@@ -99,13 +102,65 @@ export class MonitorController {
   findAll(
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 20,
+    @Query('shift_id') shiftId?: number,
+    @Query('area_id') areaId?: number,
   ): Promise<{
     data: MonitorGetSummaryDto[];
     total: number;
     page: number;
     limit: number;
   }> {
-    return this.monitorService.findAllBasicInfo(Number(page), Number(limit));
+
+    return this.monitorService.findAllBasicInfo(Number(page), Number(limit), 
+    areaId !== undefined ? Number(areaId) : undefined,
+    shiftId !== undefined ? Number(shiftId) : undefined,
+    );
+  }
+
+  @Get('search')
+  @Authorization({
+    permission: 'monitor.search',
+    description:
+      'Buscar monitores por nombre, apellido, email, teléfono o aula',
+  })
+  @ApiOperation({
+    summary: 'Buscar monitores por nombre, apellido, email, teléfono o aula',
+  })
+  @ApiQuery({
+    name: 'query',
+    type: String,
+    required: true,
+    description: 'Texto de búsqueda (nombre, apellido, email, teléfono o aula)',
+  })
+  @ApiQuery({
+    name: 'page',
+    type: Number,
+    required: false,
+    description: 'Número de página',
+  })
+  @ApiQuery({
+    name: 'limit',
+    type: Number,
+    required: false,
+    description: 'Cantidad de resultados por página',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de monitores que coinciden con la búsqueda',
+    type: MonitorGetSummaryDto,
+    isArray: true,
+  })
+  search(
+    @Query('query') query: string,
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 20,
+  ): Promise<{
+    data: MonitorGetSummaryDto[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    return this.monitorService.search(query, Number(page), Number(limit));
   }
 
   @Get(':id/')
@@ -166,7 +221,7 @@ export class MonitorController {
 
   @Get('/datos/teachers')
   @Authorization({
-    roles: [Role.MONITOR, Role.ADMIN],
+    roles: [Role.MONITOR, Role.ADMIN, Role.SUPERVISOR],
     permission: 'monitor.listTeachersByMonitor',
     description: 'Cargar los docentes de un monitor',
   })

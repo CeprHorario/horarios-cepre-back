@@ -1,5 +1,5 @@
 /* eslint-disable prettier/prettier */
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ConflictException} from '@nestjs/common';
 import { PrismaService } from '@database/prisma/prisma.service';
 import {
   CreateMonitorDto,
@@ -13,6 +13,7 @@ import { TeacherResponseDto } from './dto/teacher-response.dto';
 import { UpdateMonitorAsAdminDto } from './dto/updateMonitorAsAdmin.dto';
 import { MonitorGetSummaryDto } from './dto/monitor-get-summary.dto';
 import { MonitorWithoutSupervisorDto } from './dto/monitorWithoutSupervisor.dto';
+import { MonitorGetByIdDto } from './dto/monitor-get-by-id.dto';
 import { Prisma } from '@prisma/client';
 
 @Injectable()
@@ -38,6 +39,8 @@ export class MonitorService {
   async findAllBasicInfo(
     page: number = 1,
     limit: number = 20,
+    areaId?: number,
+    shiftId?: number,
   ): Promise<{
     data: MonitorGetSummaryDto[];
     total: number;
@@ -46,10 +49,20 @@ export class MonitorService {
   }> {
     const offset = (page - 1) * limit;
 
-    const activeFilter = {
+    const activeFilter: Prisma.MonitorWhereInput = {
       user: {
         isActive: true,
       },
+      ...(areaId || shiftId
+        ? {
+            classes:{
+              is:{
+                ...(areaId ? { areaId } : {}),
+                ...(shiftId ? { shiftId } : {}),
+              },
+            } 
+          }
+        : {}),
     };
 
     const [monitors, total] = await this.prisma.getClient().$transaction([
@@ -66,6 +79,12 @@ export class MonitorService {
           classes: {
             select: {
               name: true,
+              shift: {
+                select: {
+                  id: true,
+                  name: true
+                }
+              }
             },
           },
         },
@@ -80,24 +99,65 @@ export class MonitorService {
         id: monitor.id,
         firstName: monitor.user?.userProfile?.firstName || '',
         lastName: monitor.user?.userProfile?.lastName || '',
-        email: monitor.user?.email || '',
+        personalEmail: monitor.user?.userProfile?.personalEmail || '',
         phone: monitor.user?.userProfile?.phone || '',
         className: monitor.classes?.name || '',
+        shift: monitor.classes?.shift?.name || '',
       }),
     );
 
     return { data, total, page, limit };
   }
 
-  async findOne(id: string): Promise<MonitorBaseDto> {
-    const monitor = await this.prisma.getClient().monitor.findUnique({
-      where: { id },
-      include: { user: true, supervisors: true }, // Incluye la relación con el usuario
-    });
-    if (!monitor) {
-      throw new NotFoundException(`Monitor with ID ${id} not found`);
+  async findOne(id: string): Promise<MonitorGetByIdDto> {
+    try{
+      const monitor = await this.prisma.getClient().monitor.findUnique({
+        where: { id },
+        include: {
+          classes: {
+            select: {
+              name: true,
+              urlMeet: true,
+            },
+          },
+          user: {
+            select: {
+              email: true,
+              userProfile: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                  phone: true,
+                },
+            },
+          },
+        },
+        },});
+
+      if (!monitor) {
+        throw new NotFoundException(`Monitor with ID ${id} not found`);
+      }
+
+      return plainToInstance(MonitorGetByIdDto, {
+        monitorId: monitor.id,
+        supervisorId: monitor.supervisorId,
+        className: monitor.classes?.name || null,
+        urlMeet: monitor.classes?.urlMeet || null,
+        firstName: monitor.user?.userProfile?.firstName || '',
+        lastName: monitor.user?.userProfile?.lastName || '',
+        email: monitor.user?.email || '',
+        phone: monitor.user?.userProfile?.phone || null,
+      });
+    } catch (error) {if (
+            error instanceof NotFoundException ||
+            error instanceof BadRequestException
+          ) {
+            throw error;
+          }
+          console.error('Error en findOne:', error); // Agregar un log para depuración
+          throw new Error('Ocurrió un error inesperado al buscar el monitor');
     }
-    return this.mapToMonitorDto(monitor);
+
   }
 
   async update(
@@ -111,38 +171,61 @@ export class MonitorService {
     });
     return this.mapToMonitorDto(monitor);
   }
-
+  
   async updateMonitorAsAdmin(
     id: string,
     updateMonitorDto: UpdateMonitorAsAdminDto,
   ): Promise<UpdateMonitorAsAdminDto> {
+    // 1. Verificar si el monitor existe
     const existingMonitor = await this.prisma.getClient().monitor.findUnique({
       where: { id },
-      include: { user: { include: { userProfile: true } } },
+      include: { 
+        user: { 
+          include: { 
+            userProfile: true 
+          } 
+        } 
+      },
     });
-
-    console.log('Monitor encontrado antes de la actualización:', existingMonitor);
-
     if (!existingMonitor) {
-      throw new NotFoundException(`Monitor with ID ${id} not found`);
+      throw new NotFoundException(`Monitor con ID ${id} no encontrado`);
     }
-
-    // Verificar si el usuario tiene un perfil, si no, crearlo
+    if (updateMonitorDto.personalEmail) {
+      const existingUser = await this.prisma.getClient().user.findFirst({
+        where: {
+          userProfile: {
+            personalEmail: updateMonitorDto.personalEmail
+          },
+          NOT: {
+            monitor: {
+              id: id // Excluye al propio monitor que se está actualizando
+            }
+          }
+        },
+        include: {
+          userProfile: true
+        }
+      });
+  
+      if (existingUser) {
+        throw new ConflictException('El correo electrónico personal ya está en uso por otro usuario');
+      }
+    }
+  
+    // 3. Crear perfil si no existe
     if (!existingMonitor.user.userProfile) {
-      console.log('El usuario no tiene un perfil, creando uno...');
       await this.prisma.getClient().userProfile.create({
         data: {
           userId: existingMonitor.user.id,
           firstName: updateMonitorDto.firstName || '',
           lastName: updateMonitorDto.lastName || '',
-          personalEmail: updateMonitorDto.personalEmail || '',
           phone: updateMonitorDto.phone || '',
           dni: updateMonitorDto.dni || null,
+          personalEmail: updateMonitorDto.personalEmail || null,
         },
       });
     }
-
-    const monitor = await this.prisma.getClient().monitor.update({
+      const monitor = await this.prisma.getClient().monitor.update({
       where: { id },
       data: {
         user: {
@@ -151,13 +234,13 @@ export class MonitorService {
               update: {
                 firstName: updateMonitorDto.firstName,
                 lastName: updateMonitorDto.lastName,
-                personalEmail: updateMonitorDto.personalEmail,
                 phone: updateMonitorDto.phone,
+                personalEmail: updateMonitorDto.personalEmail,
               },
             },
           },
         },
-        classes: updateMonitorDto.className
+        classes: updateMonitorDto.classId
           ? {
               connect: { id: updateMonitorDto.classId },
             }
@@ -171,18 +254,19 @@ export class MonitorService {
         },
         classes: {
           select: {
+            id: true,
             name: true,
           },
         },
       },
     });
-
     return plainToInstance(UpdateMonitorAsAdminDto, {
       id: monitor.id,
       firstName: monitor.user.userProfile?.firstName || '',
       lastName: monitor.user.userProfile?.lastName || '',
-      personalEmail: monitor.user.userProfile?.personalEmail || '',
       phone: monitor.user.userProfile?.phone || '',
+      personalEmail: monitor.user.userProfile?.personalEmail || null,
+      classId: monitor.classes?.id || null,
       className: monitor.classes?.name || '',
     });
   }
@@ -231,6 +315,7 @@ export class MonitorService {
       lastName: teacher.user.userProfile?.lastName || 'N/A',
       email: teacher.user.email,
       courseName: teacher.courses?.name || 'Sin asignar',
+      phone: teacher.user.userProfile?.phone || 'N/A',
     }));
   }
 
@@ -285,7 +370,7 @@ export class MonitorService {
         userProfile: { select: { firstName: true, lastName: true } },
         monitor: {
           include: {
-            classes: { select: { id: true, name: true, urlMeet: true } },
+            classes: { select: { id: true, name: true, urlMeet: true ,urlClassroom:true} },
           },
         },
       },
@@ -300,6 +385,7 @@ export class MonitorService {
       salon: obj.monitor?.classes?.name,
       salon_id: obj.monitor?.classes?.id,
       urlMeet: obj.monitor?.classes?.urlMeet,
+      urlClassroom: obj.monitor?.classes?.urlClassroom,
     });
   }
 
@@ -336,6 +422,7 @@ export class MonitorService {
     shiftId?: number,
     page: number = 1,
     limit: number = 20,
+    areaId?: number,
   ): Promise<{
     data: MonitorWithoutSupervisorDto[];
     total: number;
@@ -348,6 +435,7 @@ export class MonitorService {
       supervisorId: hasSupervisor ? { not: null } : null,
       classes: {
         ...(shiftId !== undefined ? { shiftId } : {}),
+        ...(areaId !== undefined && { area: { id: areaId } }), // Corrección importante aquí
       },
     };
   
@@ -370,6 +458,17 @@ export class MonitorService {
               },
             },
           },
+          user: {
+            select: {
+              userProfile: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                },
+              },
+              email: true
+            }
+          }
         },
         orderBy: { classes: { name: 'asc' } },
       }),
@@ -383,8 +482,140 @@ export class MonitorService {
       shiftName: monitor.classes?.shift?.name || 'no asignado',
       areaId: monitor.classes?.area?.id || 0,
       areaName: monitor.classes?.area?.name || 'no asignado',
+      firstName: monitor.user?.userProfile?.firstName || 'no asignado',
+      lastName: monitor.user?.userProfile?.lastName || 'no asignado',
+      email: monitor.user?.email,
     }));
   
+    return { data, total, page, limit };
+  }
+
+  async search(
+    query: string,
+    page: number = 1,
+    limit: number = 20,
+  ): Promise<{
+    data: MonitorGetSummaryDto[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    const offset = (page - 1) * limit;
+
+    const [monitors, total] = await this.prisma.getClient().$transaction([
+      this.prisma.getClient().monitor.findMany({
+        skip: limit > 0 ? offset : undefined,
+        take: limit > 0 ? limit : undefined,
+        where: {
+          OR: [
+            {
+              user: {
+                userProfile: {
+                  firstName: { contains: query, mode: 'insensitive' },
+                },
+              },
+            },
+            {
+              user: {
+                userProfile: {
+                  lastName: { contains: query, mode: 'insensitive' },
+                },
+              },
+            },
+            {
+              user: {
+                email: { contains: query, mode: 'insensitive' },
+              },
+            },
+            {
+              user: {
+                userProfile: {
+                  phone: { contains: query, mode: 'insensitive' },
+                },
+              },
+            },
+            {
+              classes: {
+                name: { contains: query, mode: 'insensitive' },
+              },
+            },
+          ],
+          user: {
+            isActive: true,
+          },
+        },
+        include: {
+          user: {
+            include: {
+              userProfile: true,
+            },
+          },
+          classes: {
+            select: {
+              name: true,
+              shift: {
+                select: {
+                  name: true
+                }
+              }
+            },
+          },
+        },
+      }),
+      this.prisma.getClient().monitor.count({
+        where: {
+          OR: [
+            {
+              user: {
+                userProfile: {
+                  firstName: { contains: query, mode: 'insensitive' },
+                },
+              },
+            },
+            {
+              user: {
+                userProfile: {
+                  lastName: { contains: query, mode: 'insensitive' },
+                },
+              },
+            },
+            {
+              user: {
+                email: { contains: query, mode: 'insensitive' },
+              },
+            },
+            {
+              user: {
+                userProfile: {
+                  phone: { contains: query, mode: 'insensitive' },
+                },
+              },
+            },
+            {
+              classes: {
+                name: { contains: query, mode: 'insensitive' },
+              },
+            },
+          ],
+          user: {
+            isActive: true,
+          },
+        },
+      }),
+    ]);
+
+    const data = monitors.map((monitor) =>
+      plainToInstance(MonitorGetSummaryDto, {
+        id: monitor.id,
+        firstName: monitor.user?.userProfile?.firstName || '',
+        lastName: monitor.user?.userProfile?.lastName || '',
+        email: monitor.user?.email || '',
+        phone: monitor.user?.userProfile?.phone || '',
+        className: monitor.classes?.name || '',
+        shift: monitor.classes?.shift?.name || '',
+      }),
+    );
+
     return { data, total, page, limit };
   }
 

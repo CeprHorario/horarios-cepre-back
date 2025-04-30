@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '@database/prisma/prisma.service';
 import { SupervisorBaseDto } from './dto';
 import { plainToInstance } from 'class-transformer';
@@ -9,6 +9,7 @@ import { Role } from '@modules/auth/decorators/authorization.decorator';
 import { UpdateSupervisorWithProfileDto } from './dto/update-supervisor-with-profile.dto';
 import { SupervisorGetSummaryDto } from './dto/supervisor-get-summary.dto';
 import { AssignMonitorDto } from './dto/assign-monitor.dto';
+import { SupervisorGetByIdDto } from './dto/supervisor-get-by-id.dto';
 
 @Injectable()
 export class SupervisorService {
@@ -77,12 +78,12 @@ export class SupervisorService {
           users: {
             select: {
               isActive: true,
-              email: true,
               userProfile: {
                 select: {
                   firstName: true,
                   lastName: true,
                   phone: true,
+                  personalEmail: true,
                 },
               },
             },
@@ -101,7 +102,7 @@ export class SupervisorService {
         shiftId: supervisor.shiftId || null, // Mapear shiftId
         firstName: supervisor.users?.userProfile?.firstName || '',
         lastName: supervisor.users?.userProfile?.lastName || '',
-        email: supervisor.users?.email || null,
+        personalEmail: supervisor.users?.userProfile?.personalEmail || null,
         phone: supervisor.users?.userProfile?.phone || null,
       }),
     );
@@ -109,21 +110,88 @@ export class SupervisorService {
     return { data, total, page, limit };
   }
 
-  async findOne(id: string): Promise<SupervisorBaseDto> {
-    const supervisor = await this.prisma.getClient().supervisor.findUnique({
-      where: { id },
-      include: { users: true }, // Incluye la relación con el usuario
-    });
-    if (!supervisor) {
-      throw new NotFoundException(`Supervisor with ID ${id} not found`);
+  async findOne(id: string): Promise<SupervisorGetByIdDto> {
+    try {
+      const supervisor = await this.prisma.getClient().supervisor.findUnique({
+        where: { id },
+        include: {
+          shift: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          users: {
+            select: {
+              email: true,
+              userProfile: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                  personalEmail: true,
+                  phone: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (!supervisor) {
+        throw new NotFoundException('Supervisor no encontrado');
+      }
+
+      return plainToInstance(SupervisorGetByIdDto, {
+        supervisorId: supervisor.id,
+        shiftId: supervisor.shiftId || null,
+        shiftName: supervisor.shift?.name || null,
+        firstName: supervisor.users?.userProfile?.firstName || '',
+        lastName: supervisor.users?.userProfile?.lastName || '',
+        email: supervisor.users?.email || null,
+        personalEmail: supervisor.users?.userProfile?.personalEmail || null,
+        phone: supervisor.users?.userProfile?.phone || null,
+      });
+
+
+    } catch (error) {
+      if (
+          error instanceof NotFoundException ||
+          error instanceof BadRequestException
+        ) {
+            throw error;
+        }
+        console.error('Error en findOne:', error); // Agregar un log para depuración
+        throw new Error('Ocurrió un error inesperado al buscar el profesor');
     }
-    return this.mapToSupervisorDto(supervisor);
   }
 
   async update(
     id: string,
     updateSupervisorDto: UpdateSupervisorWithProfileDto,
   ): Promise<SupervisorGetSummaryDto> {
+    // 1. Verificar solo el email personal si está presente
+    if (updateSupervisorDto.personalEmail) {
+      const existingUser = await this.prisma.getClient().user.findFirst({
+        where: {
+          userProfile: {
+            personalEmail: updateSupervisorDto.personalEmail
+          },
+          NOT: {
+            supervisor: {
+              id: id // Excluye al propio supervisor que se está actualizando
+            }
+          }
+        },
+        include: {
+          userProfile: true
+        }
+      });
+  
+      if (existingUser) {
+        throw new ConflictException('El correo electrónico personal ya está en uso por otro usuario');
+      }
+    }
+    // 2. Actualizar el supervisor
     const supervisor = await this.prisma.getClient().supervisor.update({
       where: { id },
       data: {
@@ -133,8 +201,8 @@ export class SupervisorService {
               update: {
                 firstName: updateSupervisorDto.firstName,
                 lastName: updateSupervisorDto.lastName,
-                personalEmail: updateSupervisorDto.personalEmail,
                 phone: updateSupervisorDto.phone,
+                personalEmail: updateSupervisorDto.personalEmail,
               },
             },
           },
@@ -155,12 +223,11 @@ export class SupervisorService {
         },
       },
     });
-
     return plainToInstance(SupervisorGetSummaryDto, {
       id: supervisor.id,
+      emailPersonal: supervisor.users?.userProfile?.personalEmail || null,
       firstName: supervisor.users?.userProfile?.firstName || '',
       lastName: supervisor.users?.userProfile?.lastName || '',
-      personalEmail: supervisor.users?.userProfile?.personalEmail || null,
       phone: supervisor.users?.userProfile?.phone || null,
     });
   }
@@ -197,6 +264,7 @@ export class SupervisorService {
           select: {
             name: true,
             urlMeet: true,
+            urlClassroom: true,
           },
         },
       },
@@ -344,11 +412,9 @@ export class SupervisorService {
       },
       },
     });
-
     if (!supervisor) {
       throw new NotFoundException('Supervisor no encontrado');
     }
-
     // Luego obtenemos los monitores asignados
     const monitors = await this.prisma.getClient().monitor.findMany({
       where: {
@@ -357,8 +423,32 @@ export class SupervisorService {
         },
       },
       include: {
+        classes: {
+          select: {
+            name: true,
+            urlMeet: true,
+            shift: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+            area: {
+              select: {
+                id: true,
+                name: true,
+              },
+            }
+          },
+        },
         user: {
           select: {
+            userProfile: {
+              select: {
+                firstName: true,
+                lastName: true,
+              },
+            },
             email: true
           }
         }
@@ -371,7 +461,14 @@ export class SupervisorService {
       email: supervisor.users.email,
       shift_id: supervisor.shiftId,
       monitores_asignados: monitors.map(monitor => ({
-        monitor_id: monitor.id,
+        monitorId: monitor.id,
+        className: monitor.classes?.name || 'no asignada',
+        shiftId: monitor.classes?.shift?.id || 0,
+        shiftName: monitor.classes?.shift?.name || 'no asignado',
+        areaId: monitor.classes?.area?.id || 0,
+        areaName: monitor.classes?.area?.name || 'no asignado',
+        firstName: monitor.user.userProfile?.firstName || 'no asignado',
+        lastName: monitor.user.userProfile?.lastName || 'no asignado',
         email: monitor.user.email
       }))
     };

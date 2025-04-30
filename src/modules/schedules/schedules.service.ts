@@ -5,6 +5,8 @@ import { plainToInstance } from 'class-transformer';
 import { LoadScheduleDto } from './dto';
 import { Prisma, Weekday } from '@prisma/client';
 import { Role } from '@modules/auth/decorators/authorization.decorator';
+import { Weekday } from '@prisma/client';
+
 
 @Injectable()
 export class ScheduleService {
@@ -144,154 +146,245 @@ export class ScheduleService {
     return plainToInstance(ScheduleBaseDto, obj);
   }
 
-
-  async assignTeacherToSchedules(
-    classroomIds: string[], 
-    teacherId: string 
-  ) {
+  async assignTeacherToSchedules(classroomIds: string[], teacherId: string) {
     const teacher = await this.prisma.getClient().teacher.findUnique({
       where: { id: teacherId },
-      include: { schedules: true, courses: true }
+      include: { schedules: true, courses: true },
     });
-  
+
     if (!teacher) {
       throw new Error('Profesor no encontrado');
     }
-  
+
     const { scheduledHours, maxHours, courseId } = teacher;
-  
+
     if (maxHours === null || scheduledHours >= maxHours) {
       throw new Error('El profesor ha alcanzado su límite de horas');
     }
-  
+
     const schedulesToAssign = await this.prisma.getClient().schedule.findMany({
       where: {
-        classId: { in: classroomIds }, 
+        classId: { in: classroomIds },
         courseId: courseId,
-        teacherId: null, 
+        teacherId: null,
       },
     });
-  
+
     if (schedulesToAssign.length === 0) {
-      throw new Error('No hay horarios disponibles para este curso y estos salones');
+      throw new Error(
+        'No hay horarios disponibles para este curso y estos salones',
+      );
     }
-  
+
     const totalHoursToAdd = schedulesToAssign.length;
     const newTotalScheduledHours = scheduledHours + totalHoursToAdd;
-  
+
     if (newTotalScheduledHours > maxHours) {
-      throw new Error('El profesor no tiene suficiente capacidad para asumir estos horarios');
+      throw new Error(
+        'El profesor no tiene suficiente capacidad para asumir estos horarios',
+      );
     }
-  
-    const updatedSchedules = await this.prisma.getClient().$transaction(async (prisma) => {
-      const updatedSchedules = await prisma.schedule.updateMany({
-        where: {
-          id: { in: schedulesToAssign.map(schedule => schedule.id) }
-        },
-        data: { teacherId: teacher.id }
+
+    const updatedSchedules = await this.prisma
+      .getClient()
+      .$transaction(async (prisma) => {
+        const updatedSchedules = await prisma.schedule.updateMany({
+          where: {
+            id: { in: schedulesToAssign.map((schedule) => schedule.id) },
+          },
+          data: { teacherId: teacher.id },
+        });
+
+        await prisma.teacher.update({
+          where: { id: teacher.id },
+          data: {
+            scheduledHours: newTotalScheduledHours,
+          },
+        });
+
+        return updatedSchedules;
       });
-  
-      await prisma.teacher.update({
-        where: { id: teacher.id },
-        data: {
-          scheduledHours: newTotalScheduledHours
-        }
-      });
-  
-      return updatedSchedules;
-    });
-  
+
     return updatedSchedules;
   }
-  
-  
+
+  async unassignTeacherFromSchedules(
+    classroomIds: string[],
+    teacherId: string,
+  ) {
+    // Primero verificamos que el profesor exista
+    const teacher = await this.prisma.getClient().teacher.findUnique({
+      where: { id: teacherId },
+    });
+
+    if (!teacher) {
+      throw new Error('Profesor no encontrado');
+    }
+
+    // Obtenemos los horarios que coinciden con los IDs de clase y el profesor especificado
+    const schedulesToUnassign = await this.prisma
+      .getClient()
+      .schedule.findMany({
+        where: {
+          classId: { in: classroomIds },
+          teacherId: teacherId, // Solo los horarios del profesor especificado
+        },
+      });
+
+    if (schedulesToUnassign.length === 0) {
+      throw new Error(
+        'No hay horarios asignados a este profesor en los salones especificados',
+      );
+    }
+
+    const totalHoursToRemove = schedulesToUnassign.length;
+
+    // Realizamos las actualizaciones en una transacción
+    const updatedSchedules = await this.prisma
+      .getClient()
+      .$transaction(async (prisma) => {
+        // Actualizamos los horarios para quitar el profesor
+        const updatedSchedules = await prisma.schedule.updateMany({
+          where: {
+            id: { in: schedulesToUnassign.map((schedule) => schedule.id) },
+            teacherId: teacherId, // Aseguramos que solo se desasignen los del profesor indicado
+          },
+          data: { teacherId: null },
+        });
+
+        // Actualizamos las horas programadas del profesor
+        const currentTeacher = await prisma.teacher.findUnique({
+          where: { id: teacherId },
+          select: { scheduledHours: true },
+        });
+
+        if (currentTeacher) {
+          const newScheduledHours = Math.max(
+            0,
+            currentTeacher.scheduledHours - totalHoursToRemove,
+          );
+          await prisma.teacher.update({
+            where: { id: teacherId },
+            data: { scheduledHours: newScheduledHours },
+          });
+        }
+
+        return updatedSchedules;
+      });
+
+    return updatedSchedules;
+  }
 
   async findAvailableClassrooms(
     id_course: number,
     horario: Array<{ id_hour_session: number; weekday: Weekday }>,
-    id_teacher?: string,
     page: number = 1,
-    pageSize: number = 10
+    pageSize: number = 10,
+    areaId?: number,
+    shiftId?: number,
   ) {
-    const allClassroomsInAreas = await this.prisma.getClient().class.findMany({
-      where: {
-        schedules: {
-          some: {
-            courseId: id_course, 
-          },
+    const availableTimeSlots = new Set(
+      horario.map((slot) => `${slot.id_hour_session}-${slot.weekday}`),
+    );
+
+    const classroomFilter: any = {
+      schedules: {
+        some: {
+          courseId: id_course,
         },
       },
+      ...(areaId ? { areaId } : {}),
+      ...(shiftId ? { shiftId } : {}),
+    };
+
+    const allClassroomsInAreas = await this.prisma.getClient().class.findMany({
+      where: classroomFilter,
       select: { id: true },
     });
-  
-    const allClassroomIds = allClassroomsInAreas.map((classroom) => classroom.id);
-  
+
+    const allClassroomIds = allClassroomsInAreas.map((c) => c.id);
+
     if (allClassroomIds.length === 0) {
-      return []; 
+      return [];
     }
 
-    const conflictConditions: Prisma.ScheduleWhereInput[] = horario.flatMap((slot) => {
-      const conditions: Prisma.ScheduleWhereInput[] = [
-        {
-          hourSessionId: slot.id_hour_session,
-          weekday: slot.weekday,
-          courseId: id_course,
-          teacherId: null,  
-        },
-      ];
-  
-      if (id_teacher) {
-        conditions.push({
-          hourSessionId: slot.id_hour_session,
-          weekday: slot.weekday,
-          teacherId: id_teacher,
-        });
-      }
-  
-      return conditions;
-    });
-  
-    const conflictingSchedules = await this.prisma.getClient().schedule.findMany({
+    const courseSchedules = await this.prisma.getClient().schedule.findMany({
       where: {
         classId: { in: allClassroomIds },
-        OR: conflictConditions,
+        courseId: id_course,
+        teacherId: null,
       },
-      select: { classId: true },
+      select: {
+        id: true,
+        classId: true,
+        hourSessionId: true,
+        weekday: true,
+      },
     });
-  
-    const conflictingClassroomIds = conflictingSchedules.map((schedule) => schedule.classId);
+
+    const schedulesByClassroom = new Map<
+      string,
+      { hourSessionId: number; weekday: Weekday }[]
+    >();
+
+    for (const schedule of courseSchedules) {
+      if (!schedulesByClassroom.has(schedule.classId)) {
+        schedulesByClassroom.set(schedule.classId, []);
+      }
+      schedulesByClassroom.get(schedule.classId)!.push({
+        hourSessionId: schedule.hourSessionId,
+        weekday: schedule.weekday,
+      });
+    }
+
+    const matchingClassroomIds: string[] = [];
+
+    for (const [classId, slots] of schedulesByClassroom.entries()) {
+      const allSlotsAvailable = slots.every((slot) =>
+        availableTimeSlots.has(`${slot.hourSessionId}-${slot.weekday}`),
+      );
+
+      if (allSlotsAvailable) {
+        matchingClassroomIds.push(classId);
+      }
+    }
+
     const startIndex = (page - 1) * pageSize;
-    const paginatedClassroomIds = conflictingClassroomIds.slice(startIndex, startIndex + pageSize);
-  
+    const paginatedClassroomIds = matchingClassroomIds.slice(
+      startIndex,
+      startIndex + pageSize,
+    );
+
+    if (paginatedClassroomIds.length === 0) {
+      return [];
+    }
 
     const classrooms = await this.prisma.getClient().class.findMany({
       where: {
-      id: { in: paginatedClassroomIds },
+        id: { in: paginatedClassroomIds },
       },
       include: {
-      sede: true,
-      shift: true,
-      schedules: {
-        where: {
-        courseId: id_course,
-        teacherId: null,
-        },
-        select: {
-        hourSession: {
+        sede: true,
+        shift: true,
+        schedules: {
+          where: {
+            courseId: id_course,
+            teacherId: null,
+          },
           select: {
-          id: true,
-          startTime: true,
-          endTime: true,
+            hourSession: {
+              select: {
+                id: true,
+                startTime: true,
+                endTime: true,
+              },
+            },
+            weekday: true,
           },
         },
-        weekday: true,
-        },
-      },
       },
     });
-  
+
     return classrooms;
   }
-  
-
 }
