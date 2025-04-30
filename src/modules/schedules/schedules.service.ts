@@ -1,12 +1,14 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '@database/prisma/prisma.service';
 import { ScheduleBaseDto, CreateScheduleDto, UpdateScheduleDto } from './dto';
 import { plainToInstance } from 'class-transformer';
 import { LoadScheduleDto } from './dto';
-import { Prisma, Weekday } from '@prisma/client';
-import { Role } from '@modules/auth/decorators/authorization.decorator';
 import { Weekday } from '@prisma/client';
-
+import { Role } from '@modules/auth/decorators/authorization.decorator';
 
 @Injectable()
 export class ScheduleService {
