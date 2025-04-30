@@ -38,6 +38,20 @@ export class ScheduleController {
     return this.scheduleService.loadWithCourses(data);
   }
 
+  @Get('public/teachers')
+  @HttpCode(HttpStatus.OK)
+  @Unauthenticated()
+  @ApiOperation({
+    summary: 'Obtener horarios públicos por profesor',
+    description: 'Get public schedules by teacher',
+  })
+  async getPublicScheduleByTeacher(
+    @Query('email') email: string,
+    @Query('dni') dni: string,
+  ) {
+    return await this.scheduleService.getPublicScheduleByTeacher(email, dni);
+  }
+
   // ─────── CRUD ───────
   @Post()
   @HttpCode(HttpStatus.CREATED)

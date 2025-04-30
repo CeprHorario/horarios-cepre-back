@@ -10,6 +10,7 @@ import {
   integer,
   boolean,
   check,
+  date,
 } from 'drizzle-orm/pg-core';
 import { relations, sql } from 'drizzle-orm';
 
@@ -21,6 +22,8 @@ export const admissionProcesses = pgTable(
     name: varchar('name', { length: 48 }).notNull(),
     year: smallint('year').notNull(),
     isCurrent: boolean('is_current').default(true).notNull(),
+    started: date('started').defaultNow().notNull(),
+    finished: date('finished').defaultNow().notNull(),
     description: varchar('description', { length: 255 }),
     createdAt: timestamp('created_at').defaultNow().notNull(),
   },

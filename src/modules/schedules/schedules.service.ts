@@ -1,9 +1,12 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@database/prisma/prisma.service';
 import { ScheduleBaseDto, CreateScheduleDto, UpdateScheduleDto } from './dto';
 import { plainToInstance } from 'class-transformer';
 import { LoadScheduleDto } from './dto';
+import { Prisma, Weekday } from '@prisma/client';
+import { Role } from '@modules/auth/decorators/authorization.decorator';
 import { Weekday } from '@prisma/client';
+
 
 @Injectable()
 export class ScheduleService {
@@ -23,6 +26,72 @@ export class ScheduleService {
     };
     console.log(result);
     return data;
+  }
+
+  async getPublicScheduleByTeacher(email: string, dni: string) {
+    console.log('email', email);
+    console.log('dni', dni);
+    if (!(email && dni)) {
+      throw new NotFoundException('Se debe proporcionar un email o un DNI');
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const isEmailValid = email ? emailRegex.test(email) : false;
+    const isDniValid = dni ? dni.length >= 8 : false;
+    if (!(isEmailValid && isDniValid)) {
+      throw new BadRequestException(
+        'Se debe proporcionar un email válido o un DNI con al menos 8 caracteres',
+      );
+    }
+    const user = await this.prisma.getClient().user.findFirst({
+      where: {
+        AND: [
+          { email, role: Role.TEACHER, isActive: true },
+          { userProfile: { dni } },
+        ],
+      },
+      select: {
+        teacher: {
+          select: {
+            courses: {
+              select: { name: true },
+            },
+            schedules: {
+              select: {
+                clas: {
+                  select: { name: true, shift: { select: { name: true } } },
+                },
+                weekday: true,
+                hourSession: { select: { startTime: true, endTime: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('Profesor no encontrado');
+    }
+    const parsedHoraMinutoUTC = (value: string | Date): string => {
+      const date = new Date(value);
+      const hours = String(date.getUTCHours()).padStart(2, '0');
+      const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+      return `${hours}:${minutes}`;
+    };
+
+    return {
+      curso: user?.teacher?.courses.name,
+      horarios: user?.teacher?.schedules.map((schedule) => {
+        return {
+          turno: schedule.clas.shift.name,
+          dia: schedule.weekday,
+          clase: schedule.clas.name,
+          hora_inicio: parsedHoraMinutoUTC(schedule.hourSession.startTime),
+          hora_fin: parsedHoraMinutoUTC(schedule.hourSession.endTime),
+        };
+      }),
+    };
   }
 
   // ─────── CRUD ───────
