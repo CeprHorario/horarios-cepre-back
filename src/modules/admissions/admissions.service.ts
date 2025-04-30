@@ -101,6 +101,9 @@ export class AdmissionsService {
           },
         },
       },
+      orderBy: (admissionProcesses, { desc }) => [
+        desc(admissionProcesses.createdAt),
+      ],
     });
     return obj.map((item) =>
       plainToInstance(AdmissionBaseDto, item, {
