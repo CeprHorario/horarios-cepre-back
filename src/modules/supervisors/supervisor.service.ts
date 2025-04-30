@@ -77,6 +77,7 @@ export class SupervisorService {
           shiftId: true,
           users: {
             select: {
+              email: true,
               isActive: true,
               userProfile: {
                 select: {
@@ -103,6 +104,7 @@ export class SupervisorService {
         firstName: supervisor.users?.userProfile?.firstName || '',
         lastName: supervisor.users?.userProfile?.lastName || '',
         personalEmail: supervisor.users?.userProfile?.personalEmail || null,
+        email: supervisor.users?.email || null,
         phone: supervisor.users?.userProfile?.phone || null,
       }),
     );

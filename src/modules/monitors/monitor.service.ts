@@ -100,6 +100,7 @@ export class MonitorService {
         firstName: monitor.user?.userProfile?.firstName || '',
         lastName: monitor.user?.userProfile?.lastName || '',
         personalEmail: monitor.user?.userProfile?.personalEmail || '',
+        email: monitor.user?.email || '',
         phone: monitor.user?.userProfile?.phone || '',
         className: monitor.classes?.name || '',
         shift: monitor.classes?.shift?.name || '',
