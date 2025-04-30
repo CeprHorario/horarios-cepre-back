@@ -22,7 +22,7 @@ const runMigrations = async () => {
     console.log('Migrations applied successfully.\n');
 
     // Ejecutar el archivo SQL después de la primera migración
-    const sqlFilePath = join(
+    /* const sqlFilePath = join(
       __dirname,
       'sql/trigger_process_admission.sql', // Ruta al archivo SQL
     );
@@ -32,7 +32,7 @@ const runMigrations = async () => {
       console.log('\nStored procedures executed successfully.');
     } else {
       console.error('Error: No se encontró el archivo SQL en', sqlFilePath);
-    }
+    } */
   } catch (err) {
     console.error('Error during migration:', err);
   } finally {
