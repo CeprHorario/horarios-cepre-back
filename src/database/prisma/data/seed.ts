@@ -33,28 +33,31 @@ import {
   validateShiftTimes,
 } from './utils';
 
-const pool = (schema: string): Pool => {
-  return new Pool({
-    connectionString: `${process.env.DATABASE_URL}`,
-    options: `-c search_path=${schema}`,
-  });
-};
-
 export const initialDataSchema = async (
   schema: string,
   config: ConfigurationDto,
 ): Promise<boolean> => {
-  const db = await pool(schema).connect();
-  // Start a transaction
-  await db.query('BEGIN');
+  // Create a new pool connection to the database
+  const pool = new Pool({
+    connectionString: `${process.env.DATABASE_URL}`,
+  });
+  const db = await pool.connect();
+
+  // Create data in schema new
+  const sql = await fs.readFile(
+    './src/database/drizzle/sql/schema.sql',
+    'utf8',
+  );
 
   try {
-    // Create data in schema new
-    const sql = await fs.readFile(
-      './src/database/drizzle/sql/schema.sql',
-      'utf8',
-    );
-    await db.query(sql);
+    // Start a transaction
+    await db.query('BEGIN');
+
+    // 0: Set the search path to the new schema and migrate the database
+    await db.query(`
+      SET search_path TO ${schema};
+      ${sql}
+      `);
 
     // 1: Create the basic data in the database
     const { areas, shifts, sedes, hourSessions, courses } =
@@ -84,6 +87,7 @@ export const initialDataSchema = async (
     throw new Error(error as string);
   } finally {
     db.release();
+    await pool.end();
   }
 
   return true;
