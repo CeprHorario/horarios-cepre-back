@@ -1,0 +1,55 @@
+{
+  "users": [
+    {
+      "email": "sistema.horarios@cepr.unsa.pe",
+      "role": "administrador"
+    },
+    {
+      "email": "christian.sullca@cepr.unsa.pe",
+      "role": "administrador"
+    },
+    {
+      "email": "christiandsp28@gmail.com",
+      "role": "administrador"
+    },
+    {
+      "email": "supervision.academica@cepr.unsa.pe",
+      "role": "administrador"
+    },
+    {
+      "email": "eventos.ceprunsa@unsa.edu.pe",
+      "role": "administrador"
+    }
+  ],
+  "areas": [
+    {
+      "name": "Biomédicas",
+      "description": "Área de Biomédicas"
+    },
+    {
+      "name": "Ingenierías",
+      "description": "Área de Ingenierías"
+    },
+    {
+      "name": "Sociales",
+      "description": "Área de Sociales"
+    }
+  ],
+  "sedes": [
+    {
+      "name": "Sede Virtual",
+      "description": "Sede Virtual de CEPRUNSA"
+    }
+  ],
+  "shifts": [
+    {
+      "name": "Turno 1"
+    },
+    {
+      "name": "Turno 2"
+    },
+    {
+      "name": "Turno 3"
+    }
+  ]
+}

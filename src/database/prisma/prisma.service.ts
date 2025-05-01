@@ -3,12 +3,8 @@ import { PrismaClient } from '@prisma/client';
 import { PrismaClientFactory } from './prisma-client.factory';
 import { AsyncLocalStorage } from 'async_hooks';
 
-import {
-  initialCourses,
-  initialUsers,
-  initalSedes,
-  initialAreas,
-} from './data/seed-data-initial';
+import { initialDataSchema } from './data/seed';
+import { ConfigurationDto } from '@modules/admissions/dto/create-admission.dto';
 
 @Injectable()
 export class PrismaService {
@@ -26,14 +22,13 @@ export class PrismaService {
     return await this.factory.setMainClient(schema);
   }
 
-  async migrationInitialSchema(schema: string): Promise<void> {
-    const client: PrismaClient = await this.setMainClient(schema);
-    // Realizamos las migraciones iniciales
-    await client.$transaction([
-      client.course.createMany({ data: initialCourses }),
-      client.user.createMany({ data: initialUsers }),
-      client.area.createMany({ data: initialAreas }),
-      client.sede.createMany({ data: initalSedes }),
-    ]);
+  async migrationInitialSchema(
+    schema: string,
+    conf: ConfigurationDto,
+  ): Promise<void> {
+    // 1: Realizamos las migraciones iniciales
+    const success = await initialDataSchema(schema, conf);
+    // 2: Establecemos el cliente principal para el nuevo esquema
+    if (success) await this.setMainClient(schema);
   }
 }

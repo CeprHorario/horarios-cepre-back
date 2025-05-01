@@ -22,10 +22,10 @@ export const admissionProcesses = pgTable(
     name: varchar('name', { length: 48 }).notNull(),
     year: smallint('year').notNull(),
     isCurrent: boolean('is_current').default(true).notNull(),
-    started: date('started').defaultNow().notNull(),
-    finished: date('finished').defaultNow().notNull(),
+    started: date('started', { mode: 'date' }).defaultNow().notNull(),
+    finished: date('finished', { mode: 'date' }).defaultNow().notNull(),
     description: varchar('description', { length: 255 }),
-    createdAt: timestamp('created_at').defaultNow().notNull(),
+    createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
   },
   (table) => [
     uniqueIndex('admission_process_name_unique').on(table.name),
@@ -45,7 +45,7 @@ export const admissionProcessesRelations = relations(
 export const observations = pgTable('observations', {
   id: serial('id').primaryKey(),
   description: varchar('description', { length: 500 }),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
+  createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
   admissionProcessId: smallserial('admission_process_id')
     .notNull()
     .references(() => admissionProcesses.id, { onDelete: 'cascade' }),
@@ -66,7 +66,9 @@ export const roles = pgTable(
     id: smallserial('id').primaryKey(),
     name: varchar('name', { length: 48 }).notNull(),
     description: varchar('description', { length: 255 }),
-    createdAt: timestamp('created_at', { precision: 3 }).defaultNow().notNull(),
+    createdAt: timestamp('created_at', { precision: 3, mode: 'date' })
+      .defaultNow()
+      .notNull(),
   },
   (table) => [uniqueIndex('role_name_unique').on(table.name)],
 );
@@ -83,8 +85,12 @@ export const permissions = pgTable('permissions', {
   path: varchar('path', { length: 128 }).notNull(),
   methodHttp: varchar('method_http', { length: 16 }).notNull(),
   description: varchar('description', { length: 255 }),
-  createdAt: timestamp('created_at', { precision: 3 }).defaultNow().notNull(),
-  updatedAt: timestamp('updated_at', { precision: 3 }).defaultNow().notNull(),
+  createdAt: timestamp('created_at', { precision: 3, mode: 'date' })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp('updated_at', { precision: 3, mode: 'date' })
+    .defaultNow()
+    .notNull(),
 });
 
 // Relaciones para Permission
@@ -102,7 +108,9 @@ export const rolesPermissions = pgTable(
     permissionId: integer('permission_id')
       .notNull()
       .references(() => permissions.id, { onDelete: 'cascade' }),
-    createdAt: timestamp('created_at', { precision: 3 }).defaultNow().notNull(),
+    createdAt: timestamp('created_at', { precision: 3, mode: 'date' })
+      .defaultNow()
+      .notNull(),
   },
   (table) => [
     primaryKey({ columns: [table.roleId, table.permissionId] }),
