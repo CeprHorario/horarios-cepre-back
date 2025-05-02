@@ -294,94 +294,137 @@ export class TeacherService {
   }
 
   async createManyTeachers(dtos: CreateTeacherDto[]) {
+
+    type UserWithRelations = Prisma.UserGetPayload<{
+      include: {
+        teacher: true;
+        userProfile: true;
+      }
+    }>;
+
+    const validDtos = dtos.map(dto => ({
+      ...dto,
+      phonesAdditional: dto.phonesAdditional ?? [],
+      personalEmail: dto.personalEmail ?? null,
+      isCoordinator: dto.isCoordinator ?? false
+    }));
     const prisma = this.prisma.getClient();
-  
-    const existingUsers = await prisma.user.findMany({
-      where: {
-        email: {
-          in: dtos.map((dto) => dto.email),
+
+    const [existingUsers, existingProfiles] = await Promise.all([
+      prisma.user.findMany({
+        where: {
+          email: {
+            in: validDtos.map((dto) => dto.email),
+          },
         },
-      },
-      select: { email: true },
-    });
+        select: { email: true },
+      }),
+      prisma.userProfile.findMany({
+        where: {
+          dni: {
+            in: validDtos.map((dto) => dto.dni),
+          },
+        },
+        select: { dni: true },
+      }),
+    ]);
   
     const existingEmails = new Set(existingUsers.map((u) => u.email));
-  
-    const duplicated = dtos.filter((dto) => existingEmails.has(dto.email));
-    const toCreate = dtos.filter((dto) => !existingEmails.has(dto.email));
+    const existingDnis = new Set(existingProfiles.map((p) => p.dni));
+
+    const duplicated = validDtos.filter((dto) => 
+      existingEmails.has(dto.email) || existingDnis.has(dto.dni)
+    );
+    const toCreate = validDtos.filter((dto) => 
+      !existingEmails.has(dto.email) && !existingDnis.has(dto.dni)
+    );
   
     if (toCreate.length === 0) {
       return {
         creados: [],
-        noCreados: duplicated.map((d) => ({ email: d.email, dni: d.dni })),
+        noCreados: duplicated.map((d) => ({ 
+          email: d.email, 
+          dni: d.dni,
+          motivo: existingEmails.has(d.email) ? 'email duplicado' : 'dni duplicado'
+        })),
       };
     }
   
     try {
-      const result = await prisma.$transaction(
-        toCreate.map((dto) => {
-          const { jobStatus, courseId, isCoordinator } = dto;
+      const createData = toCreate.map((dto) => {
+        const { jobStatus, courseId, isCoordinator, email, dni, firstName, lastName, phone, phonesAdditional, personalEmail } = dto;
+        
+        // Calculate maxHours based on rules
+        let maxHours: number;
+        if (isCoordinator) {
+          maxHours = jobStatus === 'FullTime' ? 12 : 16;
+        } else if (courseId === 12) {
+          maxHours = jobStatus === 'FullTime' ? 16 : 21;
+        } else {
+          maxHours = jobStatus === 'FullTime' ? 16 : 20;
+        }
   
-          let maxHours: number;
-  
-          if (isCoordinator) {
-            // Reglas para coordinadores
-            if (jobStatus === 'FullTime') maxHours = 12;
-            else maxHours = 16;
-          } else if (courseId === 12) {
-            // Reglas para Matemática
-            if (jobStatus === 'FullTime') maxHours = 16;
-            else maxHours = 21;
-          } else {
-            // Reglas generales
-            if (jobStatus === 'FullTime') maxHours = 16;
-            else maxHours = 20;
-          }
-  
-          return prisma.user.create({
-            data: {
-              email: dto.email,
-              role: Role.TEACHER,
-              userProfile: {
-                create: {
-                  dni: dto.dni,
-                  firstName: dto.firstName,
-                  lastName: dto.lastName,
-                  phone: dto.phone,
-                  phonesAdditional: dto.phonesAdditional ?? [],
-                  personalEmail: dto.personalEmail || null,
-                },
-              },
-              teacher: {
-                create: {
-                  courseId,
-                  maxHours,
-                  scheduledHours: 0,
-                  jobStatus,
-                },
-              },
+        return {
+          email,
+          role: Role.TEACHER,
+          userProfile: {
+            create: {
+              dni,
+              firstName,
+              lastName,
+              phone,
+              phonesAdditional: phonesAdditional ?? [],
+              personalEmail: personalEmail ?? null,
             },
-            include: {
-              teacher: true,
-              userProfile: true,
+          },
+          teacher: {
+            create: {
+              courseId,
+              maxHours,
+              scheduledHours: 0,
+              jobStatus,
+              isCoordinator: isCoordinator ?? false,
             },
-          });
-        })
-      );
+          },
+        };
+      });
+
+      const chunkSize = 30; 
+      const results: UserWithRelations[] = [];
+
+      for (let i = 0; i < createData.length; i += chunkSize) {
+        const chunk = createData.slice(i, i + chunkSize);
+        const chunkResults = await prisma.$transaction(
+          chunk.map(userData => 
+            prisma.user.create({
+              data: userData,
+              include: {
+                teacher: true,
+                userProfile: true,
+              },
+            })
+          )
+        );
+        
+        results.push(...chunkResults);
+      }
   
       return {
-        creados: result.map((r) => ({
+        creados: results.map((r) => ({
           email: r.email,
           dni: r.userProfile?.dni,
         })),
-        noCreados: duplicated.map((d) => ({ email: d.email, dni: d.dni })),
+        noCreados: duplicated.map((d) => ({ 
+          email: d.email, 
+          dni: d.dni,
+          motivo: existingEmails.has(d.email) ? 'email duplicado' : 'dni duplicado'
+        })),
       };
     } catch (error) {
       console.error('Error al crear usuarios:', error);
       throw new Error('Error creando profesores. No se creó ningún profesor.');
     }
   }
-  
   
   async deactivate(id: string) {
     const teacher = await this.prisma.getClient().teacher.findUnique({

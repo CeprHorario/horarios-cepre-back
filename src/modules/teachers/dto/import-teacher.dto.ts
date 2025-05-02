@@ -33,7 +33,7 @@ export class CreateTeacherDto {
   @IsOptional()
   @IsString()
   @MaxLength(10)
-  dni?: string;
+  dni: string;
 
   @ApiProperty({ example: '987654321', required: false })
   @IsOptional()
