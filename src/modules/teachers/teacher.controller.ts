@@ -197,7 +197,7 @@ export class TeacherController {
   delete(@Param('id') id: string) {
     return this.teacherService.delete(id);
   }
-
+  
   @Post('json')
   @Authorization({
     permission: 'teacher.importjson',
