@@ -31,6 +31,7 @@ import {
 import { TeacherGetByIdDto } from './dto/teacher-get-by-id.dto';
 import { ScheduleTeacherDto } from './dto/schedule-teacher.dto';
 import { TeacherFilteredDto } from '@modules/teachers/dto/teacherFiltered.dto';
+import { Unauthenticated } from '@modules/auth/decorators/unauthenticated.decorator';
 
 @ApiTags('Teachers')
 @Controller('teachers')
@@ -198,6 +199,7 @@ export class TeacherController {
     return this.teacherService.delete(id);
   }
 
+  @Unauthenticated()
   @Post('json')
   @Authorization({
     permission: 'teacher.importjson',

@@ -319,8 +319,26 @@ export class TeacherService {
   
     try {
       const result = await prisma.$transaction(
-        toCreate.map((dto) =>
-          prisma.user.create({
+        toCreate.map((dto) => {
+          const { jobStatus, courseId, isCoordinator } = dto;
+  
+          let maxHours: number;
+  
+          if (isCoordinator) {
+            // Reglas para coordinadores
+            if (jobStatus === 'FullTime') maxHours = 12;
+            else maxHours = 16;
+          } else if (courseId === 12) {
+            // Reglas para Matemática
+            if (jobStatus === 'FullTime') maxHours = 16;
+            else maxHours = 21;
+          } else {
+            // Reglas generales
+            if (jobStatus === 'FullTime') maxHours = 16;
+            else maxHours = 20;
+          }
+  
+          return prisma.user.create({
             data: {
               email: dto.email,
               role: Role.TEACHER,
@@ -336,10 +354,10 @@ export class TeacherService {
               },
               teacher: {
                 create: {
-                  courseId: dto.courseId,
-                  maxHours: dto.maxHours,
+                  courseId,
+                  maxHours,
                   scheduledHours: 0,
-                  jobStatus: dto.jobStatus,
+                  jobStatus,
                 },
               },
             },
@@ -347,24 +365,23 @@ export class TeacherService {
               teacher: true,
               userProfile: true,
             },
-          }),
-        ),
+          });
+        })
       );
   
       return {
         creados: result.map((r) => ({
           email: r.email,
           dni: r.userProfile?.dni,
-          
         })),
         noCreados: duplicated.map((d) => ({ email: d.email, dni: d.dni })),
       };
     } catch (error) {
       console.error('Error al crear usuarios:', error);
-
       throw new Error('Error creando profesores. No se creó ningún profesor.');
     }
   }
+  
   
   async deactivate(id: string) {
     const teacher = await this.prisma.getClient().teacher.findUnique({

@@ -64,4 +64,10 @@ export class CreateTeacherDto {
   @ApiProperty({ enum: JobStatus, example: JobStatus.FullTime })
   @IsEnum(JobStatus)
   jobStatus: JobStatus;
+
+  @ApiProperty({ example: true, required: false })
+  @IsOptional()
+  @IsNotEmpty()
+  isCoordinator?: boolean;
+
 }
