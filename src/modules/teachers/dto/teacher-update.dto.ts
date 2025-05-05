@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsOptional, IsEnum, IsBoolean } from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsBoolean, IsNumber } from 'class-validator';
 import { JobStatus } from '@prisma/client';
 
 export class TeacherUpdateDto {
@@ -59,4 +59,12 @@ export class TeacherUpdateDto {
   @IsBoolean()
   @IsOptional()
   isCoordinator: boolean;
+
+  @ApiProperty({
+    description: 'Horas máximas de enseñanza',
+    required: false,
+  })
+  @IsOptional()
+  @IsNumber()
+  maxHours?: number;
 }
