@@ -61,4 +61,12 @@ export class TeacherGetSummaryDto {
   })
   @Expose()
   isCoordinator: boolean;
+
+  @ApiProperty({
+    description: 'Horas máximas de enseñanza',
+    nullable: true,
+    example: 20,
+  })
+  @Expose()
+  maxHours: number | null;
 }

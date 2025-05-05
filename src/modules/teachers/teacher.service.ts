@@ -108,6 +108,7 @@ export class TeacherService {
           id: true,
           jobStatus: true,
           isCoordinator: true,
+          maxHours: true,
           courses: {
             select: {
               id: true,
@@ -144,6 +145,7 @@ export class TeacherService {
         phone: teacher.user?.userProfile?.phone || null,
         jobStatus: teacher.jobStatus || '',
         isCoordinator: teacher.isCoordinator || false,
+        maxHours: teacher.maxHours || null,
       }),
     );
 
@@ -228,6 +230,7 @@ export class TeacherService {
       data: {
         jobStatus: updateTeacherDto.jobStatus,
         isCoordinator: updateTeacherDto.isCoordinator,
+        maxHours: updateTeacherDto.maxHours,
         user: {
           update: {
             email: updateTeacherDto.email,
@@ -276,6 +279,7 @@ export class TeacherService {
       phone: teacher.user?.userProfile?.phone || null,
       jobStatus: teacher.jobStatus || '',
       isCoordinator: teacher.isCoordinator || false,
+      maxHours: teacher.maxHours || null,
     });
   }
 
