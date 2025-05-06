@@ -1,0 +1,199 @@
+{
+  "areaCourse": [
+    {
+      "area": "Ingenierías",
+      "hours": [
+        {
+          "course": "Biología",
+          "total": "3"
+        },
+        {
+          "course": "Cívica",
+          "total": "1"
+        },
+        {
+          "course": "Filosofía",
+          "total": "1"
+        },
+        {
+          "course": "Física",
+          "total": "5"
+        },
+        {
+          "course": "Geografía",
+          "total": "2"
+        },
+        {
+          "course": "Historia",
+          "total": "2"
+        },
+        {
+          "course": "Inglés",
+          "total": "2"
+        },
+        {
+          "course": "Lenguaje",
+          "total": "2"
+        },
+        {
+          "course": "Literatura",
+          "total": "1"
+        },
+        {
+          "course": "Matemática",
+          "total": "7"
+        },
+        {
+          "course": "Psicología",
+          "total": "3"
+        },
+        {
+          "course": "Química",
+          "total": "5"
+        },
+        {
+          "course": "Razonamiento Lógico",
+          "total": "2"
+        },
+        {
+          "course": "Razonamiento Matemático",
+          "total": "2"
+        },
+        {
+          "course": "Razonamiento Verbal",
+          "total": "4"
+        }
+      ]
+    },
+    {
+      "area": "Biomédicas",
+      "hours": [
+        {
+          "course": "Biología",
+          "total": "6"
+        },
+        {
+          "course": "Cívica",
+          "total": "1"
+        },
+        {
+          "course": "Filosofía",
+          "total": "1"
+        },
+        {
+          "course": "Física",
+          "total": "3"
+        },
+        {
+          "course": "Geografía",
+          "total": "2"
+        },
+        {
+          "course": "Historia",
+          "total": "3"
+        },
+        {
+          "course": "Inglés",
+          "total": "2"
+        },
+        {
+          "course": "Lenguaje",
+          "total": "2"
+        },
+        {
+          "course": "Literatura",
+          "total": "1"
+        },
+        {
+          "course": "Matemática",
+          "total": "5"
+        },
+        {
+          "course": "Psicología",
+          "total": "3"
+        },
+        {
+          "course": "Química",
+          "total": "5"
+        },
+        {
+          "course": "Razonamiento Lógico",
+          "total": "2"
+        },
+        {
+          "course": "Razonamiento Matemático",
+          "total": "2"
+        },
+        {
+          "course": "Razonamiento Verbal",
+          "total": "4"
+        }
+      ]
+    },
+    {
+      "area": "Sociales",
+      "hours": [
+        {
+          "course": "Biología",
+          "total": "1"
+        },
+        {
+          "course": "Cívica",
+          "total": "2"
+        },
+        {
+          "course": "Filosofía",
+          "total": "2"
+        },
+        {
+          "course": "Física",
+          "total": "1"
+        },
+        {
+          "course": "Geografía",
+          "total": "4"
+        },
+        {
+          "course": "Historia",
+          "total": "5"
+        },
+        {
+          "course": "Inglés",
+          "total": "2"
+        },
+        {
+          "course": "Lenguaje",
+          "total": "6"
+        },
+        {
+          "course": "Literatura",
+          "total": "3"
+        },
+        {
+          "course": "Matemática",
+          "total": "3"
+        },
+        {
+          "course": "Psicología",
+          "total": "4"
+        },
+        {
+          "course": "Química",
+          "total": "1"
+        },
+        {
+          "course": "Razonamiento Lógico",
+          "total": "2"
+        },
+        {
+          "course": "Razonamiento Matemático",
+          "total": "2"
+        },
+        {
+          "course": "Razonamiento Verbal",
+          "total": "4"
+        }
+      ]
+    }
+  ]
+}
