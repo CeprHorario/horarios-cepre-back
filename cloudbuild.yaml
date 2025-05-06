@@ -15,8 +15,8 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     args: [
       'build', 
-      '-t', 'us-central1-docker.pkg.dev/$PROJECT_ID/horarios-repo/horarios-cepre-back:$COMMIT_SHA', 
-      '-t', 'us-central1-docker.pkg.dev/$PROJECT_ID/horarios-repo/horarios-cepre-back:latest', 
+      '-t', 'southamerica-west1-docker.pkg.dev/$PROJECT_ID/horarios-repo/horarios-cepre-back:$COMMIT_SHA', 
+      '-t', 'southamerica-west1-docker.pkg.dev/$PROJECT_ID/horarios-repo/horarios-cepre-back:latest', 
       '.'
     ]
 
@@ -24,7 +24,7 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     args: [
       'push', 
-      'us-central1-docker.pkg.dev/$PROJECT_ID/horarios-repo/horarios-cepre-back', 
+      'southamerica-west1-docker.pkg.dev/$PROJECT_ID/horarios-repo/horarios-cepre-back', 
       '--all-tags'
     ]
 
@@ -32,8 +32,8 @@ steps:
   - name: 'gcr.io/cloud-builders/gcloud'
     args: [
       'run', 'deploy', 'horarios-cepre-back',
-      '--image', 'us-central1-docker.pkg.dev/$PROJECT_ID/horarios-repo/horarios-cepre-back:$COMMIT_SHA',
-      '--region', 'us-central1',
+      '--image', 'southamerica-west1-docker.pkg.dev/$PROJECT_ID/horarios-repo/horarios-cepre-back:$COMMIT_SHA',
+      '--region', 'southamerica-west1',
       '--platform', 'managed',
       '--allow-unauthenticated',
       '--set-secrets', 
@@ -41,7 +41,7 @@ steps:
     ]
 
 images:
-  - 'us-central1-docker.pkg.dev/$PROJECT_ID/horarios-repo/horarios-cepre-back'
+  - 'southamerica-west1-docker.pkg.dev/$PROJECT_ID/horarios-repo/horarios-cepre-back'
 
 options:
   logging: CLOUD_LOGGING_ONLY
