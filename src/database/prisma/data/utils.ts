@@ -92,7 +92,7 @@ export const getMapAndSorted = (
         shifts.find((s) => s.id === cls.shiftId)?.name ?? 'Unknown Shift';
       const areaName =
         areas.find((a) => a.id === cls.areaId)?.name ?? 'Unknown Area';
-      // Inicializar y agregar la clase en una sola operación
+
       if (!acc[areaName]) acc[areaName] = {};
       if (!acc[areaName][shiftName]) acc[areaName][shiftName] = [];
       acc[areaName][shiftName].push(cls);
@@ -102,14 +102,10 @@ export const getMapAndSorted = (
     {},
   );
 
-  // Realizar una única pasada de mezcla después de agrupar todo
+  // Ordenar por nombre de clase (alfabéticamente)
   Object.values(result).forEach((shift) => {
-    Object.values(shift).forEach((classes) => {
-      // Fisher-Yates shuffle (más eficiente que sort con random)
-      for (let i = classes.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [classes[i], classes[j]] = [classes[j], classes[i]];
-      }
+    Object.values(shift).forEach((classList) => {
+      classList.sort((a, b) => a.name.localeCompare(b.name));
     });
   });
 
@@ -139,8 +135,8 @@ export const generarDataMonitors = (data: InDataMonitors): DataMonitor[] => {
     const monitorId = randomUUID();
     const classId = randomUUID();
     // Generar correo
-    const email = `${letraArea}-${inicio + i}@${domain}`;
-    const className = `${area[0].toUpperCase()}-${inicio} ${area}`;
+    const email = `${inicio + i}${letraArea}${domain}`;
+    const className = `${area[0].toUpperCase()}-${inicio + i} ${area}`;
 
     return {
       user: {
@@ -259,11 +255,18 @@ export const generateScheduleData = (
   hourSessions: HourSessionData[],
 ) => {
   let index = 0;
+  let currentAreaId: number | null = null;
 
   const scheduleData: ScheduleData[] = [];
   Object.values(classes).flatMap((classGroup) =>
     classGroup.flatMap((c) => {
-      dataSchedules[index].flatMap((d) =>
+      // Reiniciar el índice cuando cambia el areaId
+      if (currentAreaId !== null && currentAreaId !== c.shiftId) {
+        index = 0;
+      }
+      currentAreaId = c.shiftId;
+
+      dataSchedules[index].flatMap((d) => {
         d.clases.map((cl) => {
           const hourSessionId =
             hourSessions.find(
@@ -281,8 +284,9 @@ export const generateScheduleData = (
               `Error: No se encontró la sesión horaria para el bloque ${cl.bloque} y el turno ${c.shiftId} En el salon ${c.name} del curso ${cl.curso}`,
             );
           }
-        }),
-      );
+        });
+      });
+
       index = index === dataSchedules.length - 1 ? 0 : index + 1;
     }),
   );

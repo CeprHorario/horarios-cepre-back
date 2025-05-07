@@ -10,7 +10,6 @@ import { PrismaService } from '@database/prisma/prisma.service';
 const WEEKDAYS_COUNT = 6;
 
 import {
-  CreateClassDto,
   UpdateClassDto,
   ClassBaseDto,
   ClassForTeacherDto,
@@ -23,18 +22,134 @@ import { MonitorForTeacherDto } from '@modules/monitors/dto/monitorForTeacher.dt
 import { UserProfileForTeacherDto } from '@modules/user-profile/dto/user-profile-for-teacher.dto';
 import { ScheduleForClass } from './dto/scheduleForClass.dto';
 import { TeacherResponseDto } from '@modules/monitors/dto/teacher-response.dto';
+import { CreateClassDataDto } from './dto/CreateClassData.dto';
+import { Role } from '@modules/auth/decorators/authorization.decorator';
+import { parsedScheduleJson } from '@database/prisma/data/utils';
+
+import * as rawScheduleBio from '@database/prisma/data/schedules/bio.json';
+import * as rawScheduleIng from '@database/prisma/data/schedules/ing.json';
+import * as rawScheduleSoc from '@database/prisma/data/schedules/soc.json';
+import { Weekday } from '@prisma/client';
 
 @Injectable()
 export class ClassService {
   constructor(private prisma: PrismaService) {}
 
   // ─────── CRUD ───────
-  async create(createClassDto: CreateClassDto): Promise<ClassBaseDto> {
-    const obj = await this.prisma.getClient().class.create({
-      data: createClassDto,
-      include: { sede: true, area: true, shift: true, monitor: true },
+  async create(body: CreateClassDataDto): Promise<ClassBaseDto> {
+    const area = await this.prisma.getClient().area.findUnique({
+      where: { id: body.area_id },
     });
-    return this.mapToClassDto(obj);
+    if (!area) {
+      throw new NotFoundException('Área no encontrada');
+    }
+
+    const shift = await this.prisma.getClient().shift.findUnique({
+      where: { id: body.shift_id },
+    });
+    if (!shift) {
+      throw new NotFoundException('Turno no encontrado');
+    }
+
+    const countClasses = await this.prisma.getClient().class.count({
+      where: {
+        areaId: body.area_id,
+        shiftId: body.shift_id,
+      },
+    });
+
+    const number = countClasses + 1 + 100 * body.shift_id;
+
+    const className = `${area.name[0]}-${number} ${area.name}`;
+
+    // Validar si la clase ya existe en la base de datos
+    const existingClass = await this.prisma.getClient().class.findFirst({
+      where: { name: className },
+    });
+    if (existingClass) {
+      throw new BadRequestException(
+        `La clase ${className} ya existe en la base de datos`,
+      );
+    }
+
+    const dataSchedules =
+      area.name === 'Biomédicas'
+        ? parsedScheduleJson(rawScheduleBio as any)
+        : area.name === 'Ingenierías'
+          ? parsedScheduleJson(rawScheduleIng as any)
+          : area.name === 'Sociales'
+            ? parsedScheduleJson(rawScheduleSoc as any)
+            : (() => {
+                throw new BadRequestException('Area no válida');
+              })();
+
+    const userEmail = `${number}${area.name[0].toLowerCase()}@cepr.unsa.pe`;
+    const classResult = await this.prisma
+      .getClient()
+      .$transaction(async (px) => {
+        // Crear la clase y el monitor asociado
+        const newClass = await px.class.create({
+          data: {
+            name: className,
+            area: { connect: { id: area.id } },
+            shift: { connect: { id: shift.id } },
+            sede: { connect: { id: 1 } },
+            monitor: {
+              create: {
+                user: {
+                  create: {
+                    email: userEmail,
+                    role: Role.MONITOR,
+                  },
+                },
+              },
+            },
+          },
+        });
+
+        // Obtener los cursos de la base de datos
+        const courses = await px.course.findMany({
+          select: { id: true, name: true },
+        });
+        const courseMap: Record<string, number> = {};
+        courses.forEach((course) => {
+          courseMap[course.name] = course.id;
+        });
+
+        // Obtener los bloques de horas del turno
+        const hourSessions = await px.hourSession.findMany({
+          where: { shiftId: shift.id },
+          select: { id: true, period: true },
+        });
+        const hourSessionMap: Record<string, number> = {};
+        hourSessions.forEach((session) => {
+          hourSessionMap[session.period] = session.id;
+        });
+
+        // Crear los horarios para la clase
+        const index = ((number % 100) - 1) % dataSchedules.length;
+        const schedules = dataSchedules[index].flatMap((schedule) => {
+          return schedule.clases.map((c) => {
+            const courseId = courseMap[c.curso];
+            const hourSessionId = hourSessionMap[c.bloque];
+
+            return {
+              weekday: Weekday[schedule.dia as keyof typeof Weekday],
+              courseId: courseId,
+              hourSessionId: hourSessionId,
+              classId: newClass.id,
+            };
+          });
+        });
+
+        await px.schedule.createMany({
+          data: schedules,
+        });
+
+        return this.mapToClassDto(newClass);
+      });
+
+    return classResult;
   }
 
   async findAll(): Promise<ClassBaseDto[]> {
@@ -170,10 +285,28 @@ export class ClassService {
   }
 
   async delete(id: string): Promise<ClassBaseDto> {
+    // borrar los schedules relacionados a la clase
+    await this.prisma.getClient().schedule.deleteMany({
+      where: { classId: id },
+    });
+
+    // borrar la clase
     const obj = await this.prisma.getClient().class.delete({
       where: { id },
       include: { sede: true, area: true, shift: true, monitor: true },
     });
+
+    // borrar monitor relacionado a la clase
+    const deletedMonitor = await this.prisma.getClient().monitor.delete({
+      where: { id: obj.monitorId! },
+      include: { user: true },
+    });
+
+    // borrar usuario relacionado al monitor
+    await this.prisma.getClient().user.delete({
+      where: { id: deletedMonitor.userId },
+    });
+
     return this.mapToClassDto(obj);
   }
 
