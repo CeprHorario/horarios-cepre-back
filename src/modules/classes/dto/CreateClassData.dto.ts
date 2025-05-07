@@ -1,25 +1,17 @@
-import * as rawData from '@database/prisma/data/initial.json';
-import { DataInitial } from '@database/prisma/data/type';
 import { ApiProperty } from '@nestjs/swagger';
-import { IsIn, IsNumber, IsString, Min } from 'class-validator';
+import { IsIn, IsNumber } from 'class-validator';
 
-const dataInitial = rawData as DataInitial;
-const validAreas: string[] = dataInitial.areas.map((area) => area.name);
-const validShifts: string[] = dataInitial.shifts.map((shift) => shift.name);
+const validAreas: number[] = [1, 2, 3];
+const validShifts: number[] = [1, 2, 3];
 
 export class CreateClassDataDto {
   @IsNumber()
-  @Min(101)
-  @ApiProperty({ example: 101 })
-  number: number;
-
-  @IsString()
   @IsIn(validAreas)
   @ApiProperty({ example: validAreas[0] })
-  area: string;
+  area_id: number;
 
-  @IsString()
+  @IsNumber()
   @IsIn(validShifts)
   @ApiProperty({ example: validShifts[0] })
-  shift: string;
+  shift_id: number;
 }
