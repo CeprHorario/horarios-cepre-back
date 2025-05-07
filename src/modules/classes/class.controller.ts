@@ -25,8 +25,7 @@ import { Authorization, Role } from '@modules/auth/decorators/authorization.deco
 import { ScheduleForClass } from './dto/scheduleForClass.dto';
 import { TeacherResponseDto } from '@modules/monitors/dto/teacher-response.dto';
 import { CreateClassDataDto } from './dto/CreateClassData.dto';
-import { Unauthenticated } from '@modules/auth/decorators/unauthenticated.decorator';
-
+\
 @Controller('classes')
 @ApiTags('Classes')
 export class ClassController {
@@ -34,7 +33,10 @@ export class ClassController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  @Unauthenticated()
+  @Authorization({
+    permission: 'class.createwithSchedule',
+    description: 'Crear una nueva clase con su respectivo horario',
+  })
   @ApiOperation({
     summary: 'Crear una nueva clase con su respectivo horario',
     description: 'Create a new class with its respective schedule',
