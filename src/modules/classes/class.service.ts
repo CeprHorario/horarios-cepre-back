@@ -37,13 +37,30 @@ export class ClassService {
 
   // ─────── CRUD ───────
   async create(body: CreateClassDataDto): Promise<ClassBaseDto> {
-    if (String(body.number)[0] !== body.shift.trim().slice(-1)) {
-      throw new BadRequestException(
-        'El número de la clase no coincide con el turno seleccionado',
-      );
+    const area = await this.prisma.getClient().area.findUnique({
+      where: { id: body.area_id },
+    });
+    if (!area) {
+      throw new NotFoundException('Área no encontrada');
     }
 
-    const className = `${body.area[0]}-${body.number} ${body.area}`;
+    const shift = await this.prisma.getClient().shift.findUnique({
+      where: { id: body.shift_id },
+    });
+    if (!shift) {
+      throw new NotFoundException('Turno no encontrado');
+    }
+
+    const countClasses = await this.prisma.getClient().class.count({
+      where: {
+        areaId: body.area_id,
+        shiftId: body.shift_id,
+      },
+    });
+
+    const number = countClasses + 1 + 100 * body.shift_id;
+
+    const className = `${area.name[0]}-${number} ${area.name}`;
 
     // Validar si la clase ya existe en la base de datos
     const existingClass = await this.prisma.getClient().class.findFirst({
@@ -56,31 +73,20 @@ export class ClassService {
     }
 
     const dataSchedules =
-      body.area === 'Biomédicas'
+      area.name === 'Biomédicas'
         ? parsedScheduleJson(rawScheduleBio as any)
-        : body.area === 'Ingenierías'
+        : area.name === 'Ingenierías'
           ? parsedScheduleJson(rawScheduleIng as any)
-          : body.area === 'Sociales'
+          : area.name === 'Sociales'
             ? parsedScheduleJson(rawScheduleSoc as any)
             : (() => {
                 throw new BadRequestException('Area no válida');
               })();
 
-    const userEmail = `${body.number}${body.area[0].toLowerCase()}@cepr.unsa.pe`;
+    const userEmail = `${number}${area.name[0].toLowerCase()}@cepr.unsa.pe`;
     const classResult = await this.prisma
       .getClient()
       .$transaction(async (px) => {
-        const shift = await px.shift.findFirst({
-          where: { name: body.shift },
-        });
-        if (!shift) throw new NotFoundException('Turno no encontrado');
-
-        // Obtener el área por su nombre
-        const area = await px.area.findFirst({
-          where: { name: body.area },
-        });
-        if (!area) throw new NotFoundException('Área no encontrada');
-
         // Crear la clase y el monitor asociado
         const newClass = await px.class.create({
           data: {
@@ -121,7 +127,7 @@ export class ClassService {
         });
 
         // Crear los horarios para la clase
-        const index = ((body.number % 100) - 1) % dataSchedules.length;
+        const index = ((number % 100) - 1) % dataSchedules.length;
         const schedules = dataSchedules[index].flatMap((schedule) => {
           return schedule.clases.map((c) => {
             const courseId = courseMap[c.curso];
@@ -279,10 +285,28 @@ export class ClassService {
   }
 
   async delete(id: string): Promise<ClassBaseDto> {
+    // borrar los schedules relacionados a la clase
+    await this.prisma.getClient().schedule.deleteMany({
+      where: { classId: id },
+    });
+
+    // borrar la clase
     const obj = await this.prisma.getClient().class.delete({
       where: { id },
       include: { sede: true, area: true, shift: true, monitor: true },
     });
+
+    // borrar monitor relacionado a la clase
+    const deletedMonitor = await this.prisma.getClient().monitor.delete({
+      where: { id: obj.monitorId! },
+      include: { user: true },
+    });
+
+    // borrar usuario relacionado al monitor
+    await this.prisma.getClient().user.delete({
+      where: { id: deletedMonitor.userId },
+    });
+
     return this.mapToClassDto(obj);
   }
 
