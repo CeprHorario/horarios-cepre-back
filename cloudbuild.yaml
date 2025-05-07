@@ -15,8 +15,8 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     args: [
       'build', 
-      '-t', 'us-central1-docker.pkg.dev/$PROJECT_ID/horarios-repo/horarios-cepre-back-develop:$COMMIT_SHA', 
-      '-t', 'us-central1-docker.pkg.dev/$PROJECT_ID/horarios-repo/horarios-cepre-back-develop:latest', 
+      '-t', 'southamerica-west1-docker.pkg.dev/$PROJECT_ID/horarios-repo/horarios-cepre-back:$COMMIT_SHA', 
+      '-t', 'southamerica-west1-docker.pkg.dev/$PROJECT_ID/horarios-repo/horarios-cepre-back:latest', 
       '.'
     ]
 
@@ -24,24 +24,24 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     args: [
       'push', 
-      'us-central1-docker.pkg.dev/$PROJECT_ID/horarios-repo/horarios-cepre-back-develop', 
+      'southamerica-west1-docker.pkg.dev/$PROJECT_ID/horarios-repo/horarios-cepre-back', 
       '--all-tags'
     ]
 
   # Deploy to Cloud Run using Secret Manager references
   - name: 'gcr.io/cloud-builders/gcloud'
     args: [
-      'run', 'deploy', 'horarios-cepre-back-develop',
-      '--image', 'us-central1-docker.pkg.dev/$PROJECT_ID/horarios-repo/horarios-cepre-back-develop:$COMMIT_SHA',
-      '--region', 'us-central1',
+      'run', 'deploy', 'horarios-cepre-back',
+      '--image', 'southamerica-west1-docker.pkg.dev/$PROJECT_ID/horarios-repo/horarios-cepre-back:$COMMIT_SHA',
+      '--region', 'southamerica-west1',
       '--platform', 'managed',
       '--allow-unauthenticated',
       '--set-secrets', 
-      'DATABASE_URL=DATABASE_URL:latest,DB_HOST=DB_HOST:latest,DB_PORT=DB_PORT:latest,DB_USER=DB_USER:latest,DB_DATABASE=DB_DATABASE:latest,DB_PASSWORD=DB_PASSWORD:latest,GOOGLE_CLIENT_ID=GOOGLE_CLIENT_ID:latest,GOOGLE_CLIENT_SECRET=GOOGLE_CLIENT_SECRET:latest,GOOGLE_REDIRECT_URI=GOOGLE_REDIRECT_URI:4,JWT_SECRET=JWT_SECRET:latest,JWT_EXPIRES_IN=JWT_EXPIRES_IN:latest,REDIRECT_FRONT=REDIRECT_FRONT:5'
+      'DATABASE_URL=DATABASE_URL:latest,DB_HOST=DB_HOST:latest,DB_PORT=DB_PORT:latest,DB_USER=DB_USER:latest,DB_DATABASE=DB_DATABASE:latest,DB_PASSWORD=DB_PASSWORD:latest,GOOGLE_CLIENT_ID=GOOGLE_CLIENT_ID:latest,GOOGLE_CLIENT_SECRET=GOOGLE_CLIENT_SECRET:latest,GOOGLE_REDIRECT_URI=GOOGLE_REDIRECT_URI:5,JWT_SECRET=JWT_SECRET:latest,JWT_EXPIRES_IN=JWT_EXPIRES_IN:latest,REDIRECT_FRONT=REDIRECT_FRONT:5'
     ]
 
 images:
-  - 'us-central1-docker.pkg.dev/$PROJECT_ID/horarios-repo/horarios-cepre-back-develop'
+  - 'southamerica-west1-docker.pkg.dev/$PROJECT_ID/horarios-repo/horarios-cepre-back'
 
 options:
   logging: CLOUD_LOGGING_ONLY
