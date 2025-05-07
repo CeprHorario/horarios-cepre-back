@@ -25,6 +25,7 @@ import { TeacherResponseDto } from '@modules/monitors/dto/teacher-response.dto';
 import { CreateClassDataDto } from './dto/CreateClassData.dto';
 import { Role } from '@modules/auth/decorators/authorization.decorator';
 import { parsedScheduleJson } from '@database/prisma/data/utils';
+import { ScheduleService } from '@modules/schedules/schedules.service';
 
 import * as rawScheduleBio from '@database/prisma/data/schedules/bio.json';
 import * as rawScheduleIng from '@database/prisma/data/schedules/ing.json';
@@ -33,7 +34,10 @@ import { Weekday } from '@prisma/client';
 
 @Injectable()
 export class ClassService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private schedulesServices: ScheduleService,
+  ) {}
 
   // ─────── CRUD ───────
   async create(body: CreateClassDataDto): Promise<ClassBaseDto> {
@@ -60,7 +64,7 @@ export class ClassService {
 
     const number = countClasses + 1 + 100 * body.shift_id;
 
-    const className = `${area.name[0]}-${number} ${area.name}`;
+    const className = `${area.name[0]}-${number}`;
 
     // Validar si la clase ya existe en la base de datos
     const existingClass = await this.prisma.getClient().class.findFirst({
@@ -285,6 +289,23 @@ export class ClassService {
   }
 
   async delete(id: string): Promise<ClassBaseDto> {
+    // obtener los id_teacher de los schedules relacionados a la clase  sin repetir
+    const lista_teachers_id = await this.prisma.getClient().schedule?.findMany({
+      where: {
+        classId: id,
+        teacherId: { not: null },
+      },
+      select: { teacherId: true },
+      distinct: ['teacherId'],
+    });
+
+    for (const { teacherId } of lista_teachers_id) {
+      await this.schedulesServices.unassignTeacherFromSchedules(
+        [id],
+        teacherId!,
+      );
+    }
+
     // borrar los schedules relacionados a la clase
     await this.prisma.getClient().schedule.deleteMany({
       where: { classId: id },
