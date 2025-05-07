@@ -9,7 +9,6 @@ import {
   HttpStatus,
   HttpCode,
   ParseUUIDPipe,
-  UseGuards,
   Req,
   BadRequestException,
   Patch,
@@ -17,22 +16,32 @@ import {
 import { ClassService } from './class.service';
 //import { Prisma } from '@prisma/client';
 import {
-  CreateClassDto,
   UpdateClassDto,
   ClassBaseDto,
   ClassForTeacherDto,
 } from './dto';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Authorization, Role } from '@modules/auth/decorators/authorization.decorator';
-import { JwtAuthGuard } from '@modules/auth/guards/jwt-auth.guard';
 import { ScheduleForClass } from './dto/scheduleForClass.dto';
 import { TeacherResponseDto } from '@modules/monitors/dto/teacher-response.dto';
+import { CreateClassDataDto } from './dto/CreateClassData.dto';
+import { Unauthenticated } from '@modules/auth/decorators/unauthenticated.decorator';
 
 @Controller('classes')
 @ApiTags('Classes')
-@UseGuards(JwtAuthGuard)
 export class ClassController {
   constructor(private readonly classService: ClassService) {}
+
+  @Post()
+  @HttpCode(HttpStatus.CREATED)
+  @Unauthenticated()
+  @ApiOperation({
+    summary: 'Crear una nueva clase con su respectivo horario',
+    description: 'Create a new class with its respective schedule',
+  })
+  create(@Body() body: CreateClassDataDto): Promise<ClassBaseDto> {
+    return this.classService.create(body);
+  }
 
   @Get(':classId/schedules')
   @HttpCode(HttpStatus.OK)
@@ -67,19 +76,6 @@ export class ClassController {
   }
 
   // ─────── CRUD ───────
-  @Post()
-  @HttpCode(HttpStatus.CREATED)
-  @Authorization({
-    permission: 'class.create',
-    description: 'Crear una nueva clase',
-  })
-  @ApiOperation({
-    summary: 'Crear una nueva clase',
-    description: 'Create a new class',
-  })
-  create(@Body() createClassDto: CreateClassDto): Promise<ClassBaseDto> {
-    return this.classService.create(createClassDto);
-  }
 
   @Get()
   @HttpCode(HttpStatus.OK)

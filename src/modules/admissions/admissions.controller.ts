@@ -11,6 +11,7 @@ import { AdmissionsService } from './admissions.service';
 import { ApiOperation } from '@nestjs/swagger';
 import { Authorization } from '@modules/auth/decorators/authorization.decorator';
 import { ProcessAdmissionDto } from './dto/create-admission.dto';
+import { Unauthenticated } from '@modules/auth/decorators/unauthenticated.decorator';
 //import { Unauthenticated } from '@modules/auth/decorators/unauthenticated.decorator';
 
 @Controller('admissions')
@@ -19,10 +20,7 @@ export class AdmissionsController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  @Authorization({
-    permission: 'admission.create-with-data',
-    description: 'Crear un nuevo proceso de admisión con datos iniciales',
-  })
+  @Unauthenticated()
   @ApiOperation({
     summary: 'Crear un nuevo proceso de admisión con datos iniciales',
     description: 'Create a new process admision with initial data',
