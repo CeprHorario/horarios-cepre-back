@@ -25,7 +25,7 @@ import { Authorization, Role } from '@modules/auth/decorators/authorization.deco
 import { ScheduleForClass } from './dto/scheduleForClass.dto';
 import { TeacherResponseDto } from '@modules/monitors/dto/teacher-response.dto';
 import { CreateClassDataDto } from './dto/CreateClassData.dto';
-\
+
 @Controller('classes')
 @ApiTags('Classes')
 export class ClassController {
