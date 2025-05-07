@@ -43,13 +43,13 @@
   ],
   "shifts": [
     {
-      "name": "Turno 1"
+      "name": "Turno 01"
     },
     {
-      "name": "Turno 2"
+      "name": "Turno 02"
     },
     {
-      "name": "Turno 3"
+      "name": "Turno 03"
     }
   ]
 }

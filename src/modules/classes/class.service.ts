@@ -10,7 +10,6 @@ import { PrismaService } from '@database/prisma/prisma.service';
 const WEEKDAYS_COUNT = 6;
 
 import {
-  CreateClassDto,
   UpdateClassDto,
   ClassBaseDto,
   ClassForTeacherDto,
@@ -23,18 +22,128 @@ import { MonitorForTeacherDto } from '@modules/monitors/dto/monitorForTeacher.dt
 import { UserProfileForTeacherDto } from '@modules/user-profile/dto/user-profile-for-teacher.dto';
 import { ScheduleForClass } from './dto/scheduleForClass.dto';
 import { TeacherResponseDto } from '@modules/monitors/dto/teacher-response.dto';
+import { CreateClassDataDto } from './dto/CreateClassData.dto';
+import { Role } from '@modules/auth/decorators/authorization.decorator';
+import { parsedScheduleJson } from '@database/prisma/data/utils';
+
+import * as rawScheduleBio from '@database/prisma/data/schedules/bio.json';
+import * as rawScheduleIng from '@database/prisma/data/schedules/ing.json';
+import * as rawScheduleSoc from '@database/prisma/data/schedules/soc.json';
+import { Weekday } from '@prisma/client';
 
 @Injectable()
 export class ClassService {
   constructor(private prisma: PrismaService) {}
 
   // ─────── CRUD ───────
-  async create(createClassDto: CreateClassDto): Promise<ClassBaseDto> {
-    const obj = await this.prisma.getClient().class.create({
-      data: createClassDto,
-      include: { sede: true, area: true, shift: true, monitor: true },
+  async create(body: CreateClassDataDto): Promise<ClassBaseDto> {
+    if (String(body.number)[0] !== body.shift.trim().slice(-1)) {
+      throw new BadRequestException(
+        'El número de la clase no coincide con el turno seleccionado',
+      );
+    }
+
+    const className = `${body.area[0]}-${body.number} ${body.area}`;
+
+    // Validar si la clase ya existe en la base de datos
+    const existingClass = await this.prisma.getClient().class.findFirst({
+      where: { name: className },
     });
-    return this.mapToClassDto(obj);
+    if (existingClass) {
+      throw new BadRequestException(
+        `La clase ${className} ya existe en la base de datos`,
+      );
+    }
+
+    const dataSchedules =
+      body.area === 'Biomédicas'
+        ? parsedScheduleJson(rawScheduleBio as any)
+        : body.area === 'Ingenierías'
+          ? parsedScheduleJson(rawScheduleIng as any)
+          : body.area === 'Sociales'
+            ? parsedScheduleJson(rawScheduleSoc as any)
+            : (() => {
+                throw new BadRequestException('Area no válida');
+              })();
+
+    const userEmail = `${body.number}${body.area[0].toLowerCase()}@cepr.unsa.pe`;
+    const classResult = await this.prisma
+      .getClient()
+      .$transaction(async (px) => {
+        const shift = await px.shift.findFirst({
+          where: { name: body.shift },
+        });
+        if (!shift) throw new NotFoundException('Turno no encontrado');
+
+        // Obtener el área por su nombre
+        const area = await px.area.findFirst({
+          where: { name: body.area },
+        });
+        if (!area) throw new NotFoundException('Área no encontrada');
+
+        // Crear la clase y el monitor asociado
+        const newClass = await px.class.create({
+          data: {
+            name: className,
+            area: { connect: { id: area.id } },
+            shift: { connect: { id: shift.id } },
+            sede: { connect: { id: 1 } },
+            monitor: {
+              create: {
+                user: {
+                  create: {
+                    email: userEmail,
+                    role: Role.MONITOR,
+                  },
+                },
+              },
+            },
+          },
+        });
+
+        // Obtener los cursos de la base de datos
+        const courses = await px.course.findMany({
+          select: { id: true, name: true },
+        });
+        const courseMap: Record<string, number> = {};
+        courses.forEach((course) => {
+          courseMap[course.name] = course.id;
+        });
+
+        // Obtener los bloques de horas del turno
+        const hourSessions = await px.hourSession.findMany({
+          where: { shiftId: shift.id },
+          select: { id: true, period: true },
+        });
+        const hourSessionMap: Record<string, number> = {};
+        hourSessions.forEach((session) => {
+          hourSessionMap[session.period] = session.id;
+        });
+
+        // Crear los horarios para la clase
+        const index = ((body.number % 100) - 1) % dataSchedules.length;
+        const schedules = dataSchedules[index].flatMap((schedule) => {
+          return schedule.clases.map((c) => {
+            const courseId = courseMap[c.curso];
+            const hourSessionId = hourSessionMap[c.bloque];
+
+            return {
+              weekday: Weekday[schedule.dia as keyof typeof Weekday],
+              courseId: courseId,
+              hourSessionId: hourSessionId,
+              classId: newClass.id,
+            };
+          });
+        });
+
+        await px.schedule.createMany({
+          data: schedules,
+        });
+
+        return this.mapToClassDto(newClass);
+      });
+
+    return classResult;
   }
 
   async findAll(): Promise<ClassBaseDto[]> {

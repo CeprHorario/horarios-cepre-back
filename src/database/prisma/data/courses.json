@@ -11,14 +11,14 @@
       "description": "ROSA CHICLE"
     },
     {
-      "name": "Física",
-      "color": "#0B8043",
-      "description": "VERDE MUSGO"
-    },
-    {
       "name": "Filosofía",
       "color": "#8E24AA",
       "description": "MORADO INTENSO"
+    },
+    {
+      "name": "Física",
+      "color": "#0B8043",
+      "description": "VERDE MUSGO"
     },
     {
       "name": "Geografía",
