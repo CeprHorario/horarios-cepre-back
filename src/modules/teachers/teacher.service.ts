@@ -91,11 +91,11 @@ export class TeacherService {
   }> {
     const offset = (page - 1) * limit;
 
-    const where:Prisma.TeacherWhereInput = {
+    const where: Prisma.TeacherWhereInput = {
       user: {
         isActive: true,
       },
-        ...(courseId !== undefined && { courses: { id: courseId } }),
+      ...(courseId !== undefined && { courses: { id: courseId } }),
     };
 
     const [teachers, total] = await this.prisma.getClient().$transaction([
@@ -104,6 +104,13 @@ export class TeacherService {
         take: limit > 0 ? limit : undefined,
         relationLoadStrategy: 'join',
         where: where,
+        orderBy: {
+          user: {
+            userProfile: {
+              lastName: 'asc',
+            },
+          },
+        },
         select: {
           id: true,
           jobStatus: true,
@@ -209,22 +216,24 @@ export class TeacherService {
     id: string,
     updateTeacherDto: TeacherUpdateDto,
   ): Promise<TeacherGetSummaryDto> {
-      // 1. Verificar si el email ya existe en otro usuario
-      if (updateTeacherDto.email) {
-        const existingUser = await this.prisma.getClient().user.findFirst({
-          where: {
-            email: updateTeacherDto.email,
-            NOT: {
-              teacher: {
-                id: id 
-              }
-            }
-          }
-        });
-        if (existingUser) {
-          throw new ConflictException('El correo electrónico ya está en uso por otro usuario');
-        }
+    // 1. Verificar si el email ya existe en otro usuario
+    if (updateTeacherDto.email) {
+      const existingUser = await this.prisma.getClient().user.findFirst({
+        where: {
+          email: updateTeacherDto.email,
+          NOT: {
+            teacher: {
+              id: id,
+            },
+          },
+        },
+      });
+      if (existingUser) {
+        throw new ConflictException(
+          'El correo electrónico ya está en uso por otro usuario',
+        );
       }
+    }
     const teacher = await this.prisma.getClient().teacher.update({
       where: { id },
       data: {
@@ -298,19 +307,18 @@ export class TeacherService {
   }
 
   async createManyTeachers(dtos: CreateTeacherDto[]) {
-
     type UserWithRelations = Prisma.UserGetPayload<{
       include: {
         teacher: true;
         userProfile: true;
-      }
+      };
     }>;
 
-    const validDtos = dtos.map(dto => ({
+    const validDtos = dtos.map((dto) => ({
       ...dto,
       phonesAdditional: dto.phonesAdditional ?? [],
       personalEmail: dto.personalEmail ?? null,
-      isCoordinator: dto.isCoordinator ?? false
+      isCoordinator: dto.isCoordinator ?? false,
     }));
     const prisma = this.prisma.getClient();
 
@@ -332,32 +340,45 @@ export class TeacherService {
         select: { dni: true },
       }),
     ]);
-  
+
     const existingEmails = new Set(existingUsers.map((u) => u.email));
     const existingDnis = new Set(existingProfiles.map((p) => p.dni));
 
-    const duplicated = validDtos.filter((dto) => 
-      existingEmails.has(dto.email) || existingDnis.has(dto.dni)
+    const duplicated = validDtos.filter(
+      (dto) => existingEmails.has(dto.email) || existingDnis.has(dto.dni),
     );
-    const toCreate = validDtos.filter((dto) => 
-      !existingEmails.has(dto.email) && !existingDnis.has(dto.dni)
+    const toCreate = validDtos.filter(
+      (dto) => !existingEmails.has(dto.email) && !existingDnis.has(dto.dni),
     );
-  
+
     if (toCreate.length === 0) {
       return {
         creados: [],
-        noCreados: duplicated.map((d) => ({ 
-          email: d.email, 
+        noCreados: duplicated.map((d) => ({
+          email: d.email,
           dni: d.dni,
-          motivo: existingEmails.has(d.email) ? 'email duplicado' : 'dni duplicado'
+          motivo: existingEmails.has(d.email)
+            ? 'email duplicado'
+            : 'dni duplicado',
         })),
       };
     }
-  
+
     try {
       const createData = toCreate.map((dto) => {
-        const { jobStatus, courseId, isCoordinator, email, dni, firstName, lastName, phone, phonesAdditional, personalEmail } = dto;
-        
+        const {
+          jobStatus,
+          courseId,
+          isCoordinator,
+          email,
+          dni,
+          firstName,
+          lastName,
+          phone,
+          phonesAdditional,
+          personalEmail,
+        } = dto;
+
         // Calculate maxHours based on rules
         let maxHours: number;
         if (isCoordinator) {
@@ -367,7 +388,7 @@ export class TeacherService {
         } else {
           maxHours = jobStatus === 'FullTime' ? 16 : 20;
         }
-  
+
         return {
           email,
           role: Role.TEACHER,
@@ -393,35 +414,37 @@ export class TeacherService {
         };
       });
 
-      const chunkSize = 30; 
+      const chunkSize = 30;
       const results: UserWithRelations[] = [];
 
       for (let i = 0; i < createData.length; i += chunkSize) {
         const chunk = createData.slice(i, i + chunkSize);
         const chunkResults = await prisma.$transaction(
-          chunk.map(userData => 
+          chunk.map((userData) =>
             prisma.user.create({
               data: userData,
               include: {
                 teacher: true,
                 userProfile: true,
               },
-            })
-          )
+            }),
+          ),
         );
-        
+
         results.push(...chunkResults);
       }
-  
+
       return {
         creados: results.map((r) => ({
           email: r.email,
           dni: r.userProfile?.dni,
         })),
-        noCreados: duplicated.map((d) => ({ 
-          email: d.email, 
+        noCreados: duplicated.map((d) => ({
+          email: d.email,
           dni: d.dni,
-          motivo: existingEmails.has(d.email) ? 'email duplicado' : 'dni duplicado'
+          motivo: existingEmails.has(d.email)
+            ? 'email duplicado'
+            : 'dni duplicado',
         })),
       };
     } catch (error) {
@@ -429,7 +452,7 @@ export class TeacherService {
       throw new Error('Error creando profesores. No se creó ningún profesor.');
     }
   }
-  
+
   async deactivate(id: string) {
     const teacher = await this.prisma.getClient().teacher.findUnique({
       where: { id },
