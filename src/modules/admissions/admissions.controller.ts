@@ -35,7 +35,8 @@ export class AdmissionsController {
   @HttpCode(HttpStatus.OK)
   @Authorization({
     permission: 'admission.getAll',
-    description: 'Obtener todos los procesos de admisión con sus observaciones',
+    description:
+      'Obtener todos los procesos de admisión con sus observaciones y el actual',
   })
   @ApiOperation({
     summary: 'Obtener todos los procesos de admisión',
