@@ -107,7 +107,7 @@ export class AdmissionsService {
     });
     return obj.map((item) =>
       plainToInstance(AdmissionBaseDto, item, {
-        excludePrefixes: ['id', 'isCurrent', 'createdAt'],
+        excludePrefixes: ['id', 'createdAt'],
       }),
     );
   }
