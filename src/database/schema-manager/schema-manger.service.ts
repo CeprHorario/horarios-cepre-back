@@ -20,8 +20,6 @@ export class SchemaManagerService {
     const currentKey = this.config.get<string>(
       'CACHE_KEYS.CURRENT_ADMISSION',
     ) as string;
-    const current = await this.cacheManager.get(currentKey);
-    if (current) return current as AdmissionCurrentDto;
 
     // Obtener el proceso de admisión actual desde la base de datos
     const obj = await this.drizzle.db.query.admissionProcesses.findFirst({
