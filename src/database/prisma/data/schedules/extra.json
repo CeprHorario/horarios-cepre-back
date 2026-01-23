@@ -1,0 +1,706 @@
+[
+  [
+    {
+      "dia": "Lunes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 2,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 3,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 4,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 5,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 6,
+          "curso": "Razonamiento Matemático"
+        }
+      ]
+    },
+    {
+      "dia": "Martes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 2,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 3,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 4,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 5,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 6,
+          "curso": "Razonamiento Lógico"
+        }
+      ]
+    },
+    {
+      "dia": "Miercoles",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 2,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 3,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 4,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 5,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 6,
+          "curso": "Razonamiento Matemático"
+        }
+      ]
+    },
+    {
+      "dia": "Jueves",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 2,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 3,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 4,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 5,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 6,
+          "curso": "Razonamiento Lógico"
+        }
+      ]
+    },
+    {
+      "dia": "Viernes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 2,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 3,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 4,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 5,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 6,
+          "curso": "Razonamiento Matemático"
+        }
+      ]
+    },
+    {
+      "dia": "Sabado",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 2,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 3,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 4,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 5,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 6,
+          "curso": "Razonamiento Lógico"
+        }
+      ]
+    }
+  ],
+  [
+    {
+      "dia": "Lunes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 2,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 3,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 4,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 5,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 6,
+          "curso": "Razonamiento Verbal"
+        }
+      ]
+    },
+    {
+      "dia": "Martes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 2,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 3,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 4,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 5,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 6,
+          "curso": "Razonamiento Verbal"
+        }
+      ]
+    },
+    {
+      "dia": "Miercoles",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 2,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 3,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 4,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 5,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 6,
+          "curso": "Razonamiento Verbal"
+        }
+      ]
+    },
+    {
+      "dia": "Jueves",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 2,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 3,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 4,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 5,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 6,
+          "curso": "Razonamiento Verbal"
+        }
+      ]
+    },
+    {
+      "dia": "Viernes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 2,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 3,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 4,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 5,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 6,
+          "curso": "Razonamiento Verbal"
+        }
+      ]
+    },
+    {
+      "dia": "Sabado",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 2,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 3,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 4,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 5,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 6,
+          "curso": "Razonamiento Verbal"
+        }
+      ]
+    }
+  ],
+  [
+    {
+      "dia": "Lunes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 2,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 3,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 4,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 5,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 6,
+          "curso": "Razonamiento Lógico"
+        }
+      ]
+    },
+    {
+      "dia": "Martes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 2,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 3,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 4,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 5,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 6,
+          "curso": "Razonamiento Matemático"
+        }
+      ]
+    },
+    {
+      "dia": "Miercoles",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 2,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 3,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 4,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 5,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 6,
+          "curso": "Razonamiento Lógico"
+        }
+      ]
+    },
+    {
+      "dia": "Jueves",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 2,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 3,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 4,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 5,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 6,
+          "curso": "Razonamiento Matemático"
+        }
+      ]
+    },
+    {
+      "dia": "Viernes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 2,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 3,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 4,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 5,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 6,
+          "curso": "Razonamiento Lógico"
+        }
+      ]
+    },
+    {
+      "dia": "Sabado",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 2,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 3,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 4,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 5,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 6,
+          "curso": "Razonamiento Matemático"
+        }
+      ]
+    }
+  ],
+  [
+    {
+      "dia": "Lunes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 2,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 3,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 4,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 5,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 6,
+          "curso": "Razonamiento Verbal"
+        }
+      ]
+    },
+    {
+      "dia": "Martes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 2,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 3,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 4,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 5,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 6,
+          "curso": "Razonamiento Verbal"
+        }
+      ]
+    },
+    {
+      "dia": "Miercoles",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 2,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 3,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 4,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 5,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 6,
+          "curso": "Razonamiento Verbal"
+        }
+      ]
+    },
+    {
+      "dia": "Jueves",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 2,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 3,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 4,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 5,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 6,
+          "curso": "Razonamiento Verbal"
+        }
+      ]
+    },
+    {
+      "dia": "Viernes",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 2,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 3,
+          "curso": "Razonamiento Lógico"
+        },
+        {
+          "bloque": 4,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 5,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 6,
+          "curso": "Razonamiento Verbal"
+        }
+      ]
+    },
+    {
+      "dia": "Sabado",
+      "clases": [
+        {
+          "bloque": 1,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 2,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 3,
+          "curso": "Razonamiento Matemático"
+        },
+        {
+          "bloque": 4,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 5,
+          "curso": "Razonamiento Verbal"
+        },
+        {
+          "bloque": 6,
+          "curso": "Razonamiento Verbal"
+        }
+      ]
+    }
+  ]
+]

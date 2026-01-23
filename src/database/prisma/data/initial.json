@@ -33,6 +33,10 @@
     {
       "name": "Sociales",
       "description": "Área de Sociales"
+    },
+    {
+      "name": "Extraordinario",
+      "description": "Área Extraordinario"
     }
   ],
   "sedes": [
@@ -50,6 +54,12 @@
     },
     {
       "name": "Turno 03"
+    },
+    {
+      "name": "Turno 04"
+    },
+    {
+      "name": "Turno 05"
     }
   ]
 }

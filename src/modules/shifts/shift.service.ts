@@ -6,6 +6,7 @@ import {
 import { PrismaService } from '@database/prisma/prisma.service';
 import { CreateShiftDto, UpdateShiftDto } from './dto/index';
 import { CreateHourSessionDto } from '@modules/hour-session/dto';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class ShiftService {
@@ -116,6 +117,13 @@ export class ShiftService {
 
       return await this.prisma.getClient().shift.delete({ where: { id } });
     } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === 'P2003') {
+          throw new BadRequestException(
+            'No se puede eliminar el turno porque tiene horarios o clases asociadas.',
+          );
+        }
+      }
       throw new BadRequestException(
         // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         'Error al eliminar el turno: ' + error.message,

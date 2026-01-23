@@ -20,7 +20,6 @@ import { ApiProperty } from '@nestjs/swagger';
 const dataInitial = rawData as DataInitial;
 const validAreas: string[] = dataInitial.areas.map((area) => area.name);
 const validSedes: string[] = dataInitial.sedes.map((sede) => sede.name);
-const validShifts: string[] = dataInitial.shifts.map((shift) => shift.name);
 
 export class ClassToAreaDto {
   @IsString()
@@ -38,8 +37,7 @@ export class ClassToAreaDto {
 export class ShiftDetailDto {
   @IsString()
   @IsNotEmpty()
-  @IsIn(validShifts)
-  @ApiProperty({ example: validShifts[0] })
+  @ApiProperty({ example: 'Turno 01' })
   name: string;
 
   @Matches(/^([01]\d|2[0-3]):([0-5]\d)$/, {

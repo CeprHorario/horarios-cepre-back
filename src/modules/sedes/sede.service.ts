@@ -1,6 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, InternalServerErrorException } from '@nestjs/common';
 import { PrismaService } from '@database/prisma/prisma.service';
 import { CreateSedeDto, UpdateSedeDto } from './dto/index';
+import { Prisma } from '@prisma/client';
 @Injectable()
 export class SedeService {
   constructor(private readonly prisma: PrismaService) {}
@@ -46,6 +47,17 @@ export class SedeService {
     if (!sede) {
       throw new NotFoundException(`Sede con ID ${id} no encontrada`);
     }
-    return this.prisma.getClient().sede.delete({ where: { id } });
+    try {
+      return await this.prisma.getClient().sede.delete({ where: { id } });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === 'P2003') {
+          throw new BadRequestException(
+            'No se puede eliminar la sede porque tiene relaciones asociadas.',
+          );
+        }
+      }
+      throw new InternalServerErrorException('Error al eliminar la sede.');
+    }
   }
 }
