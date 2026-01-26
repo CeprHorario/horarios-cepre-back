@@ -1,4 +1,11 @@
-import { IsEmail, IsNotEmpty, IsString, IsArray, IsOptional } from 'class-validator';
+import {
+  IsEmail,
+  IsNotEmpty,
+  IsString,
+  IsArray,
+  IsOptional,
+  IsNumber,
+} from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateSupervisorWithUserDto {
@@ -27,10 +34,10 @@ export class CreateSupervisorWithUserDto {
   @IsOptional()
   phone?: string;
 
-  @ApiProperty({ 
-    example: ['987654321', '123456789'], 
+  @ApiProperty({
+    example: ['987654321', '123456789'],
     required: false,
-    type: [String] 
+    type: [String],
   })
   @IsArray()
   @IsString({ each: true })
@@ -42,4 +49,8 @@ export class CreateSupervisorWithUserDto {
   @IsOptional()
   personalEmail?: string;
 
+  @ApiProperty({ example: '1', required: false })
+  @IsNumber()
+  @IsOptional()
+  shift_id?: number;
 }

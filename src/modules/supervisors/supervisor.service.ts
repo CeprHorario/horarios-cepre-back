@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+} from '@nestjs/common';
 import { PrismaService } from '@database/prisma/prisma.service';
 import { SupervisorBaseDto } from './dto';
 import { plainToInstance } from 'class-transformer';
@@ -37,7 +42,9 @@ export class SupervisorService {
             },
           },
           supervisor: {
-            create: {},
+            create: {
+              shiftId: createDto.shift_id,
+            },
           },
         },
         include: {
@@ -153,17 +160,15 @@ export class SupervisorService {
         personalEmail: supervisor.users?.userProfile?.personalEmail || null,
         phone: supervisor.users?.userProfile?.phone || null,
       });
-
-
     } catch (error) {
       if (
-          error instanceof NotFoundException ||
-          error instanceof BadRequestException
-        ) {
-            throw error;
-        }
-        console.error('Error en findOne:', error); // Agregar un log para depuración
-        throw new Error('Ocurrió un error inesperado al buscar el profesor');
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      ) {
+        throw error;
+      }
+      console.error('Error en findOne:', error); // Agregar un log para depuración
+      throw new Error('Ocurrió un error inesperado al buscar el profesor');
     }
   }
 
@@ -176,21 +181,23 @@ export class SupervisorService {
       const existingUser = await this.prisma.getClient().user.findFirst({
         where: {
           userProfile: {
-            personalEmail: updateSupervisorDto.personalEmail
+            personalEmail: updateSupervisorDto.personalEmail,
           },
           NOT: {
             supervisor: {
-              id: id // Excluye al propio supervisor que se está actualizando
-            }
-          }
+              id: id, // Excluye al propio supervisor que se está actualizando
+            },
+          },
         },
         include: {
-          userProfile: true
-        }
+          userProfile: true,
+        },
       });
-  
+
       if (existingUser) {
-        throw new ConflictException('El correo electrónico personal ya está en uso por otro usuario');
+        throw new ConflictException(
+          'El correo electrónico personal ya está en uso por otro usuario',
+        );
       }
     }
     // 2. Actualizar el supervisor
@@ -412,8 +419,8 @@ export class SupervisorService {
                 personalEmail: true,
               },
             },
+          },
         },
-      },
       },
     });
     if (!supervisor) {
@@ -442,7 +449,7 @@ export class SupervisorService {
                 id: true,
                 name: true,
               },
-            }
+            },
           },
         },
         user: {
@@ -453,9 +460,9 @@ export class SupervisorService {
                 lastName: true,
               },
             },
-            email: true
-          }
-        }
+            email: true,
+          },
+        },
       },
     });
 
@@ -464,7 +471,7 @@ export class SupervisorService {
       lastName: supervisor.users.userProfile?.lastName,
       email: supervisor.users.email,
       shift_id: supervisor.shiftId,
-      monitores_asignados: monitors.map(monitor => ({
+      monitores_asignados: monitors.map((monitor) => ({
         monitorId: monitor.id,
         className: monitor.classes?.name || 'no asignada',
         shiftId: monitor.classes?.shift?.id || 0,
@@ -473,10 +480,10 @@ export class SupervisorService {
         areaName: monitor.classes?.area?.name || 'no asignado',
         firstName: monitor.user.userProfile?.firstName || 'no asignado',
         lastName: monitor.user.userProfile?.lastName || 'no asignado',
-        email: monitor.user.email
-      }))
+        email: monitor.user.email,
+      })),
     };
-}
+  }
 
   // ─────── Métodos auxiliares ───────
 
