@@ -69,4 +69,7 @@ export class TeacherGetSummaryDto {
   })
   @Expose()
   maxHours: number | null;
+
+  @Expose()
+  scheduledHours: number;
 }

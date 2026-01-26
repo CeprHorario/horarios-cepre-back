@@ -197,7 +197,7 @@ export class TeacherController {
   delete(@Param('id') id: string) {
     return this.teacherService.delete(id);
   }
-  
+
   @Post('json')
   @Authorization({
     permission: 'teacher.importjson',
@@ -206,12 +206,11 @@ export class TeacherController {
   @ApiOperation({
     summary: 'Crear profesores desde un archivo JSON',
   })
-
   @ApiBody({ type: [CreateTeacherDto] })
   async createTeachersFromJson(@Body() importTeacherDto: CreateTeacherDto[]) {
     return this.teacherService.createManyTeachers(importTeacherDto);
   }
-  
+
   @Patch(':id/deactivate')
   @Authorization({
     permission: 'teacher.deactivate',

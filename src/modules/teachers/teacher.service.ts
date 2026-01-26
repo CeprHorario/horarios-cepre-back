@@ -122,6 +122,7 @@ export class TeacherService {
               name: true,
             },
           },
+          scheduledHours: true,
           user: {
             select: {
               email: true,
@@ -153,6 +154,7 @@ export class TeacherService {
         jobStatus: teacher.jobStatus || '',
         isCoordinator: teacher.isCoordinator || false,
         maxHours: teacher.maxHours || null,
+        scheduledHours: teacher.scheduledHours || null,
       }),
     );
 
