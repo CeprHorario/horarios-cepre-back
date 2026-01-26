@@ -15,13 +15,12 @@ import {
 } from '@nestjs/common';
 import { ClassService } from './class.service';
 //import { Prisma } from '@prisma/client';
-import {
-  UpdateClassDto,
-  ClassBaseDto,
-  ClassForTeacherDto,
-} from './dto';
+import { UpdateClassDto, ClassBaseDto, ClassForTeacherDto } from './dto';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { Authorization, Role } from '@modules/auth/decorators/authorization.decorator';
+import {
+  Authorization,
+  Role,
+} from '@modules/auth/decorators/authorization.decorator';
 import { ScheduleForClass } from './dto/scheduleForClass.dto';
 import { TeacherResponseDto } from '@modules/monitors/dto/teacher-response.dto';
 import { CreateClassDataDto } from './dto/CreateClassData.dto';

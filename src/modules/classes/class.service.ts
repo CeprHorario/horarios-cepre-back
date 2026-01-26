@@ -62,7 +62,7 @@ export class ClassService {
 
     const number = countClasses + 1 + 100 * body.shift_id;
 
-    const className = `${area.name[0]}-${number}`;
+    const className = `${area.name[0]}-${number}-${area.name}`;
 
     // Validar si la clase ya existe en la base de datos
     const existingClass = await this.prisma.getClient().class.findFirst({
