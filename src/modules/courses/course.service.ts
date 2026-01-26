@@ -68,19 +68,25 @@ export class CourseService {
   }
   private handleDatabaseError(error: any): never {
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      console.log('🔴 Prisma Error Code:', error.code, 'Message:', error.message);
       switch (error.code) {
         case 'P2002':
           throw new BadRequestException('Ya existe un curso con ese nombre.');
+        case 'P2003':
+          throw new BadRequestException(
+            'No se puede eliminar el curso porque tiene profesores, horarios o relaciones asociadas.',
+          );
         case 'P2025':
           throw new NotFoundException(
             'No se encontró el curso para actualizar o eliminar.',
           );
         default:
           throw new InternalServerErrorException(
-            'Error inesperado en la base de datos.',
+            `Error de base de datos (${error.code}): ${error.message}`,
           );
       }
     }
+    console.log('🔴 Error no manejado:', error);
     throw new InternalServerErrorException('Error interno del servidor.');
   }
 }

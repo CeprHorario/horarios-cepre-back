@@ -9,11 +9,7 @@ import { PrismaService } from '@database/prisma/prisma.service';
 
 const WEEKDAYS_COUNT = 6;
 
-import {
-  UpdateClassDto,
-  ClassBaseDto,
-  ClassForTeacherDto,
-} from './dto';
+import { UpdateClassDto, ClassBaseDto, ClassForTeacherDto } from './dto';
 import { plainToInstance } from 'class-transformer';
 import { ScheduleForTeacherDto } from '@modules/schedules/dto';
 import { HourSessionForTeacherDto } from '@modules/hour-session/dto';
@@ -30,6 +26,8 @@ import { ScheduleService } from '@modules/schedules/schedules.service';
 import * as rawScheduleBio from '@database/prisma/data/schedules/bio.json';
 import * as rawScheduleIng from '@database/prisma/data/schedules/ing.json';
 import * as rawScheduleSoc from '@database/prisma/data/schedules/soc.json';
+import * as rawScheduleExtra from '@database/prisma/data/schedules/extra.json';
+
 import { Weekday } from '@prisma/client';
 
 @Injectable()
@@ -64,7 +62,7 @@ export class ClassService {
 
     const number = countClasses + 1 + 100 * body.shift_id;
 
-    const className = `${area.name[0]}-${number}`;
+    const className = `${area.name[0]}-${number}-${area.name}`;
 
     // Validar si la clase ya existe en la base de datos
     const existingClass = await this.prisma.getClient().class.findFirst({
@@ -83,9 +81,11 @@ export class ClassService {
           ? parsedScheduleJson(rawScheduleIng as any)
           : area.name === 'Sociales'
             ? parsedScheduleJson(rawScheduleSoc as any)
-            : (() => {
-                throw new BadRequestException('Area no válida');
-              })();
+            : area.name === 'Extraordinario'
+              ? parsedScheduleJson(rawScheduleExtra as any)
+              : (() => {
+                  throw new BadRequestException('Area no válida');
+                })();
 
     const userEmail = `${number}${area.name[0].toLowerCase()}@cepr.unsa.pe`;
     const classResult = await this.prisma

@@ -7,6 +7,7 @@ import * as areaCourseHr from './area-course-hrs.json';
 import * as rawScheduleBio from './schedules/bio.json';
 import * as rawScheduleIng from './schedules/ing.json';
 import * as rawScheduleSoc from './schedules/soc.json';
+import * as rawScheduleExtra from './schedules/extra.json';
 
 import * as fs from 'fs/promises';
 import {
@@ -25,7 +26,6 @@ import {
 import {
   arrayMonitors,
   assignNumericIds,
-  assignUuidIds,
   generateHourSessions,
   generateScheduleData,
   getMapAndSorted,
@@ -60,10 +60,18 @@ export const initialDataSchema = async (
       ${sql}
       `);
 
+    // 0.5: Copy admin users from core_schema to new schema
+    await db.query(`
+      INSERT INTO ${schema}.users (id, email, password, is_active, created_at, updated_at, last_login, google_id, role)
+      SELECT id, email, password, is_active, created_at, updated_at, last_login, google_id, role
+      FROM core_schema.users
+      WHERE role = 'administrador'
+      ON CONFLICT (id) DO NOTHING;
+    `);
+
     // 1: Create the basic data in the database
     const { areas, shifts, sedes, hourSessions, courses } =
       await createBasicData(db, config.shifts);
-
     // 2: Insert monitors and classes into the database
     const { classes } = await createDataMonitors(
       db,
@@ -101,16 +109,40 @@ const createBasicData = async (
   shiftsBody: ShiftDetailDto[],
 ) => {
   // Destructure the data from the JSON files
-  const { users, areas, sedes } = rawData as DataInitial;
+  const { areas, sedes } = rawData as DataInitial;
   const { courses } = rawCourses as { courses: Course[] };
   const { areaCourse } = areaCourseHr as { areaCourse: AreaCourseHours[] };
 
+  // Determinar qué áreas se están creando basándose en shiftsBody
+  const areasBeingCreated = new Set<string>();
+  shiftsBody.forEach((shift) => {
+    shift.classesToAreas.forEach((classArea) => {
+      areasBeingCreated.add(classArea.area);
+    });
+  });
+
+  // Filtrar cursos según las áreas
+  const isExtraordinarioOnly =
+    areasBeingCreated.has('Extraordinario') && areasBeingCreated.size === 1;
+
+  const extraordinarioCourses = [
+    'Razonamiento Verbal',
+    'Razonamiento Matemático',
+    'Razonamiento Lógico',
+  ];
+  const filteredCourses = isExtraordinarioOnly
+    ? courses.filter((course) => extraordinarioCourses.includes(course.name))
+    : courses;
+
+  const filteredAreas = isExtraordinarioOnly
+    ? areas.filter((area) => area.name === 'Extraordinario')
+    : areas.filter((area) => area.name !== 'Extraordinario');
+
   // asingIds(users, areas, sedes, courses);
-  // Assign IDs to all data entities
-  const usersWithIds = assignUuidIds(users);
-  const areasWithIds = assignNumericIds(areas);
+  // Assign IDs to all data entities (usuarios ya fueron copiados desde core_schema)
+  const areasWithIds = assignNumericIds(filteredAreas);
   const sedesWithIds = assignNumericIds(sedes);
-  const coursesWithIds = assignNumericIds(courses);
+  const coursesWithIds = assignNumericIds(filteredCourses);
 
   // Validate and assign IDs to shifts and generate hour sessions
   const shiftsWithIds = shiftsBody.map((shift) => validateShiftTimes(shift));
@@ -119,7 +151,12 @@ const createBasicData = async (
   );
 
   // Assign hours to areas and courses
-  const areaCourseHours: AreaCourse[] = areaCourse.flatMap((area) => {
+
+  const areaCourseFiltered: AreaCourseHours[] = isExtraordinarioOnly
+    ? areaCourse.filter((area) => area.area === 'Extraordinario')
+    : areaCourse.filter((area) => area.area !== 'Extraordinario');
+
+  const areaCourseHours: AreaCourse[] = areaCourseFiltered.flatMap((area) => {
     const areaId = areasWithIds.find((a) => a.name === area.area)?.id;
     return area.hours.map((course) => {
       const courseId = coursesWithIds.find((c) => c.name === course.course)?.id;
@@ -131,9 +168,7 @@ const createBasicData = async (
     });
   });
 
-  // Crear consultas para todas las tablas de una forma más concisa
   const tablesToInsert = [
-    { table: 'users', data: usersWithIds },
     { table: 'areas', data: areasWithIds },
     { table: 'sedes', data: sedesWithIds },
     { table: 'courses', data: coursesWithIds },
@@ -206,6 +241,7 @@ export const createSchedules = async (
     bio: parsedScheduleJson(rawScheduleBio as any),
     ing: parsedScheduleJson(rawScheduleIng as any),
     soc: parsedScheduleJson(rawScheduleSoc as any),
+    extra: parsedScheduleJson(rawScheduleExtra as any),
   };
   const areas: string[] = [];
   shifts.map((s) => {
@@ -257,6 +293,17 @@ export const createSchedules = async (
       ...generateScheduleData(
         dataSchedules.soc,
         classes['Sociales'],
+        courseMap,
+        hourSessions,
+      ),
+    );
+  }
+
+  if (areas.includes('Extraordinario')) {
+    scheduleData.push(
+      ...generateScheduleData(
+        dataSchedules.extra,
+        classes['Extraordinario'],
         courseMap,
         hourSessions,
       ),

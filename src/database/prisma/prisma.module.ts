@@ -7,6 +7,6 @@ import { SchemaManagerModule } from '../schema-manager/schema-manager.module';
 @Module({
   imports: [AlsModule, SchemaManagerModule],
   providers: [PrismaService, PrismaClientFactory],
-  exports: [PrismaService],
+  exports: [PrismaService, PrismaClientFactory],
 })
 export class PrismaModule {}

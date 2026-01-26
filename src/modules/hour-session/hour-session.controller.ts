@@ -13,7 +13,10 @@ import {
 import { HourSessionService } from './hour-session.service';
 import { CreateHourSessionDto, UpdateHourSessionDto } from './dto/index';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
-import { Authorization } from '@modules/auth/decorators/authorization.decorator';
+import {
+  Authorization,
+  Role,
+} from '@modules/auth/decorators/authorization.decorator';
 
 @ApiTags('Hour Sessions')
 @Controller('hour-sessions')
@@ -35,6 +38,7 @@ export class HourSessionController {
 
   @Get()
   @Authorization({
+    roles: [Role.SUPERVISOR, Role.MONITOR, Role.TEACHER, Role.ADMIN],
     permission: 'hour-session.list',
     description: 'Listar las horas de sesión',
   })

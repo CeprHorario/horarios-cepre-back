@@ -182,6 +182,7 @@ export class AdmissionsService {
         },
       },
     });
+
     return plainToInstance(AdmissionBaseDto, obj, {
       excludePrefixes: ['id', 'isCurrent', 'createdAt'],
     });

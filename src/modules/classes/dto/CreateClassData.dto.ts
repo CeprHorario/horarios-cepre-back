@@ -1,8 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsIn, IsNumber } from 'class-validator';
 
-const validAreas: number[] = [1, 2, 3];
-const validShifts: number[] = [1, 2, 3];
+const validAreas: number[] = [1, 2, 3, 4];
+const validShifts: number[] = [1, 2, 3, 4];
 
 export class CreateClassDataDto {
   @IsNumber()

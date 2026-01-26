@@ -194,6 +194,23 @@
           "total": "4"
         }
       ]
+    },
+    {
+      "area": "Extraordinario",
+      "hours": [
+        {
+          "course": "Razonamiento Lógico",
+          "total": "24"
+        },
+        {
+          "course": "Razonamiento Matemático",
+          "total": "24"
+        },
+        {
+          "course": "Razonamiento Verbal",
+          "total": "48"
+        }
+      ]
     }
   ]
 }
