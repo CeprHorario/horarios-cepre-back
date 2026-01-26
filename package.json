@@ -29,7 +29,7 @@
   "dependencies": {
     "@nestjs/cache-manager": "^3.0.0",
     "@nestjs/common": "^11.0.1",
-    "@nestjs/config": "^1.1.5",
+    "@nestjs/config": "^4.0.1",
     "@nestjs/core": "^11.0.1",
     "@nestjs/jwt": "^11.0.0",
     "@nestjs/passport": "^11.0.5",
@@ -67,7 +67,7 @@
     "@types/pg": "^8.11.11",
     "@types/supertest": "^6.0.2",
     "cross-env": "^7.0.3",
-    "drizzle-kit": "^0.31.8",
+    "drizzle-kit": "^0.30.5",
     "eslint": "^9.18.0",
     "eslint-config-prettier": "^10.0.1",
     "eslint-plugin-prettier": "^5.2.2",
