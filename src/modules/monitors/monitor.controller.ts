@@ -110,10 +110,11 @@ export class MonitorController {
     page: number;
     limit: number;
   }> {
-
-    return this.monitorService.findAllBasicInfo(Number(page), Number(limit), 
-    areaId !== undefined ? Number(areaId) : undefined,
-    shiftId !== undefined ? Number(shiftId) : undefined,
+    return this.monitorService.findAllBasicInfo(
+      Number(page),
+      Number(limit),
+      areaId !== undefined ? Number(areaId) : undefined,
+      shiftId !== undefined ? Number(shiftId) : undefined,
     );
   }
 
