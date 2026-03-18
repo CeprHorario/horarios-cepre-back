@@ -4,6 +4,7 @@ import {
   NotFoundException,
   ConflictException,
 } from '@nestjs/common';
+import * as ExcelJS from 'exceljs';
 import { PrismaService } from '@database/prisma/prisma.service';
 import { TeacherBaseDto } from './dto';
 import { plainToInstance } from 'class-transformer';
@@ -806,5 +807,133 @@ export class TeacherService {
     );
 
     return { data, page, limit };
+  }
+
+  async exportToExcel(): Promise<Buffer> {
+    const teachers = await this.prisma.getClient().teacher.findMany({
+      where: { user: { isActive: true } },
+      orderBy: {
+        user: { userProfile: { lastName: 'asc' } },
+      },
+      select: {
+        maxHours: true,
+        scheduledHours: true,
+        jobStatus: true,
+        isCoordinator: true,
+        courses: { select: { name: true } },
+        user: {
+          select: {
+            email: true,
+            userProfile: {
+              select: {
+                dni: true,
+                firstName: true,
+                lastName: true,
+                phone: true,
+                phonesAdditional: true,
+                personalEmail: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'SISPAD';
+    workbook.created = new Date();
+
+    const sheet = workbook.addWorksheet('Docentes_Ceprunsa');
+
+    // ── Estilos de encabezado ──
+    const headerFill: ExcelJS.Fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: '1F3864' },
+    };
+    const headerFont: Partial<ExcelJS.Font> = {
+      bold: true,
+      color: { argb: 'FFFFFFFF' },
+      size: 11,
+    };
+    const headerAlignment: Partial<ExcelJS.Alignment> = {
+      horizontal: 'center',
+      vertical: 'middle',
+      wrapText: true,
+    };
+
+    sheet.columns = [
+      { header: 'N°', key: 'n', width: 5 },
+      { header: 'DNI', key: 'dni', width: 12 },
+      { header: 'Apellidos', key: 'lastName', width: 22 },
+      { header: 'Nombres', key: 'firstName', width: 22 },
+      { header: 'Correo inst.', key: 'email', width: 30 },
+      { header: 'Correo pers.', key: 'personalEmail', width: 30 },
+      { header: 'Teléfono', key: 'phone', width: 14 },
+      { header: 'Curso', key: 'course', width: 18 },
+      { header: 'Tipo contrato', key: 'jobStatus', width: 16 },
+      { header: 'Coordinador', key: 'isCoordinator', width: 14 },
+      { header: 'Horas máx.', key: 'maxHours', width: 12 },
+      { header: 'Horas asig.', key: 'scheduledHours', width: 12 },
+    ];
+
+    // Aplicar estilo a la fila de encabezado
+    sheet.getRow(1).eachCell((cell) => {
+      cell.fill = headerFill;
+      cell.font = headerFont;
+      cell.alignment = headerAlignment;
+      cell.border = {
+        bottom: { style: 'thin', color: { argb: 'FFFFFFFF' } },
+      };
+    });
+
+    // ── Filas de datos ──
+    teachers.forEach((t, idx) => {
+      const profile = t.user?.userProfile;
+      const row = sheet.addRow({
+        n: idx + 1,
+        dni: profile?.dni ?? '',
+        lastName: profile?.lastName ?? '',
+        firstName: profile?.firstName ?? '',
+        email: t.user?.email ?? '',
+        personalEmail: profile?.personalEmail ?? '',
+        phone: profile?.phone ?? '',
+        course: t.courses?.name ?? '',
+        jobStatus: t.jobStatus ?? '',
+        isCoordinator: t.isCoordinator ? 'Sí' : 'No',
+        maxHours: t.maxHours ?? 0,
+        scheduledHours: t.scheduledHours ?? 0,
+      });
+
+      // Zebra
+      if (idx % 2 === 0) {
+        row.eachCell((cell) => {
+          cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFF0F4FA' },
+          };
+        });
+      }
+
+      // Alinear columnas numéricas
+      ['n', 'maxHours', 'scheduledHours'].forEach((key) => {
+        const colIdx = sheet.columns.findIndex((c) => c.key === key) + 1;
+        if (colIdx > 0)
+          row.getCell(colIdx).alignment = { horizontal: 'center' };
+      });
+    });
+
+    // Auto-filtros
+    /*sheet.autoFilter = {
+      from: { row: 1, column: 1 },
+      to: { row: 1, column: sheet.columns.length },
+    };*/
+
+    // Fijar primera fila
+    sheet.views = [{ state: 'frozen', ySplit: 1 }];
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    return Buffer.from(buffer);
   }
 }

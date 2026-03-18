@@ -11,7 +11,9 @@ import {
   NotFoundException,
   HttpCode,
   HttpStatus,
+  Res,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { TeacherService } from './teacher.service';
 import { CreateTeacherWithUserDto } from './dto/create-teacher.dto';
 import { Authorization } from '@modules/auth/decorators/authorization.decorator';
@@ -143,6 +145,32 @@ export class TeacherController {
     limit: number;
   }> {
     return this.teacherService.search(query, Number(page), Number(limit));
+  }
+
+  @Get('export')
+  @Authorization({
+    permission: 'teacher.export',
+    description: 'Exportar profesores a Excel',
+  })
+  @ApiOperation({
+    summary: 'Exportar listado de profesores a Excel',
+    description:
+      'Descarga un archivo .xlsx con los datos personales y horas asignadas de todos los profesores activos.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Archivo Excel generado correctamente',
+  })
+  async exportTeachers(@Res() res: Response): Promise<void> {
+    const buffer = await this.teacherService.exportToExcel();
+    const filename = `docentes_ceprunsa_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    res.set({
+      'Content-Type':
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Content-Length': buffer.length,
+    });
+    res.end(buffer);
   }
 
   @Get(':id')
