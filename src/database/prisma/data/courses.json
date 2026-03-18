@@ -46,6 +46,11 @@
       "description": "ROSA CHICLE"
     },
     {
+      "name": "Matemática",
+      "color": "#33B679",
+      "description": "VERDE ESMERALDA"
+    },
+    {
       "name": "Psicología",
       "color": "#8E24AA",
       "description": "MORADO INTENSO"
@@ -55,11 +60,7 @@
       "color": "#F6BF26",
       "description": "AMARILLO HUEVO"
     },
-    {
-      "name": "Matemática",
-      "color": "#33B679",
-      "description": "VERDE ESMERALDA"
-    },
+
     {
       "name": "Razonamiento Lógico",
       "color": "#7986CB",
