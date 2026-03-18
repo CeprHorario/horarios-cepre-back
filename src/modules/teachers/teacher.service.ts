@@ -386,7 +386,7 @@ export class TeacherService {
         let maxHours: number;
         if (isCoordinator) {
           maxHours = jobStatus === 'FullTime' ? 12 : 16;
-        } else if (courseId === 12) {
+        } else if (courseId === 10) {
           maxHours = jobStatus === 'FullTime' ? 16 : 21;
         } else {
           maxHours = jobStatus === 'FullTime' ? 16 : 20;
