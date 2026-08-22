@@ -696,6 +696,8 @@ export class TeacherService {
           select: {
             id: true,
             name: true,
+            urlMeet: true,
+            urlClassroom: true,
             area: {
               select: {
                 id: true,
@@ -733,6 +735,8 @@ export class TeacherService {
               areaName: s.clas.area.name,
               shiftId: s.clas.shift.id,
               shiftName: s.clas.shift.name,
+              urlMeet: s.clas.urlMeet || '',
+              urlClassroom: s.clas.urlClassroom || '',
               schedules: [],
             });
           map.get(key)!.schedules.push({
