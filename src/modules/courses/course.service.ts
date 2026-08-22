@@ -20,9 +20,11 @@ export class CourseService {
     }
   }
 
-  async findAll() {
+  async findAll(courseId?: number) {
     try {
-      return await this.prisma.getClient().course.findMany();
+      return await this.prisma.getClient().course.findMany({
+        where: courseId !== undefined ? { id: courseId } : undefined,
+      });
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (error) {
       throw new InternalServerErrorException('Error al obtener los cursos.');
@@ -68,7 +70,12 @@ export class CourseService {
   }
   private handleDatabaseError(error: any): never {
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      console.log('🔴 Prisma Error Code:', error.code, 'Message:', error.message);
+      console.log(
+        '🔴 Prisma Error Code:',
+        error.code,
+        'Message:',
+        error.message,
+      );
       switch (error.code) {
         case 'P2002':
           throw new BadRequestException('Ya existe un curso con ese nombre.');

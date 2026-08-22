@@ -13,6 +13,7 @@ export enum Role {
   MONITOR = 'monitor',
   SUPERVISOR = 'supervisor',
   TEACHER = 'profesor',
+  COORDINATOR = 'coordinador',
 }
 
 export const Authorization = ({

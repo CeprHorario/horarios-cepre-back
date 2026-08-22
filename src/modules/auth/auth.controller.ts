@@ -61,8 +61,8 @@ export class AuthController {
 
   @Authorization({
     roles: [Role.SUPERVISOR, Role.MONITOR, Role.TEACHER, Role.ADMIN],
-    permission: 'supervisor.monitors',
-    description: 'Obtiene los monitores de este supervisor',
+    permission: 'auth.userInfo',
+    description: 'Obtiene la informaciÃ³n del usuario autenticado',
   })
   @Get('user-info')
   async getUserInfo(@Headers('authorization') authHeader: string) {

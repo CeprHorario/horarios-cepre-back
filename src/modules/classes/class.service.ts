@@ -156,8 +156,18 @@ export class ClassService {
     return classResult;
   }
 
-  async findAll(): Promise<ClassBaseDto[]> {
+  async findAll(courseId?: number): Promise<ClassBaseDto[]> {
     const classes = await this.prisma.getClient().class.findMany({
+      where:
+        courseId !== undefined
+          ? {
+              schedules: {
+                some: {
+                  courseId,
+                },
+              },
+            }
+          : undefined,
       include: {
         sede: true,
         area: true,
@@ -217,9 +227,20 @@ export class ClassService {
     return classesWithStatus.map((clas) => this.mapToClassDto(clas));
   }
 
-  async findOne(id: string): Promise<ClassBaseDto> {
-    const obj = await this.prisma.getClient().class.findUnique({
-      where: { id },
+  async findOne(id: string, courseId?: number): Promise<ClassBaseDto> {
+    const obj = await this.prisma.getClient().class.findFirst({
+      where: {
+        id,
+        ...(courseId !== undefined
+          ? {
+              schedules: {
+                some: {
+                  courseId,
+                },
+              },
+            }
+          : {}),
+      },
       include: {
         sede: true,
         area: true,
@@ -426,9 +447,15 @@ export class ClassService {
    * @returns - Lista de horarios de la clase
    * @throws NotFoundException - Si no se encuentran horarios para la clase
    */
-  async getSchedulesByClassId(classId: string): Promise<ScheduleForClass[]> {
+  async getSchedulesByClassId(
+    classId: string,
+    courseId?: number,
+  ): Promise<ScheduleForClass[]> {
     const schedules = await this.prisma.getClient().schedule.findMany({
-      where: { classId },
+      where: {
+        classId,
+        ...(courseId !== undefined && { courseId }),
+      },
       select: {
         id: true,
         weekday: true,
@@ -457,10 +484,16 @@ export class ClassService {
     }));
   }
 
-  async getTeachersByClassId(classId: string): Promise<TeacherResponseDto[]> {
+  async getTeachersByClassId(
+    classId: string,
+    courseId?: number,
+  ): Promise<TeacherResponseDto[]> {
     const teachers = await this.prisma.getClient().schedule.findMany({
       distinct: ['teacherId'],
-      where: { classId },
+      where: {
+        classId,
+        ...(courseId !== undefined && { courseId }),
+      },
       select: {
         teacher: {
           select: {

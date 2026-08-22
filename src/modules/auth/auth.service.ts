@@ -2,6 +2,10 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '@database/prisma/prisma.service';
 import { AuthResponseDto } from '@modules/auth/dto/auth-google.dto';
 import { JwtService } from '@nestjs/jwt';
+import {
+  COORDINATOR_ROLE,
+  parseCoordinatorRole,
+} from '@modules/auth/utils/coordinator-role';
 //import e from 'express';
 
 @Injectable()
@@ -25,7 +29,7 @@ export class AuthService {
 
     const payload = { email: user.email, id: user.id, role: user.role };
     const token = this.jwtService.sign(payload, {
-      expiresIn: process.env.JWT_EXPIRES_IN || '8h', 
+      expiresIn: process.env.JWT_EXPIRES_IN || '8h',
     });
     return {
       token,
@@ -46,10 +50,14 @@ export class AuthService {
       if (!user) {
         throw new UnauthorizedException('Usuario no encontrado');
       }
+      const coordinatorScope = parseCoordinatorRole(user.role);
+
       return {
         id: user.id,
         email: user.email,
-        role: user.role,
+        role: coordinatorScope.isCoordinator ? COORDINATOR_ROLE : user.role,
+        rawRole: user.role,
+        coordinatorCourseId: coordinatorScope.courseId ?? null,
         firstName: user.userProfile?.firstName,
         lastName: user.userProfile?.lastName,
       };

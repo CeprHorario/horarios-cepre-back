@@ -162,10 +162,13 @@ export class TeacherService {
     return { data, total, page, limit };
   }
 
-  async findOne(id: string): Promise<TeacherGetByIdDto> {
+  async findOne(id: string, courseId?: number): Promise<TeacherGetByIdDto> {
     try {
-      const teacher = await this.prisma.getClient().teacher.findUnique({
-        where: { id },
+      const teacher = await this.prisma.getClient().teacher.findFirst({
+        where: {
+          id,
+          ...(courseId !== undefined && { courseId }),
+        },
         include: {
           user: {
             select: {
@@ -488,6 +491,7 @@ export class TeacherService {
     query: string,
     page: number = 1,
     limit: number = 20,
+    courseId?: number,
   ): Promise<{
     data: TeacherGetSummaryDto[];
     total: number;
@@ -501,6 +505,7 @@ export class TeacherService {
         skip: limit > 0 ? offset : undefined,
         take: limit > 0 ? limit : undefined,
         where: {
+          ...(courseId !== undefined && { courses: { id: courseId } }),
           OR: [
             {
               user: {
@@ -552,6 +557,7 @@ export class TeacherService {
       }),
       this.prisma.getClient().teacher.count({
         where: {
+          ...(courseId !== undefined && { courses: { id: courseId } }),
           OR: [
             {
               user: {
@@ -670,9 +676,15 @@ export class TeacherService {
   //async getTeacherSchedules(teacherId: string) {
   //  return Promise.resolve(undefined);
   //}
-  async getTeacherSchedules(teacherId: string): Promise<ScheduleTeacherDto[]> {
+  async getTeacherSchedules(
+    teacherId: string,
+    courseId?: number,
+  ): Promise<ScheduleTeacherDto[]> {
     const schedules = await this.prisma.getClient().schedule.findMany({
-      where: { teacherId },
+      where: {
+        teacherId,
+        ...(courseId !== undefined && { courseId }),
+      },
       include: {
         course: {
           select: {
@@ -809,35 +821,106 @@ export class TeacherService {
     return { data, page, limit };
   }
 
-  async exportToExcel(): Promise<Buffer> {
-    const teachers = await this.prisma.getClient().teacher.findMany({
-      where: { user: { isActive: true } },
-      orderBy: {
-        user: { userProfile: { lastName: 'asc' } },
-      },
-      select: {
-        maxHours: true,
-        scheduledHours: true,
-        jobStatus: true,
-        isCoordinator: true,
-        courses: { select: { name: true } },
-        user: {
-          select: {
-            email: true,
-            userProfile: {
-              select: {
-                dni: true,
-                firstName: true,
-                lastName: true,
-                phone: true,
-                phonesAdditional: true,
-                personalEmail: true,
+  async exportToExcel(courseId?: number): Promise<Buffer> {
+    const prisma = this.prisma.getClient();
+    const [teachers, shifts, schedules] = await prisma.$transaction([
+      prisma.teacher.findMany({
+        where: {
+          user: { isActive: true },
+          ...(courseId !== undefined && { courses: { id: courseId } }),
+        },
+        orderBy: {
+          user: { userProfile: { lastName: 'asc' } },
+        },
+        select: {
+          id: true,
+          maxHours: true,
+          scheduledHours: true,
+          jobStatus: true,
+          isCoordinator: true,
+          courses: { select: { name: true } },
+          user: {
+            select: {
+              email: true,
+              userProfile: {
+                select: {
+                  dni: true,
+                  firstName: true,
+                  lastName: true,
+                  phone: true,
+                  phonesAdditional: true,
+                  personalEmail: true,
+                },
               },
             },
           },
         },
-      },
-    });
+      }),
+      prisma.shift.findMany({
+        orderBy: { id: 'asc' },
+        select: {
+          id: true,
+          name: true,
+        },
+      }),
+      prisma.schedule.findMany({
+        where: courseId !== undefined ? { courseId } : undefined,
+        select: {
+          course: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          clas: {
+            select: {
+              id: true,
+              name: true,
+              shiftId: true,
+            },
+          },
+          teacherId: true,
+          teacher: {
+            select: {
+              id: true,
+              user: {
+                select: {
+                  email: true,
+                  userProfile: {
+                    select: {
+                      dni: true,
+                      firstName: true,
+                      lastName: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      }),
+    ]);
+
+    const shiftColumns = shifts.map((shift) => ({
+      header: `Horas ${shift.name}`,
+      key: `shift_${shift.id}`,
+      width: Math.max(14, `Horas ${shift.name}`.length + 2),
+    }));
+    const activeTeacherIds = new Set(teachers.map((teacher) => teacher.id));
+    const scheduledHoursByTeacherAndShift = schedules.reduce<
+      Record<string, Record<string, number>>
+    >((acc, schedule) => {
+      if (!schedule.teacherId || !activeTeacherIds.has(schedule.teacherId)) {
+        return acc;
+      }
+
+      const shiftKey = `shift_${schedule.clas.shiftId}`;
+      acc[schedule.teacherId] ??= {};
+      acc[schedule.teacherId][shiftKey] =
+        (acc[schedule.teacherId][shiftKey] ?? 0) + 1;
+
+      return acc;
+    }, {});
 
     const workbook = new ExcelJS.Workbook();
     workbook.creator = 'SISPAD';
@@ -875,6 +958,7 @@ export class TeacherService {
       { header: 'Coordinador', key: 'isCoordinator', width: 14 },
       { header: 'Horas máx.', key: 'maxHours', width: 12 },
       { header: 'Horas asig.', key: 'scheduledHours', width: 12 },
+      ...shiftColumns,
     ];
 
     // Aplicar estilo a la fila de encabezado
@@ -890,6 +974,19 @@ export class TeacherService {
     // ── Filas de datos ──
     teachers.forEach((t, idx) => {
       const profile = t.user?.userProfile;
+      const scheduledHoursByShift = shifts.reduce<Record<string, number>>(
+        (acc, shift) => {
+          acc[`shift_${shift.id}`] = 0;
+          return acc;
+        },
+        {},
+      );
+
+      Object.assign(
+        scheduledHoursByShift,
+        scheduledHoursByTeacherAndShift[t.id],
+      );
+
       const row = sheet.addRow({
         n: idx + 1,
         dni: profile?.dni ?? '',
@@ -903,6 +1000,7 @@ export class TeacherService {
         isCoordinator: t.isCoordinator ? 'Sí' : 'No',
         maxHours: t.maxHours ?? 0,
         scheduledHours: t.scheduledHours ?? 0,
+        ...scheduledHoursByShift,
       });
 
       // Zebra
@@ -917,7 +1015,12 @@ export class TeacherService {
       }
 
       // Alinear columnas numéricas
-      ['n', 'maxHours', 'scheduledHours'].forEach((key) => {
+      [
+        'n',
+        'maxHours',
+        'scheduledHours',
+        ...shiftColumns.map((column) => column.key),
+      ].forEach((key) => {
         const colIdx = sheet.columns.findIndex((c) => c.key === key) + 1;
         if (colIdx > 0)
           row.getCell(colIdx).alignment = { horizontal: 'center' };
@@ -932,6 +1035,100 @@ export class TeacherService {
 
     // Fijar primera fila
     sheet.views = [{ state: 'frozen', ySplit: 1 }];
+
+    const detailSheet = workbook.addWorksheet('Horas_por_salon');
+    detailSheet.columns = [
+      { header: 'N°', key: 'n', width: 5 },
+      { header: 'DNI', key: 'dni', width: 12 },
+      { header: 'Profesor', key: 'teacherName', width: 36 },
+      { header: 'Email institucional', key: 'institutionalEmail', width: 30 },
+      { header: 'Salón', key: 'className', width: 20 },
+      { header: 'Curso', key: 'courseName', width: 22 },
+      { header: 'Horas', key: 'hours', width: 10 },
+    ];
+
+    detailSheet.getRow(1).eachCell((cell) => {
+      cell.fill = headerFill;
+      cell.font = headerFont;
+      cell.alignment = headerAlignment;
+      cell.border = {
+        bottom: { style: 'thin', color: { argb: 'FFFFFFFF' } },
+      };
+    });
+
+    const detailRows = new Map<
+      string,
+      {
+        dni: string;
+        teacherName: string;
+        institutionalEmail: string;
+        className: string;
+        courseName: string;
+        hours: number;
+      }
+    >();
+
+    schedules.forEach((schedule) => {
+      const profile = schedule.teacher?.user.userProfile;
+      const teacherName =
+        `${profile?.lastName ?? ''} ${profile?.firstName ?? ''}`.trim() ||
+        'Sin docente asignado';
+      const teacherKey = schedule.teacher?.id ?? 'sin_docente';
+
+      const key = [teacherKey, schedule.clas.id, schedule.course.id].join('|');
+      const current = detailRows.get(key);
+
+      if (current) {
+        current.hours += 1;
+        return;
+      }
+
+      detailRows.set(key, {
+        dni: profile?.dni ?? '',
+        teacherName,
+        institutionalEmail: schedule.teacher?.user.email ?? '',
+        className: schedule.clas.name,
+        courseName: schedule.course.name,
+        hours: 1,
+      });
+    });
+
+    Array.from(detailRows.values())
+      .sort((a, b) => {
+        const byTeacher = a.teacherName.localeCompare(b.teacherName);
+        if (byTeacher !== 0) return byTeacher;
+
+        const byClass = a.className.localeCompare(b.className);
+        if (byClass !== 0) return byClass;
+
+        return a.courseName.localeCompare(b.courseName);
+      })
+      .forEach((detail, idx) => {
+        const row = detailSheet.addRow({
+          n: idx + 1,
+          ...detail,
+        });
+
+        if (idx % 2 === 0) {
+          row.eachCell((cell) => {
+            cell.fill = {
+              type: 'pattern',
+              pattern: 'solid',
+              fgColor: { argb: 'FFF0F4FA' },
+            };
+          });
+        }
+
+        ['n', 'hours'].forEach((key) => {
+          const colIdx =
+            detailSheet.columns.findIndex((column) => column.key === key) + 1;
+          if (colIdx > 0) {
+            row.getCell(colIdx).alignment = { horizontal: 'center' };
+          }
+        });
+      });
+
+    detailSheet.views = [{ state: 'frozen', ySplit: 1 }];
 
     const buffer = await workbook.xlsx.writeBuffer();
     return Buffer.from(buffer);

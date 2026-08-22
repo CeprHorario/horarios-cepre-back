@@ -24,6 +24,7 @@ import {
 import { ScheduleForClass } from './dto/scheduleForClass.dto';
 import { TeacherResponseDto } from '@modules/monitors/dto/teacher-response.dto';
 import { CreateClassDataDto } from './dto/CreateClassData.dto';
+import { getCoordinatorCourseId } from '@modules/auth/utils/coordinator-role';
 
 @Controller('classes')
 @ApiTags('Classes')
@@ -56,8 +57,12 @@ export class ClassController {
   })
   async getSchedulesByClassId(
     @Param('classId', ParseUUIDPipe) classId: string,
+    @Req() req,
   ): Promise<ScheduleForClass[]> {
-    return await this.classService.getSchedulesByClassId(classId);
+    return await this.classService.getSchedulesByClassId(
+      classId,
+      getCoordinatorCourseId(req.user?.role),
+    );
   }
 
   @Get(':classId/teachers')
@@ -72,8 +77,12 @@ export class ClassController {
   })
   async getTeachersByClassId(
     @Param('classId', ParseUUIDPipe) classId: string,
+    @Req() req,
   ): Promise<TeacherResponseDto[]> {
-    return await this.classService.getTeachersByClassId(classId);
+    return await this.classService.getTeachersByClassId(
+      classId,
+      getCoordinatorCourseId(req.user?.role),
+    );
   }
 
   // ─────── CRUD ───────
@@ -88,8 +97,8 @@ export class ClassController {
     summary: 'Obtener todas las clases',
     description: 'Get all classes',
   })
-  findAll(): Promise<ClassBaseDto[]> {
-    return this.classService.findAll();
+  findAll(@Req() req): Promise<ClassBaseDto[]> {
+    return this.classService.findAll(getCoordinatorCourseId(req.user?.role));
   }
 
   @Get('getClassOfTeacher')
@@ -123,8 +132,14 @@ export class ClassController {
     summary: 'Obtener una clase por id',
     description: 'Get a class by id',
   })
-  findOne(@Param('id', ParseUUIDPipe) id: string): Promise<ClassBaseDto> {
-    return this.classService.findOne(id);
+  findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req,
+  ): Promise<ClassBaseDto> {
+    return this.classService.findOne(
+      id,
+      getCoordinatorCourseId(req.user?.role),
+    );
   }
 
   @Put(':id')

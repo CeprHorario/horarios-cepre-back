@@ -9,6 +9,7 @@ import {
   HttpCode,
   HttpStatus,
   ParseIntPipe,
+  Req,
 } from '@nestjs/common';
 import { AreaCourseHourService } from './area-course-hour.service';
 import {
@@ -18,6 +19,7 @@ import {
 } from './dto';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Authorization } from '@modules/auth/decorators/authorization.decorator';
+import { getCoordinatorCourseId } from '@modules/auth/utils/coordinator-role';
 
 @Controller('area-course-hours')
 @ApiTags('AreaCourseHours')
@@ -51,8 +53,10 @@ export class AreaCourseHourController {
     summary: 'Obtener todas las horas de curso-area',
     description: 'Get all areas course hours',
   })
-  findAllAreas(): Promise<AreaCourseHourBaseDto[]> {
-    return this.areaCourseHourService.findAll();
+  findAllAreas(@Req() req): Promise<AreaCourseHourBaseDto[]> {
+    return this.areaCourseHourService.findAll(
+      getCoordinatorCourseId(req.user?.role),
+    );
   }
 
   @Get(':id')
@@ -67,8 +71,12 @@ export class AreaCourseHourController {
   })
   findOneArea(
     @Param('id', ParseIntPipe) id: number,
+    @Req() req,
   ): Promise<AreaCourseHourBaseDto> {
-    return this.areaCourseHourService.findOne(id);
+    return this.areaCourseHourService.findOne(
+      id,
+      getCoordinatorCourseId(req.user?.role),
+    );
   }
 
   @Put(':id')
