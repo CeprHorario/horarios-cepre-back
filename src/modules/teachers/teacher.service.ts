@@ -162,10 +162,13 @@ export class TeacherService {
     return { data, total, page, limit };
   }
 
-  async findOne(id: string): Promise<TeacherGetByIdDto> {
+  async findOne(id: string, courseId?: number): Promise<TeacherGetByIdDto> {
     try {
-      const teacher = await this.prisma.getClient().teacher.findUnique({
-        where: { id },
+      const teacher = await this.prisma.getClient().teacher.findFirst({
+        where: {
+          id,
+          ...(courseId !== undefined && { courseId }),
+        },
         include: {
           user: {
             select: {
@@ -488,6 +491,7 @@ export class TeacherService {
     query: string,
     page: number = 1,
     limit: number = 20,
+    courseId?: number,
   ): Promise<{
     data: TeacherGetSummaryDto[];
     total: number;
@@ -501,6 +505,7 @@ export class TeacherService {
         skip: limit > 0 ? offset : undefined,
         take: limit > 0 ? limit : undefined,
         where: {
+          ...(courseId !== undefined && { courses: { id: courseId } }),
           OR: [
             {
               user: {
@@ -552,6 +557,7 @@ export class TeacherService {
       }),
       this.prisma.getClient().teacher.count({
         where: {
+          ...(courseId !== undefined && { courses: { id: courseId } }),
           OR: [
             {
               user: {
@@ -670,9 +676,15 @@ export class TeacherService {
   //async getTeacherSchedules(teacherId: string) {
   //  return Promise.resolve(undefined);
   //}
-  async getTeacherSchedules(teacherId: string): Promise<ScheduleTeacherDto[]> {
+  async getTeacherSchedules(
+    teacherId: string,
+    courseId?: number,
+  ): Promise<ScheduleTeacherDto[]> {
     const schedules = await this.prisma.getClient().schedule.findMany({
-      where: { teacherId },
+      where: {
+        teacherId,
+        ...(courseId !== undefined && { courseId }),
+      },
       include: {
         course: {
           select: {
@@ -809,11 +821,14 @@ export class TeacherService {
     return { data, page, limit };
   }
 
-  async exportToExcel(): Promise<Buffer> {
+  async exportToExcel(courseId?: number): Promise<Buffer> {
     const prisma = this.prisma.getClient();
     const [teachers, shifts, schedules] = await prisma.$transaction([
       prisma.teacher.findMany({
-        where: { user: { isActive: true } },
+        where: {
+          user: { isActive: true },
+          ...(courseId !== undefined && { courses: { id: courseId } }),
+        },
         orderBy: {
           user: { userProfile: { lastName: 'asc' } },
         },
@@ -849,6 +864,7 @@ export class TeacherService {
         },
       }),
       prisma.schedule.findMany({
+        where: courseId !== undefined ? { courseId } : undefined,
         select: {
           course: {
             select: {

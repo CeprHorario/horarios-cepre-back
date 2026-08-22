@@ -12,6 +12,8 @@ import {
   Patch,
   BadRequestException,
   Query,
+  Req,
+  ForbiddenException,
 } from '@nestjs/common';
 import { ScheduleService } from './schedules.service';
 import { ScheduleBaseDto, CreateScheduleDto, UpdateScheduleDto } from './dto';
@@ -23,6 +25,7 @@ import {
 import { LoadScheduleDto } from './dto';
 import { Weekday } from '@prisma/client';
 import { Unauthenticated } from '@modules/auth/decorators/unauthenticated.decorator';
+import { getCoordinatorCourseId } from '@modules/auth/utils/coordinator-role';
 
 @Controller('schedules')
 @ApiTags('Schedules')
@@ -80,8 +83,8 @@ export class ScheduleController {
     summary: 'Obtener todos los horarios',
     description: 'Get all schedules',
   })
-  findAll(): Promise<ScheduleBaseDto[]> {
-    return this.scheduleService.findAll();
+  findAll(@Req() req): Promise<ScheduleBaseDto[]> {
+    return this.scheduleService.findAll(getCoordinatorCourseId(req.user?.role));
   }
 
   @Get(':id')
@@ -94,8 +97,14 @@ export class ScheduleController {
     summary: 'Obtener un horario por id',
     description: 'Get a schedule by id',
   })
-  findOne(@Param('id', ParseIntPipe) id: number): Promise<ScheduleBaseDto> {
-    return this.scheduleService.findOne(id);
+  findOne(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req,
+  ): Promise<ScheduleBaseDto> {
+    return this.scheduleService.findOne(
+      id,
+      getCoordinatorCourseId(req.user?.role),
+    );
   }
 
   @Put(':id')
@@ -187,7 +196,7 @@ export class ScheduleController {
       const updatedSchedules =
         await this.scheduleService.unassignTeacherFromSchedules(
           classroomIds,
-          teacherId
+          teacherId,
         );
 
       return {
@@ -216,7 +225,13 @@ export class ScheduleController {
     @Query('pageSize', ParseIntPipe) pageSize: number = 10,
     @Query('area_id') areaId?: number,
     @Query('shift_id') shiftId?: number,
+    @Req() req?,
   ) {
+    const coordinatorCourseId = getCoordinatorCourseId(req.user?.role);
+    if (coordinatorCourseId !== undefined && coordinatorCourseId !== courseId) {
+      throw new ForbiddenException('Curso no autorizado');
+    }
+
     try {
       const parsedHorario = JSON.parse(horario) as Array<{
         id_hour_session: number;
@@ -244,5 +259,4 @@ export class ScheduleController {
       throw error;
     }
   }
-
 }

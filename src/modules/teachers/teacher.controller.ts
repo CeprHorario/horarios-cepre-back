@@ -12,6 +12,8 @@ import {
   HttpCode,
   HttpStatus,
   Res,
+  Req,
+  ForbiddenException,
 } from '@nestjs/common';
 import { Response } from 'express';
 import { TeacherService } from './teacher.service';
@@ -33,6 +35,7 @@ import {
 import { TeacherGetByIdDto } from './dto/teacher-get-by-id.dto';
 import { ScheduleTeacherDto } from './dto/schedule-teacher.dto';
 import { TeacherFilteredDto } from '@modules/teachers/dto/teacherFiltered.dto';
+import { getCoordinatorCourseId } from '@modules/auth/utils/coordinator-role';
 
 @ApiTags('Teachers')
 @Controller('teachers')
@@ -95,13 +98,18 @@ export class TeacherController {
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 20,
     @Query('courseId') courseId?: number,
+    @Req() req?,
   ): Promise<{
     data: TeacherGetSummaryDto[];
     total: number;
     page: number;
     limit: number;
   }> {
-    return this.teacherService.findAll(page, limit, courseId);
+    return this.teacherService.findAll(
+      page,
+      limit,
+      getCoordinatorCourseId(req.user?.role) ?? courseId,
+    );
   }
 
   @Get('search')
@@ -138,13 +146,19 @@ export class TeacherController {
     @Query('query') query: string,
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 20,
+    @Req() req?,
   ): Promise<{
     data: TeacherGetSummaryDto[];
     total: number;
     page: number;
     limit: number;
   }> {
-    return this.teacherService.search(query, Number(page), Number(limit));
+    return this.teacherService.search(
+      query,
+      Number(page),
+      Number(limit),
+      getCoordinatorCourseId(req.user?.role),
+    );
   }
 
   @Get('export')
@@ -161,8 +175,10 @@ export class TeacherController {
     status: 200,
     description: 'Archivo Excel generado correctamente',
   })
-  async exportTeachers(@Res() res: Response): Promise<void> {
-    const buffer = await this.teacherService.exportToExcel();
+  async exportTeachers(@Res() res: Response, @Req() req): Promise<void> {
+    const buffer = await this.teacherService.exportToExcel(
+      getCoordinatorCourseId(req.user?.role),
+    );
     const filename = `docentes_ceprunsa_${new Date().toISOString().slice(0, 10)}.xlsx`;
     res.set({
       'Content-Type':
@@ -189,8 +205,14 @@ export class TeacherController {
     status: 404,
     description: 'Profesor no encontrado',
   })
-  async findOne(@Param('id') id: string): Promise<TeacherGetByIdDto> {
-    const teacher = await this.teacherService.findOne(id);
+  async findOne(
+    @Param('id') id: string,
+    @Req() req,
+  ): Promise<TeacherGetByIdDto> {
+    const teacher = await this.teacherService.findOne(
+      id,
+      getCoordinatorCourseId(req.user?.role),
+    );
     if (!teacher) {
       throw new NotFoundException(`Profesor con ID ${id} no encontrado`);
     }
@@ -268,8 +290,12 @@ export class TeacherController {
   })
   async getTeacherSchedules(
     @Param('teacherId') teacherId: string,
+    @Req() req,
   ): Promise<ScheduleTeacherDto[]> {
-    return this.teacherService.getTeacherSchedules(teacherId);
+    return this.teacherService.getTeacherSchedules(
+      teacherId,
+      getCoordinatorCourseId(req.user?.role),
+    );
   }
 
   @Get('by-course/:courseId')
@@ -295,9 +321,18 @@ export class TeacherController {
     @Param('courseId') courseId: string,
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 20,
+    @Req() req?,
   ) {
+    const coordinatorCourseId = getCoordinatorCourseId(req.user?.role);
+    if (
+      coordinatorCourseId !== undefined &&
+      coordinatorCourseId !== Number(courseId)
+    ) {
+      throw new ForbiddenException('Curso no autorizado');
+    }
+
     return this.teacherService.findByCourse(
-      courseId,
+      String(coordinatorCourseId ?? courseId),
       Number(page),
       Number(limit),
     );

@@ -24,16 +24,20 @@ export class AreaCourseHourService {
     return this.mapToAreaCourseHourDto(obj);
   }
 
-  async findAll(): Promise<AreaCourseHourBaseDto[]> {
+  async findAll(courseId?: number): Promise<AreaCourseHourBaseDto[]> {
     const objs = await this.prisma.getClient().areaCourseHour.findMany({
+      where: courseId !== undefined ? { courseId } : undefined,
       include: { area: true, course: true },
     });
     return objs.map((data) => this.mapToAreaCourseHourDto(data));
   }
 
-  async findOne(id: number): Promise<AreaCourseHourBaseDto> {
-    const obj = await this.prisma.getClient().areaCourseHour.findUnique({
-      where: { id },
+  async findOne(id: number, courseId?: number): Promise<AreaCourseHourBaseDto> {
+    const obj = await this.prisma.getClient().areaCourseHour.findFirst({
+      where: {
+        id,
+        ...(courseId !== undefined && { courseId }),
+      },
       include: { area: true, course: true },
     });
     if (!obj) {

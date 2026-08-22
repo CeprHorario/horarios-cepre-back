@@ -105,16 +105,20 @@ export class ScheduleService {
     return this.mapToScheduleDto(schedule);
   }
 
-  async findAll(): Promise<ScheduleBaseDto[]> {
+  async findAll(courseId?: number): Promise<ScheduleBaseDto[]> {
     const schedule = await this.prisma.getClient().schedule.findMany({
+      where: courseId !== undefined ? { courseId } : undefined,
       include: { clas: true, hourSession: true, teacher: true },
     });
     return schedule.map((data) => this.mapToScheduleDto(data));
   }
 
-  async findOne(id: number): Promise<ScheduleBaseDto> {
-    const schedule = await this.prisma.getClient().schedule.findUnique({
-      where: { id },
+  async findOne(id: number, courseId?: number): Promise<ScheduleBaseDto> {
+    const schedule = await this.prisma.getClient().schedule.findFirst({
+      where: {
+        id,
+        ...(courseId !== undefined && { courseId }),
+      },
       include: { clas: true, hourSession: true, teacher: true },
     });
     if (!schedule) {

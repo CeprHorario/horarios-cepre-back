@@ -9,12 +9,16 @@ import {
   ParseIntPipe,
   HttpException,
   HttpStatus,
+  Req,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
 import { CourseService } from './course.service';
 import { CreateCourseDto, UpdateCourseDto } from './dto';
-import { Authorization } from '@modules/auth/decorators/authorization.decorator';
-import {Unauthenticated} from "@modules/auth/decorators/unauthenticated.decorator";
+import {
+  Authorization,
+  Role,
+} from '@modules/auth/decorators/authorization.decorator';
+import { getCoordinatorCourseId } from '@modules/auth/utils/coordinator-role';
 
 @ApiTags('Courses')
 @Controller('courses')
@@ -43,14 +47,20 @@ export class CourseController {
   }
 
   @Get()
-  @Unauthenticated()
+  @Authorization({
+    roles: [Role.SUPERVISOR, Role.MONITOR],
+    permission: 'courses.list',
+    description: 'Obtener todos los cursos',
+  })
   @ApiOperation({ summary: 'Obtener todos los cursos' })
   @ApiResponse({
     status: 200,
     description: 'Lista de cursos obtenida con éxito.',
   })
-  async findAll() {
-    return await this.courseService.findAll();
+  async findAll(@Req() req) {
+    return await this.courseService.findAll(
+      getCoordinatorCourseId(req.user?.role),
+    );
   }
 
   @Get(':id')
@@ -61,7 +71,12 @@ export class CourseController {
   @ApiOperation({ summary: 'Obtener un curso por ID' })
   @ApiResponse({ status: 200, description: 'Curso encontrado.' })
   @ApiResponse({ status: 404, description: 'Curso no encontrado.' })
-  async findOne(@Param('id', ParseIntPipe) id: number) {
+  async findOne(@Param('id', ParseIntPipe) id: number, @Req() req) {
+    const coordinatorCourseId = getCoordinatorCourseId(req.user?.role);
+    if (coordinatorCourseId !== undefined && coordinatorCourseId !== id) {
+      throw new HttpException('Curso no autorizado', HttpStatus.FORBIDDEN);
+    }
+
     const course = await this.courseService.findOne(id);
     if (!course) {
       throw new HttpException('Curso no encontrado', HttpStatus.NOT_FOUND);
