@@ -35,6 +35,14 @@ export class ScheduleTeacherDto {
   @ApiProperty({ example: 'Turno 01' })
   shiftName: string;
 
+  @IsString()
+  @ApiProperty({ example: 'https://meet.google.com/abc-def-ghi' })
+  urlMeet: string;
+
+  @IsString()
+  @ApiProperty({ example: 'https://classroom.google.com/abc-def-ghi' })
+  urlClassroom: string;
+
   @Type(() => ScheduleForTeacherDto)
   schedules: ScheduleForTeacherDto[];
 }

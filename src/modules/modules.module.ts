@@ -22,6 +22,7 @@ import { UserProfileModule } from './user-profile/user-profile.module';
 import { SupervisorModule } from '@modules/supervisors/supervisor.module';
 import { MonitorModule } from '@modules/monitors/monitor.module';
 import { TeacherModule } from '@modules/teachers/teacher.module';
+import { CoordinatorModule } from '@modules/coordinators/coordinator.module';
 
 import { AdmissionsModule } from './admissions/admissions.module';
 import { AuthGlobalGuard } from './auth/guards/auth-global.guard';
@@ -56,6 +57,7 @@ import { AlsModule } from './shared/als.module';
     SupervisorModule,
     MonitorModule,
     TeacherModule,
+    CoordinatorModule,
   ],
 
   exports: [
@@ -82,6 +84,7 @@ import { AlsModule } from './shared/als.module';
     SupervisorModule,
     MonitorModule,
     TeacherModule,
+    CoordinatorModule,
   ],
   providers: [
     JwtAuthGuard,

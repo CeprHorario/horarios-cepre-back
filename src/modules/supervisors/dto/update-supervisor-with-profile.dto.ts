@@ -1,8 +1,17 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsOptional, IsString } from 'class-validator';
+import { IsEmail, IsNumber, IsOptional, IsString } from 'class-validator';
 import { Expose } from 'class-transformer';
 
 export class UpdateSupervisorWithProfileDto {
+  @IsOptional()
+  @IsEmail()
+  @ApiProperty({
+    description: 'Correo electronico institucional del supervisor',
+    nullable: true,
+    example: 'supervisor@cepre.edu.pe',
+  })
+  email?: string;
+
   @IsString()
   @IsOptional()
   @ApiProperty({ example: 'John' })
@@ -27,4 +36,9 @@ export class UpdateSupervisorWithProfileDto {
   @IsOptional()
   @ApiProperty({ example: '987654321' })
   phone?: string;
+
+  @IsNumber()
+  @IsOptional()
+  @ApiProperty({ example: 1, required: false })
+  shift_id?: number;
 }
