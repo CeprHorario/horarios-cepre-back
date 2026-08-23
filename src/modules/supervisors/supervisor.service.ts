@@ -15,6 +15,7 @@ import { UpdateSupervisorWithProfileDto } from './dto/update-supervisor-with-pro
 import { SupervisorGetSummaryDto } from './dto/supervisor-get-summary.dto';
 import { AssignMonitorDto } from './dto/assign-monitor.dto';
 import { SupervisorGetByIdDto } from './dto/supervisor-get-by-id.dto';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class SupervisorService {
@@ -176,6 +177,25 @@ export class SupervisorService {
     id: string,
     updateSupervisorDto: UpdateSupervisorWithProfileDto,
   ): Promise<SupervisorGetSummaryDto> {
+    if (updateSupervisorDto.email) {
+      const existingEmail = await this.prisma.getClient().user.findFirst({
+        where: {
+          email: updateSupervisorDto.email,
+          NOT: {
+            supervisor: {
+              id: id,
+            },
+          },
+        },
+      });
+
+      if (existingEmail) {
+        throw new ConflictException(
+          'El correo institucional ya esta en uso por otro usuario',
+        );
+      }
+    }
+
     // 1. Verificar solo el email personal si está presente
     if (updateSupervisorDto.personalEmail) {
       const existingUser = await this.prisma.getClient().user.findFirst({
@@ -201,22 +221,29 @@ export class SupervisorService {
       }
     }
     // 2. Actualizar el supervisor
-    const supervisor = await this.prisma.getClient().supervisor.update({
-      where: { id },
-      data: {
-        users: {
-          update: {
-            userProfile: {
-              update: {
-                firstName: updateSupervisorDto.firstName,
-                lastName: updateSupervisorDto.lastName,
-                phone: updateSupervisorDto.phone,
-                personalEmail: updateSupervisorDto.personalEmail,
-              },
+    const updateData: Prisma.SupervisorUpdateInput = {
+      shift:
+        updateSupervisorDto.shift_id !== undefined
+          ? { connect: { id: updateSupervisorDto.shift_id } }
+          : undefined,
+      users: {
+        update: {
+          email: updateSupervisorDto.email,
+          userProfile: {
+            update: {
+              firstName: updateSupervisorDto.firstName,
+              lastName: updateSupervisorDto.lastName,
+              phone: updateSupervisorDto.phone,
+              personalEmail: updateSupervisorDto.personalEmail,
             },
           },
         },
       },
+    };
+
+    const supervisor = await this.prisma.getClient().supervisor.update({
+      where: { id },
+      data: updateData,
       include: {
         users: {
           select: {
@@ -235,8 +262,9 @@ export class SupervisorService {
     });
     return plainToInstance(SupervisorGetSummaryDto, {
       id: supervisor.id,
+      shiftId: supervisor.shiftId || null,
       email: supervisor.users?.email || null,
-      emailPersonal: supervisor.users?.userProfile?.personalEmail || null,
+      personalEmail: supervisor.users?.userProfile?.personalEmail || null,
       firstName: supervisor.users?.userProfile?.firstName || '',
       lastName: supervisor.users?.userProfile?.lastName || '',
       phone: supervisor.users?.userProfile?.phone || null,
