@@ -16,6 +16,7 @@ import {
   Authorization,
   Role,
 } from '@modules/auth/decorators/authorization.decorator';
+import { MaintenanceBypass } from '@modules/runtime-config/decorators/maintenance-bypass.decorator';
 @Controller('auth')
 export class AuthController {
   constructor(
@@ -24,6 +25,7 @@ export class AuthController {
   ) {}
 
   @Unauthenticated() // Evita que se aplique el guard de autorización
+  @MaintenanceBypass()
   @Get('google')
   @UseGuards(AuthGuard('google'))
   async googleAuth() {
@@ -31,6 +33,7 @@ export class AuthController {
   }
 
   @Unauthenticated()
+  @MaintenanceBypass()
   @Get('google/redirect')
   @UseGuards(AuthGuard('google'))
   async googleAuthRedirect(@Req() req, @Res() res) {

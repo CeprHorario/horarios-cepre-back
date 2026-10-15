@@ -10,11 +10,13 @@ import { PrismaModule } from '@database/prisma/prisma.module';
 import { SyncAuthorizationService } from './sync-authorization.service';
 import { DiscoveryModule } from '@nestjs/core';
 import { DrizzleModule } from '@database/drizzle/drizzle.module';
+import { RuntimeConfigModule } from '@modules/runtime-config/runtime-config.module';
 
 @Module({
   imports: [
     PrismaModule,
     DrizzleModule,
+    RuntimeConfigModule,
     DiscoveryModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({

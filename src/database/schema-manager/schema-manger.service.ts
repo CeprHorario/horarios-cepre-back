@@ -43,15 +43,17 @@ export class SchemaManagerService {
     return obj;
   }
 
-  // Obtener todos los esquemas disponibles sin current
+  // Obtener todos los esquemas disponibles, incluyendo el actual.
   async getAllWithCache(): Promise<AdmissionCurrentDto[]> {
     const cacheKey = this.config.get<string>(
-      'CACHE_KEYS.ALL_ADMISSION',
+      'CACHE_KEYS.ALL_ADMISSIONS',
     ) as string;
 
     // Obtener la clave de cache
     const cachedData = await this.cacheManager.get(cacheKey);
-    if (cachedData) return cachedData as AdmissionCurrentDto[];
+    if (cachedData) {
+      return this.withCoreSchema(cachedData as AdmissionCurrentDto[]);
+    }
 
     // Obtener los datos de la base de datos en caso de no estar en cache
     const data = await this.drizzle.db.query.admissionProcesses.findMany({
@@ -59,19 +61,19 @@ export class SchemaManagerService {
         name: true,
         year: true,
       },
-      where: eq(admissionProcesses.isCurrent, false),
     });
 
     // Guardar los datos en cache
-    await this.cacheManager.set(cacheKey, data);
-    return data;
+    const schemas = this.withCoreSchema(data);
+    await this.cacheManager.set(cacheKey, schemas);
+    return schemas;
   }
 
   // Actualizar el esquema actual
   async setCurrentSchema(schemaName: string, year: number) {
     // 1. Eliminar de cache los procesos de admision
     const cacheKey = this.config.get<string>(
-      'CACHE_KEYS.ALL_ADMISSION',
+      'CACHE_KEYS.ALL_ADMISSIONS',
     ) as string;
     await this.cacheManager.del(cacheKey);
 
@@ -90,5 +92,13 @@ export class SchemaManagerService {
   async schemaExists(schemaName: string): Promise<boolean> {
     const schemas = await this.getAllWithCache();
     return schemas.some((s) => s.name === schemaName);
+  }
+
+  private withCoreSchema(
+    schemas: AdmissionCurrentDto[],
+  ): AdmissionCurrentDto[] {
+    const coreSchema = this.config.get<string>('CORE_SCHEMA', 'core_schema');
+    if (schemas.some((schema) => schema.name === coreSchema)) return schemas;
+    return [{ name: coreSchema, year: 0 }, ...schemas];
   }
 }

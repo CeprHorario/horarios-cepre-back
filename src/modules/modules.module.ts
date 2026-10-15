@@ -31,11 +31,13 @@ import { SchemaManagerModule } from '@database/schema-manager/schema-manager.mod
 import { SchemaManagerInterceptor } from '@database/schema-manager/schema-manager.interceptor';
 import { PrismaExceptionInterceptor } from '@database/prisma/interceptors/exception.interceptor';
 import { AlsModule } from './shared/als.module';
+import { RuntimeConfigModule } from './runtime-config/runtime-config.module';
 
 @Module({
   imports: [
     SchemaManagerModule,
     AlsModule,
+    RuntimeConfigModule,
 
     AdmissionsModule,
     RolesModule,
@@ -63,6 +65,7 @@ import { AlsModule } from './shared/als.module';
   exports: [
     SchemaManagerModule,
     AlsModule,
+    RuntimeConfigModule,
 
     AdmissionsModule,
     RolesModule,

@@ -27,6 +27,7 @@
     "schema": "src/database/prisma/schema.prisma"
   },
   "dependencies": {
+    "@google-cloud/firestore": "^9.3.1",
     "@nestjs/cache-manager": "^3.0.0",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.1",
@@ -96,6 +97,10 @@
     "testRegex": ".*\\.spec\\.ts$",
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
+    },
+    "moduleNameMapper": {
+      "^@modules/(.*)$": "<rootDir>/modules/$1",
+      "^@database/(.*)$": "<rootDir>/database/$1"
     },
     "collectCoverageFrom": [
       "**/*.(t|j)s"
