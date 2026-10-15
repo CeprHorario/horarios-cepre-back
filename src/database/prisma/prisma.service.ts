@@ -18,6 +18,10 @@ export class PrismaService {
     return this.factory.getClient(schema);
   }
 
+  getClientForSchema(schema: string): PrismaClient {
+    return this.factory.getClient(schema);
+  }
+
   async setMainClient(schema: string): Promise<PrismaClient> {
     return await this.factory.setMainClient(schema);
   }
