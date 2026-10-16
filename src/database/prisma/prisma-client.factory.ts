@@ -5,7 +5,6 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
-import NodeCache from 'node-cache';
 import { SchemaManagerService } from '../schema-manager/schema-manger.service';
 
 export interface IPrismaClient {
@@ -17,30 +16,9 @@ export interface IPrismaClient {
 export class PrismaClientFactory implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PrismaClientFactory.name);
   private mainClient: IPrismaClient;
-  private readonly cache: NodeCache;
+  private readonly clients = new Map<string, PrismaClient>();
 
-  constructor(private readonly schemaManager: SchemaManagerService) {
-    this.cache = new NodeCache({ stdTTL: 3600, checkperiod: 60 });
-
-    // Configurar el evento para manejar la expiración de clientes en la caché
-    this.cache.on('expired', (key, client: PrismaClient) => {
-      this.logger.debug(
-        `Prisma: client for schema ${key} expired from cache, disconnecting...`,
-      );
-      client
-        .$disconnect()
-        .then(() => {
-          this.logger.debug(
-            `Prisma: disconnected expired client for schema: ${key}`,
-          );
-        })
-        .catch((error) => {
-          this.logger.error(
-            `Prisma: Error disconnecting expired client for schema ${key}: ${error}`,
-          );
-        });
-    });
-  }
+  constructor(private readonly schemaManager: SchemaManagerService) {}
 
   async onModuleInit() {
     try {
@@ -57,23 +35,21 @@ export class PrismaClientFactory implements OnModuleInit, OnModuleDestroy {
   getClient(schema: string): PrismaClient {
     if (schema === 'default') return this.mainClient.client;
 
-    let client = this.cache.get(schema) as PrismaClient;
+    let client = this.clients.get(schema);
 
     if (!client) {
       this.logger.debug(`Prisma: creating client for schema: ${schema}`);
       client = this.createClient(schema);
-      this.cache.set(schema, client);
+      this.clients.set(schema, client);
     }
 
     return client;
   }
 
   async setMainClient(schema: string) {
-    if (this.mainClient) await this.mainClient.client.$disconnect(); // Desconectar el cliente principal si ya existe
+    if (this.mainClient) await this.mainClient.client.$disconnect();
 
-    // Limite de conexiones, 30 para desarrollo y 4 para producción
     const limitConnections = this.isDev() ? 4 : 30;
-    // Timeout de conexión, 5 minutos para desarrollo y 10 segundos para producción
     const timeOut = this.isDev() ? 10 : 300;
 
     this.mainClient = {
@@ -94,9 +70,7 @@ export class PrismaClientFactory implements OnModuleInit, OnModuleDestroy {
   }
 
   private createClient(schema: string): PrismaClient {
-    // Limite de conexiones, 30 para desarrollo y 4 para producción
     const limitConnections = this.isDev() ? 2 : 5;
-    // Timeout de conexión, 5 minutos para desarrollo y 10 segundos para producción
     const timeOut = this.isDev() ? 5 : 60;
 
     return new PrismaClient({
@@ -112,7 +86,6 @@ export class PrismaClientFactory implements OnModuleInit, OnModuleDestroy {
   async onModuleDestroy() {
     this.logger.log('PrismaClientFactory: cleaning up resources...');
 
-    // Cerrar cliente principal
     if (this.mainClient?.client) {
       await this.mainClient.client.$disconnect();
       this.logger.debug(
@@ -120,17 +93,12 @@ export class PrismaClientFactory implements OnModuleInit, OnModuleDestroy {
       );
     }
 
-    // Cerrar clientes en caché
-    const keys = this.cache.keys();
-    for (const schema of keys) {
-      const client = this.cache.get(schema) as PrismaClient;
-      if (client) {
-        await client.$disconnect();
-        this.logger.debug(`Prisma: disconnected cached schema: ${schema}`);
-      }
+    for (const [schema, client] of this.clients.entries()) {
+      await client.$disconnect();
+      this.logger.debug(`Prisma: disconnected cached schema: ${schema}`);
     }
 
-    this.cache.flushAll(); // Limpiar la caché
+    this.clients.clear();
     this.logger.log('Prisma: all Prisma clients disconnected');
   }
 
