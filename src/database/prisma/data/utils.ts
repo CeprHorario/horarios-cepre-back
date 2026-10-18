@@ -10,10 +10,9 @@ import {
   ScheduleData,
   weekdayData,
 } from './type';
-import { randomUUID, UUID } from 'crypto';
 import { Role } from '@modules/auth/decorators/authorization.decorator';
 import { ConfigurationDto } from '@modules/admissions/dto/create-admission.dto';
-import { Class } from '@prisma/client';
+import { Class } from '../../../generated/prisma/client';
 import path from 'path';
 import * as fs from 'fs';
 
@@ -130,29 +129,18 @@ export const generarDataMonitors = (data: InDataMonitors): DataMonitor[] => {
 
   // Generar los datos para cada monitor
   return Array.from({ length: quantity }, (_, i) => {
-    // Generar IDs
-    const userId = randomUUID();
-    const monitorId = randomUUID();
-    const classId = randomUUID();
     // Generar correo
     const email = `${inicio + i}${letraArea}${domain}`;
     const className = `${area[0].toUpperCase()}-${inicio + i} ${area}`;
 
     return {
       user: {
-        id: userId,
         email,
         role: Role.MONITOR,
       },
-      monitor: {
-        id: monitorId,
-        userId,
-      },
       classes: {
-        id: classId,
         name: className,
         capacity: 100,
-        monitorId: monitorId,
         shiftId: shiftId ?? 0,
         areaId: areaId ?? 0,
         idSede: sedeId ?? 0,
@@ -212,28 +200,6 @@ export const assignNumericIds = <T extends { id?: number }>(
     id: index + 1,
   }));
 };
-
-/**
- * Assigns UUIDs to an array of objects.
- */
-export const assignUuidIds = <T extends { id?: UUID }>(items: T[]): T[] => {
-  return items.map((item) => ({
-    ...item,
-    id: randomUUID(),
-  }));
-};
-
-/**
- * Assigns either numeric or UUID IDs to an array of objects based on the existing ID type.
- * If the ID is a number, it assigns a sequential number starting from 1.
- * If the ID is a string, it assigns a random UUID.
- */
-export function assignIds<T extends { id?: number | string }>(items: T[]): T[] {
-  return items.map((item, index) => ({
-    ...item,
-    id: typeof item.id === 'number' ? index + 1 : randomUUID(),
-  }));
-}
 
 /**
  *  Parsed Schedule JSON

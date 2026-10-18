@@ -6,6 +6,7 @@ export interface AuthorizationMetadata {
   roles?: Role[]; // administrador, monitor, supervisor, profesor
   permission: string;
   description?: string;
+  adminOnly?: boolean;
 }
 
 export enum Role {
@@ -20,6 +21,7 @@ export const Authorization = ({
   roles = [],
   permission,
   description,
+  adminOnly = false,
 }: AuthorizationMetadata) => {
   const rolesWithAdmin = roles.includes(Role.ADMIN)
     ? roles
@@ -28,5 +30,6 @@ export const Authorization = ({
     roles: rolesWithAdmin,
     permission,
     description,
+    adminOnly,
   });
 };

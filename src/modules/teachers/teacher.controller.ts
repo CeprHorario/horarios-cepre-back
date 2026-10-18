@@ -37,6 +37,7 @@ import { ScheduleTeacherDto } from './dto/schedule-teacher.dto';
 import { TeacherFilteredDto } from '@modules/teachers/dto/teacherFiltered.dto';
 import { getCoordinatorCourseId } from '@modules/auth/utils/coordinator-role';
 import { DeactivateManyDto } from '@modules/shared/dto/deactivate-many.dto';
+import type { AuthenticatedRequest } from '@modules/auth/authenticated-request';
 
 @ApiTags('Teachers')
 @Controller('teachers')
@@ -99,7 +100,7 @@ export class TeacherController {
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 20,
     @Query('courseId') courseId?: number,
-    @Req() req?,
+    @Req() req?: AuthenticatedRequest,
   ): Promise<{
     data: TeacherGetSummaryDto[];
     total: number;
@@ -109,7 +110,7 @@ export class TeacherController {
     return this.teacherService.findAll(
       page,
       limit,
-      getCoordinatorCourseId(req.user?.role) ?? courseId,
+      getCoordinatorCourseId(req?.user?.role) ?? courseId,
     );
   }
 
@@ -147,7 +148,7 @@ export class TeacherController {
     @Query('query') query: string,
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 20,
-    @Req() req?,
+    @Req() req?: AuthenticatedRequest,
   ): Promise<{
     data: TeacherGetSummaryDto[];
     total: number;
@@ -158,7 +159,7 @@ export class TeacherController {
       query,
       Number(page),
       Number(limit),
-      getCoordinatorCourseId(req.user?.role),
+      getCoordinatorCourseId(req?.user?.role),
     );
   }
 
@@ -176,7 +177,7 @@ export class TeacherController {
     status: 200,
     description: 'Archivo Excel generado correctamente',
   })
-  async exportTeachers(@Res() res: Response, @Req() req): Promise<void> {
+  async exportTeachers(@Res() res: Response, @Req() req: AuthenticatedRequest): Promise<void> {
     const buffer = await this.teacherService.exportToExcel(
       getCoordinatorCourseId(req.user?.role),
     );
@@ -208,7 +209,7 @@ export class TeacherController {
   })
   async findOne(
     @Param('id') id: string,
-    @Req() req,
+    @Req() req: AuthenticatedRequest,
   ): Promise<TeacherGetByIdDto> {
     const teacher = await this.teacherService.findOne(
       id,
@@ -300,7 +301,7 @@ export class TeacherController {
   })
   async getTeacherSchedules(
     @Param('teacherId') teacherId: string,
-    @Req() req,
+    @Req() req: AuthenticatedRequest,
   ): Promise<ScheduleTeacherDto[]> {
     return this.teacherService.getTeacherSchedules(
       teacherId,
@@ -331,9 +332,9 @@ export class TeacherController {
     @Param('courseId') courseId: string,
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 20,
-    @Req() req?,
+    @Req() req?: AuthenticatedRequest,
   ) {
-    const coordinatorCourseId = getCoordinatorCourseId(req.user?.role);
+    const coordinatorCourseId = getCoordinatorCourseId(req?.user?.role);
     if (
       coordinatorCourseId !== undefined &&
       coordinatorCourseId !== Number(courseId)

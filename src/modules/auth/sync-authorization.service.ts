@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
 import { DiscoveryService, MetadataScanner, Reflector } from '@nestjs/core';
 import { PATH_METADATA, METHOD_METADATA } from '@nestjs/common/constants';
 import { InstanceWrapper } from '@nestjs/core/injector/instance-wrapper';
@@ -9,6 +9,7 @@ import {
 } from './decorators/authorization.decorator';
 import { DrizzleService } from '@database/drizzle/drizzle.service';
 import { permissions, roles, rolesPermissions } from '@database/drizzle/schema';
+import { eq, sql } from 'drizzle-orm';
 //import path from 'path';
 interface EndpointMetadata extends AuthorizationMetadata {
   method: string; // HTTP
@@ -36,50 +37,82 @@ export class SyncAuthorizationService {
   // async syncAuthorization() {
   async syncAuthorization() {
     const data = this.getAllEndpointMetadata();
-
-    console.log(data);
-
-    // Extraer todos los roles únicos
-    const roleRecords = Object.values(Role).map((role) => ({
-      name: role,
-      description: `Rol para ${role}`,
-    }));
+    const grouped = new Map<string, EndpointMetadata[]>();
+    const routes = new Map<string, string>();
+    for (const endpoint of data) {
+      const key = `${endpoint.method} ${endpoint.path}`;
+      if (routes.has(key) && routes.get(key) !== endpoint.permission)
+        throw new ConflictException(`Conflicting permission for ${key}`);
+      routes.set(key, endpoint.permission);
+      const group = grouped.get(endpoint.permission) ?? [];
+      const policy = (item: EndpointMetadata) =>
+        JSON.stringify({
+          roles: [...new Set(item.roles)].sort(),
+          adminOnly: item.adminOnly ?? false,
+        });
+      if (group.length && policy(group[0]) !== policy(endpoint))
+        throw new ConflictException(
+          `Conflicting roles for permission ${endpoint.permission}`,
+        );
+      group.push(endpoint);
+      grouped.set(endpoint.permission, group);
+    }
 
     return await this.drizzleService.db.transaction(async (tx) => {
-      // 1. Eliminar datos existentes - usa una sola consulta si es posible con cascada
-      await tx.delete(rolesPermissions);
-      await tx.delete(permissions);
-      await tx.delete(roles);
-
-      // 2. Insertar roles (inserción masiva)
-      const insertedRoles = await tx
-        .insert(roles)
-        .values(roleRecords)
-        .returning({
-          id: roles.id,
-          name: roles.name,
-        });
+      await tx.execute(
+        sql`SELECT pg_advisory_xact_lock(hashtext('authorization-sync'))`,
+      );
+      const existingRoles = await tx.select().from(roles);
+      const missingRoles = Object.values(Role)
+        .filter(
+          (name) => !existingRoles.some((role) => role.name === String(name)),
+        )
+        .map((name) => ({ name, description: `Rol para ${name}` }));
+      if (missingRoles.length)
+        await tx.insert(roles).values(missingRoles).onConflictDoNothing();
+      const insertedRoles = await tx.select().from(roles);
 
       // Mapa de roles
       const roleIdMap = Object.fromEntries(
         insertedRoles.map((role) => [role.name, role.id]),
       );
 
-      // 3. Insertar permisos (inserción masiva)
-      const permissionRecords = data.map((item) => ({
-        name: item.permission,
-        path: item.path,
-        methodHttp: item.method,
-        description: item.description,
-      }));
-
-      const insertedPermissions = await tx
-        .insert(permissions)
-        .values(permissionRecords)
-        .returning({
-          id: permissions.id,
-          name: permissions.name,
-        });
+      const existingPermissions = await tx.select().from(permissions);
+      for (const [name, endpoints] of grouped) {
+        const previous = existingPermissions.find(
+          (permission) => permission.name === name,
+        );
+        // Preserve a still-valid representative route; one permission may protect many routes.
+        const endpoint =
+          endpoints.find(
+            (item) =>
+              item.path === previous?.path &&
+              item.method === previous.methodHttp,
+          ) ??
+          [...endpoints].sort((a, b) =>
+            `${a.method} ${a.path}`.localeCompare(`${b.method} ${b.path}`),
+          )[0];
+        const values = {
+          path: endpoint.path,
+          methodHttp: endpoint.method,
+          description: endpoint.description ?? null,
+        };
+        if (!previous)
+          await tx
+            .insert(permissions)
+            .values({ name, ...values })
+            .onConflictDoNothing();
+        else if (
+          previous.path !== values.path ||
+          previous.methodHttp !== values.methodHttp ||
+          previous.description !== values.description
+        )
+          await tx
+            .update(permissions)
+            .set({ ...values, updatedAt: new Date() })
+            .where(eq(permissions.id, previous.id));
+      }
+      const insertedPermissions = await tx.select().from(permissions);
 
       // Mapa de permisos
       const permissionIdMap = Object.fromEntries(
@@ -90,7 +123,8 @@ export class SyncAuthorizationService {
       const relationRecords: { roleId: number; permissionId: number }[] = [];
 
       // Optimizar la construcción de relationRecords
-      for (const endpoint of data) {
+      for (const endpoints of grouped.values()) {
+        const endpoint = endpoints[0];
         const permId = permissionIdMap[endpoint.permission];
         if (!permId) continue;
 
@@ -104,13 +138,16 @@ export class SyncAuthorizationService {
 
       // Realizar una sola inserción masiva
       if (relationRecords.length > 0) {
-        await tx.insert(rolesPermissions).values(relationRecords);
+        await tx
+          .insert(rolesPermissions)
+          .values(relationRecords)
+          .onConflictDoNothing();
       }
 
       return {
         data,
-        rolesCount: insertedRoles.length,
-        permissionsCount: insertedPermissions.length,
+        rolesCount: Object.values(Role).length,
+        permissionsCount: grouped.size,
         relationsCount: relationRecords.length,
       };
     });
@@ -119,47 +156,48 @@ export class SyncAuthorizationService {
   private getAllEndpointMetadata(): EndpointMetadata[] {
     const endpoints: EndpointMetadata[] = [];
     const controllers = this.discoveryService.getControllers();
-    const permissionSet = new Set<string>(); // Usamos un Set para rastrear los permisos únicos
 
-    controllers.forEach((wrapper: InstanceWrapper) => {
+    controllers.forEach((wrapper: InstanceWrapper<object>) => {
       const { instance, metatype } = wrapper;
       if (!instance || !metatype) return;
 
-      const prototype = Object.getPrototypeOf(instance);
+      const prototype = Object.getPrototypeOf(instance) as Record<
+        string,
+        (...args: unknown[]) => unknown
+      >;
       this.metadataScanner
         .getAllMethodNames(prototype)
         .forEach((methodName: string) => {
           const methodHandler = prototype[methodName];
 
-          const controllerPath = this.reflector.get(
+          const controllerPath = this.reflector.get<string>(
             PATH_METADATA,
             instance.constructor,
           );
-          const methodPath = this.reflector.get(PATH_METADATA, methodHandler);
-          const type = this.reflector.get(METHOD_METADATA, methodHandler);
-          const decorator = this.reflector.get(
+          const methodPath = this.reflector.get<string>(
+            PATH_METADATA,
+            methodHandler,
+          );
+          const type = this.reflector.get<number>(
+            METHOD_METADATA,
+            methodHandler,
+          );
+          const decorator = this.reflector.get<AuthorizationMetadata>(
             AUTHORIZATION_METADATA_KEY,
             methodHandler,
           );
 
           if (decorator) {
-            const { permission } = decorator;
             const fullPath = this.getFullPath(controllerPath, methodPath);
 
-            // Verificamos si el permiso ya existe
-            if (permissionSet.has(permission)) {
-              throw new Error(`
-                Duplicate permission in ${fullPath} found permission: ${permission}`);
-            } else {
-              permissionSet.add(permission); // Agregamos el permiso al Set
-              endpoints.push({
-                roles: decorator.roles,
-                permission: decorator.permission,
-                description: decorator.description,
-                path: fullPath,
-                method: this.httpMethods[type],
-              });
-            }
+            endpoints.push({
+              roles: decorator.roles,
+              permission: decorator.permission,
+              description: decorator.description,
+              path: fullPath,
+              method: this.httpMethods[type],
+              adminOnly: decorator.adminOnly,
+            });
           }
         });
     });

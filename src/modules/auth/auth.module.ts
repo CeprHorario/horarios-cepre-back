@@ -11,19 +11,42 @@ import { SyncAuthorizationService } from './sync-authorization.service';
 import { DiscoveryModule } from '@nestjs/core';
 import { DrizzleModule } from '@database/drizzle/drizzle.module';
 import { RuntimeConfigModule } from '@modules/runtime-config/runtime-config.module';
+import { SchemaManagerModule } from '@database/schema-manager/schema-manager.module';
+import { PermissionsModule } from '@modules/permissions/permissions.module';
+import { RolesModule } from '@modules/roles/roles.module';
+import { AuthorizationGuard } from './guards/authorization.guard';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { AuthGlobalGuard } from './guards/auth-global.guard';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { SchemaManagerInterceptor } from '@database/schema-manager/schema-manager.interceptor';
+import { GoogleCallbackGuard } from './guards/google-auth.guard';
+import { OAuthStateStore } from './oauth-state.store';
 
 @Module({
   imports: [
     PrismaModule,
     DrizzleModule,
     RuntimeConfigModule,
+    SchemaManagerModule,
+    PermissionsModule,
+    RolesModule,
     DiscoveryModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       inject: [ConfigService], // ✅ Mantiene la inyección de ConfigService
       useFactory: (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_SECRET'),
-        signOptions: { expiresIn: '1h' },
+        secret: configService.getOrThrow<string>('JWT_SECRET'),
+        signOptions: {
+          algorithm: 'HS256',
+          expiresIn: configService.getOrThrow<number>('JWT_EXPIRES_IN'),
+          issuer: 'cepr',
+          audience: 'cepr-api',
+        },
+        verifyOptions: {
+          algorithms: ['HS256'],
+          issuer: 'cepr',
+          audience: 'cepr-api',
+        },
       }),
     }),
   ],
@@ -32,7 +55,13 @@ import { RuntimeConfigModule } from '@modules/runtime-config/runtime-config.modu
     AuthService,
     JwtStrategy,
     GoogleStrategy,
+    GoogleCallbackGuard,
+    OAuthStateStore,
     SyncAuthorizationService,
+    AuthorizationGuard,
+    JwtAuthGuard,
+    { provide: APP_GUARD, useClass: AuthGlobalGuard },
+    { provide: APP_INTERCEPTOR, useClass: SchemaManagerInterceptor },
   ],
   exports: [AuthService, JwtStrategy],
 })

@@ -1,11 +1,9 @@
 import { Module } from '@nestjs/common';
-import { AlsModule } from '@modules/shared/als.module';
+import { DrizzleModule } from '../drizzle/drizzle.module';
 import { SchemaManagerService } from './schema-manger.service';
-import { DrizzleModule } from '@database/drizzle/drizzle.module';
-import { CacheModule } from '@nestjs/cache-manager';
 
 @Module({
-  imports: [AlsModule, DrizzleModule, CacheModule.register()],
+  imports: [DrizzleModule],
   providers: [SchemaManagerService],
   exports: [SchemaManagerService],
 })

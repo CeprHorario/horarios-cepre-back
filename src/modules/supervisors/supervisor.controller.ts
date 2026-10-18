@@ -15,6 +15,7 @@ import {
   Patch
 } from '@nestjs/common';
 import { SupervisorService } from './supervisor.service';
+import type { AuthenticatedRequest } from '@modules/auth/authenticated-request';
 import { UpdateSupervisorWithProfileDto } from './dto';
 import { ApiOperation, ApiResponse } from '@nestjs/swagger';
 import {
@@ -79,11 +80,10 @@ export class SupervisorController {
     type: [MonitorForSupervisorDto],
   })
   @ApiResponse({ status: 404, description: 'Ta sin monitores.' })
-  getMonitors(@Req() req) {
-    console.log('Usuario autenticado:', req.user); // Debugging
+  getMonitors(@Req() req: AuthenticatedRequest) {
     const user = req?.user; // Verifica que exista
 
-    if (user.role !== Role.SUPERVISOR) {
+    if (user.role !== String(Role.SUPERVISOR)) {
       throw new BadRequestException('No eres un supervisor');
     }
     return this.supervisorService.getMonitors(user.userId);

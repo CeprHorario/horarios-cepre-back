@@ -1,5 +1,5 @@
-import { Class } from '@prisma/client';
-import { Pool, PoolClient } from 'pg';
+import { Class } from '../../../generated/prisma/client';
+import { PoolClient } from 'pg';
 
 import * as rawData from './initial.json';
 import * as rawCourses from './courses.json';
@@ -9,7 +9,6 @@ import * as rawScheduleIng from './schedules/ing.json';
 import * as rawScheduleSoc from './schedules/soc.json';
 import * as rawScheduleExtra from './schedules/extra.json';
 
-import * as fs from 'fs/promises';
 import {
   ConfigurationDto,
   ShiftDetailDto,
@@ -34,68 +33,39 @@ import {
 } from './utils';
 
 export const initialDataSchema = async (
-  schema: string,
+  db: PoolClient,
   config: ConfigurationDto,
 ): Promise<boolean> => {
-  // Create a new pool connection to the database
-  const pool = new Pool({
-    connectionString: `${process.env.DATABASE_URL}`,
-  });
-  const db = await pool.connect();
-
-  // Create data in schema new
-  const sql = await fs.readFile(
-    './src/database/drizzle/sql/schema.sql',
-    'utf8',
+  // 1: Create the basic data in the database
+  const { areas, shifts, sedes, hourSessions, courses } = await createBasicData(
+    db,
+    config.shifts,
+  );
+  // 2: Insert monitors and classes into the database
+  const { classes } = await createDataMonitors(
+    db,
+    arrayMonitors(config, areas, shifts, sedes),
   );
 
-  try {
-    // Start a transaction
-    await db.query('BEGIN');
+  // 3: Create the schedules in the database
+  if (config.createSchedules) {
+    // Get map of classes to areas and shifts
+    const classMap = getMapAndSorted(classes, shifts, areas);
 
-    // 0: Create and set the search path to the new schema and migrate the database
-    await db.query(`
-      CREATE SCHEMA IF NOT EXISTS ${schema};
-      SET search_path TO ${schema};
-      ${sql}
-      `);
+    // Generate schedules for each area and shift
+    await createSchedules(db, config.shifts, classMap, hourSessions, courses);
+  }
 
-    // 0.5: Copy admin users from core_schema to new schema
-    await db.query(`
-      INSERT INTO ${schema}.users (id, email, password, is_active, created_at, updated_at, last_login, google_id, role)
-      SELECT id, email, password, is_active, created_at, updated_at, last_login, google_id, role
-      FROM core_schema.users
-      WHERE role = 'administrador'
-      ON CONFLICT (id) DO NOTHING;
-    `);
-
-    // 1: Create the basic data in the database
-    const { areas, shifts, sedes, hourSessions, courses } =
-      await createBasicData(db, config.shifts);
-    // 2: Insert monitors and classes into the database
-    const { classes } = await createDataMonitors(
-      db,
-      arrayMonitors(config, areas, shifts, sedes),
+  for (const table of [
+    'areas',
+    'sedes',
+    'courses',
+    'shifts',
+    'hour_sessions',
+  ]) {
+    await db.query(
+      `SELECT setval(pg_get_serial_sequence('${table}', 'id'), COALESCE(max(id), 1), max(id) IS NOT NULL) FROM "${table}"`,
     );
-
-    // 3: Create the schedules in the database
-    if (config.createSchedules) {
-      // Get map of classes to areas and shifts
-      const classMap = getMapAndSorted(classes, shifts, areas);
-
-      // Generate schedules for each area and shift
-      await createSchedules(db, config.shifts, classMap, hourSessions, courses);
-    }
-
-    // Transaction commit
-    await db.query('COMMIT');
-  } catch (error) {
-    await db.query('ROLLBACK');
-    console.log('***ROLLBACK***');
-    throw new Error(error as string);
-  } finally {
-    db.release();
-    await pool.end();
   }
 
   return true;
@@ -111,7 +81,7 @@ const createBasicData = async (
   // Destructure the data from the JSON files
   const { areas, sedes } = rawData as DataInitial;
   const { courses } = rawCourses as { courses: Course[] };
-  const { areaCourse } = areaCourseHr as { areaCourse: AreaCourseHours[] };
+  const { areaCourse } = areaCourseHr;
 
   // Determinar qué áreas se están creando basándose en shiftsBody
   const areasBeingCreated = new Set<string>();
@@ -204,27 +174,28 @@ export const createDataMonitors = async (
   pool: PoolClient,
   data: DataMonitor[],
 ) => {
-  // Destructure the data from the JSON files
-  const tablesToInsert = [
-    { table: 'users', data: data.map((d) => d.user) },
-    { table: 'monitors', data: data.map((d) => d.monitor) },
-    { table: 'classes', data: data.map((d) => d.classes) },
-  ];
-
-  // Create insert queries for each table
-  const queries = tablesToInsert.map((t) =>
-    createInsertQuery(
-      t.table,
-      extractColumnsSql(t.data as object[]),
-      extractValuesSql(t.data as object[]),
-    ),
-  );
-
-  // Concatenate all queries into a single string
-  await pool.query(concatQuery(queries));
-  return {
-    classes: data.map((d) => d.classes),
-  };
+  const classes: Class[] = [];
+  for (const item of data) {
+    const user = await pool.query<{ id: string }>(
+      'INSERT INTO users (email, role) VALUES ($1, $2) RETURNING id',
+      [item.user.email, item.user.role],
+    );
+    const monitor = await pool.query<{ id: string }>(
+      'INSERT INTO monitors (user_id) VALUES ($1) RETURNING id',
+      [user.rows[0].id],
+    );
+    const c = item.classes;
+    const result = await pool.query<{ id: string }>(
+      'INSERT INTO classes (name, capacity, monitor_id, shift_id, area_id, id_sede) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
+      [c.name, c.capacity, monitor.rows[0].id, c.shiftId, c.areaId, c.idSede],
+    );
+    classes.push({
+      ...c,
+      id: result.rows[0].id,
+      monitorId: monitor.rows[0].id,
+    });
+  }
+  return { classes };
 };
 
 /** 3-

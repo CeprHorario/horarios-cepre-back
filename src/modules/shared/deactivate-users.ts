@@ -1,5 +1,5 @@
 import { NotFoundException } from '@nestjs/common';
-import { Prisma, PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '../../generated/prisma/client';
 import { DeactivateManyResultDto } from './dto/deactivate-many.dto';
 
 type Tx = Prisma.TransactionClient;

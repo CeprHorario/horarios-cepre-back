@@ -1,5 +1,5 @@
 import { IsEnum, IsNotEmpty, IsOptional, IsString } from 'class-validator';
-import { Weekday } from '@prisma/client';
+import { Weekday } from '../../../generated/prisma/client';
 import { ApiProperty } from '@nestjs/swagger';
 
 import { HourSessionForTeacherDto } from '@modules/hour-session/dto/HourSessionForTeacher.dto';

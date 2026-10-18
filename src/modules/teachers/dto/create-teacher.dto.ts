@@ -1,6 +1,6 @@
 import { IsEmail, IsNotEmpty, IsNumber, IsString, IsEnum, IsArray, IsOptional, IsBoolean } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-import { JobStatus } from '@prisma/client';
+import { JobStatus } from '../../../generated/prisma/client';
 
 export class CreateTeacherWithUserDto {
     @ApiProperty({ example: 'teacher@example.com' })

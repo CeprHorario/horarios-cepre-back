@@ -23,9 +23,10 @@ import {
   Role,
 } from '@modules/auth/decorators/authorization.decorator';
 import { LoadScheduleDto } from './dto';
-import { Weekday } from '@prisma/client';
+import { Weekday } from '../../generated/prisma/client';
 import { Unauthenticated } from '@modules/auth/decorators/unauthenticated.decorator';
 import { getCoordinatorCourseId } from '@modules/auth/utils/coordinator-role';
+import type { AuthenticatedRequest } from '@modules/auth/authenticated-request';
 
 @Controller('schedules')
 @ApiTags('Schedules')
@@ -83,7 +84,7 @@ export class ScheduleController {
     summary: 'Obtener todos los horarios',
     description: 'Get all schedules',
   })
-  findAll(@Req() req): Promise<ScheduleBaseDto[]> {
+  findAll(@Req() req: AuthenticatedRequest): Promise<ScheduleBaseDto[]> {
     return this.scheduleService.findAll(getCoordinatorCourseId(req.user?.role));
   }
 
@@ -99,7 +100,7 @@ export class ScheduleController {
   })
   findOne(
     @Param('id', ParseIntPipe) id: number,
-    @Req() req,
+    @Req() req: AuthenticatedRequest,
   ): Promise<ScheduleBaseDto> {
     return this.scheduleService.findOne(
       id,
@@ -166,7 +167,7 @@ export class ScheduleController {
         updatedSchedules,
       };
     } catch (error) {
-      throw new BadRequestException(error.message);
+      throw new BadRequestException(error instanceof Error ? error.message : String(error));
     }
   }
 
@@ -204,7 +205,7 @@ export class ScheduleController {
         updatedSchedules,
       };
     } catch (error) {
-      throw new BadRequestException(error.message);
+      throw new BadRequestException(error instanceof Error ? error.message : String(error));
     }
   }
 
@@ -225,9 +226,9 @@ export class ScheduleController {
     @Query('pageSize', ParseIntPipe) pageSize: number = 10,
     @Query('area_id') areaId?: number,
     @Query('shift_id') shiftId?: number,
-    @Req() req?,
+    @Req() req?: AuthenticatedRequest,
   ) {
-    const coordinatorCourseId = getCoordinatorCourseId(req.user?.role);
+    const coordinatorCourseId = getCoordinatorCourseId(req?.user?.role);
     if (coordinatorCourseId !== undefined && coordinatorCourseId !== courseId) {
       throw new ForbiddenException('Curso no autorizado');
     }

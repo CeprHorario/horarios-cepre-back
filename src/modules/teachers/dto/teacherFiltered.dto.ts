@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Weekday } from '@prisma/client';
+import { Weekday } from '../../../generated/prisma/client';
 import { Type } from 'class-transformer';
 import { IsEnum, IsNumber, ValidateNested } from 'class-validator';
 

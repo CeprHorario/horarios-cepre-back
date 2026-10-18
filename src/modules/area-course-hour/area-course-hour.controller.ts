@@ -20,6 +20,7 @@ import {
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Authorization } from '@modules/auth/decorators/authorization.decorator';
 import { getCoordinatorCourseId } from '@modules/auth/utils/coordinator-role';
+import type { AuthenticatedRequest } from '@modules/auth/authenticated-request';
 
 @Controller('area-course-hours')
 @ApiTags('AreaCourseHours')
@@ -53,7 +54,7 @@ export class AreaCourseHourController {
     summary: 'Obtener todas las horas de curso-area',
     description: 'Get all areas course hours',
   })
-  findAllAreas(@Req() req): Promise<AreaCourseHourBaseDto[]> {
+  findAllAreas(@Req() req: AuthenticatedRequest): Promise<AreaCourseHourBaseDto[]> {
     return this.areaCourseHourService.findAll(
       getCoordinatorCourseId(req.user?.role),
     );
@@ -71,7 +72,7 @@ export class AreaCourseHourController {
   })
   findOneArea(
     @Param('id', ParseIntPipe) id: number,
-    @Req() req,
+    @Req() req: AuthenticatedRequest,
   ): Promise<AreaCourseHourBaseDto> {
     return this.areaCourseHourService.findOne(
       id,

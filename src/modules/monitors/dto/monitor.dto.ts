@@ -5,7 +5,7 @@ import {
   IsUUID,
   IsDateString,
 } from 'class-validator';
-import { User } from '@prisma/client';
+import { User } from '../../../generated/prisma/client';
 import { ApiProperty } from '@nestjs/swagger';
 import { SupervisorDto } from '@modules/supervisors/dto';
 

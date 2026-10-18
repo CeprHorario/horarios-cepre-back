@@ -5,6 +5,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import type { Request } from 'express';
 import {
   AUTHORIZATION_METADATA_KEY,
   AuthorizationMetadata,
@@ -53,6 +54,8 @@ export class AuthorizationGuard implements CanActivate {
       context.getHandler(),
     );
     if (!metadata) throw new UnauthorizedException();
+    if (metadata.adminOnly && role !== String(Role.ADMIN))
+      throw new UnauthorizedException();
 
     try {
       if (coordinatorScope.isCoordinator && request['method'] !== 'GET') {

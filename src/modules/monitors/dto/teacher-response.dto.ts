@@ -6,7 +6,7 @@ export class TeacherResponseDto {
     example: 'a12b3c4d-567e-8f90-1234-56789abcdef',
     description: 'Identificador único del docente',
   })
-  @IsUUID('4', { message: 'El ID del docente debe ser un UUID válido' })
+  @IsUUID('all', { message: 'El ID del docente debe ser un UUID válido' })
   teacherId: string;
 
   @ApiProperty({

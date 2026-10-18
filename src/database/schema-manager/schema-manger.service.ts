@@ -1,104 +1,49 @@
-import { Inject, Injectable } from '@nestjs/common';
-import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { Cache } from 'cache-manager';
-import { ConfigService } from '@nestjs/config';
-import { DrizzleService } from '@database/drizzle/drizzle.service';
-import { eq } from 'drizzle-orm';
-import { admissionProcesses } from '@database/drizzle/schema';
-import { AdmissionCurrentDto } from '@modules/admissions/dto';
+import { Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { eq, sql } from 'drizzle-orm';
+import { DrizzleService } from '../drizzle/drizzle.service';
+import { admissionProcesses } from '../drizzle/schema';
+import { assertSchemaName } from './schema-name';
 
 @Injectable()
 export class SchemaManagerService {
-  constructor(
-    private readonly drizzle: DrizzleService,
-    @Inject(CACHE_MANAGER) private cacheManager: Cache,
-    private config: ConfigService,
-  ) {}
+  constructor(private readonly drizzle: DrizzleService) {}
 
-  // Obtener el esquema actual
-  async getCurrent(): Promise<AdmissionCurrentDto> {
-    const currentKey = this.config.get<string>(
-      'CACHE_KEYS.CURRENT_ADMISSION',
-    ) as string;
-    const current = await this.cacheManager.get(currentKey);
-    if (current) return current as AdmissionCurrentDto;
+  async getCurrent() {
+    return (
+      (await this.drizzle.db.query.admissionProcesses.findFirst({
+        columns: { name: true, year: true },
+        where: eq(admissionProcesses.isCurrent, true),
+      })) ?? { name: 'core_schema', year: 0 }
+    );
+  }
 
-    // Obtener el proceso de admisión actual desde la base de datos
-    const obj = await this.drizzle.db.query.admissionProcesses.findFirst({
-      columns: {
-        name: true,
-        year: true,
-      },
-      where: eq(admissionProcesses.isCurrent, true),
+  async getAllWithCache() {
+    const processes = await this.drizzle.db.query.admissionProcesses.findMany({
+      columns: { name: true, year: true },
     });
+    return [{ name: 'core_schema', year: 0 }, ...processes];
+  }
 
-    // Si no hay proceso de admisión actual, retornar el core schema
-    if (!obj) {
-      const coreSchema = this.config.get<string>('CORE_SCHEMA') as string;
-      return { name: coreSchema, year: 0 };
+  async schemaExists(name: string): Promise<boolean> {
+    try {
+      assertSchemaName(name);
+    } catch {
+      return false;
     }
-
-    // Guardar el proceso de admisión actual en cache
-    await this.cacheManager.set(currentKey, obj);
-    return obj;
+    const result = await this.drizzle.db.execute(sql`
+      SELECT 1 FROM pg_namespace n WHERE n.nspname = ${name}
+      AND (${name} = 'core_schema' OR EXISTS (
+        SELECT 1 FROM public.admission_processes p WHERE p.name = ${name}
+      ))`);
+    return result.rows.length > 0;
   }
 
-  // Obtener todos los esquemas disponibles, incluyendo el actual.
-  async getAllWithCache(): Promise<AdmissionCurrentDto[]> {
-    const cacheKey = this.config.get<string>(
-      'CACHE_KEYS.ALL_ADMISSIONS',
-    ) as string;
-
-    // Obtener la clave de cache
-    const cachedData = await this.cacheManager.get(cacheKey);
-    if (cachedData) {
-      return this.withCoreSchema(cachedData as AdmissionCurrentDto[]);
+  async assertAvailable(name: string): Promise<void> {
+    if (!(await this.schemaExists(name))) {
+      throw new ServiceUnavailableException({
+        code: 'INVALID_SCHEMA_ROUTING',
+        message: `El schema configurado "${name}" no está disponible`,
+      });
     }
-
-    // Obtener los datos de la base de datos en caso de no estar en cache
-    const data = await this.drizzle.db.query.admissionProcesses.findMany({
-      columns: {
-        name: true,
-        year: true,
-      },
-    });
-
-    // Guardar los datos en cache
-    const schemas = this.withCoreSchema(data);
-    await this.cacheManager.set(cacheKey, schemas);
-    return schemas;
-  }
-
-  // Actualizar el esquema actual
-  async setCurrentSchema(schemaName: string, year: number) {
-    // 1. Eliminar de cache los procesos de admision
-    const cacheKey = this.config.get<string>(
-      'CACHE_KEYS.ALL_ADMISSIONS',
-    ) as string;
-    await this.cacheManager.del(cacheKey);
-
-    // 2. Eliminar de cache proceso current
-    const currentKey = this.config.get<string>(
-      'CACHE_KEYS.CURRENT_ADMISSION',
-    ) as string;
-
-    // Actualizar en cache y establecemos en el main
-    await this.cacheManager.set(currentKey, { name: schemaName, year: year });
-
-    //return this.prisma.setMainClient(schemaName);
-  }
-
-  // Verificar si un esquema existe
-  async schemaExists(schemaName: string): Promise<boolean> {
-    const schemas = await this.getAllWithCache();
-    return schemas.some((s) => s.name === schemaName);
-  }
-
-  private withCoreSchema(
-    schemas: AdmissionCurrentDto[],
-  ): AdmissionCurrentDto[] {
-    const coreSchema = this.config.get<string>('CORE_SCHEMA', 'core_schema');
-    if (schemas.some((schema) => schema.name === coreSchema)) return schemas;
-    return [{ name: coreSchema, year: 0 }, ...schemas];
   }
 }

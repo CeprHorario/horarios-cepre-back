@@ -26,6 +26,7 @@ export const admissionProcesses = pgTable(
     finished: date('finished', { mode: 'date' }).defaultNow().notNull(),
     description: varchar('description', { length: 255 }),
     createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
+    structureVersion: varchar('structure_version', { length: 64 }).notNull(),
   },
   (table) => [
     uniqueIndex('admission_process_name_unique').on(table.name),

@@ -1,64 +1,43 @@
-import {
-  Injectable,
-  OnModuleDestroy,
-  OnModuleInit,
-  Logger,
-} from '@nestjs/common';
-
-import { drizzle, NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { Pool } from 'pg';
-import * as schema from '@database/drizzle/schema';
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { drizzle, NodePgDatabase } from 'drizzle-orm/node-postgres';
+import { Pool, PoolClient } from 'pg';
+import * as schema from './schema';
 
 @Injectable()
-export class DrizzleService implements OnModuleInit, OnModuleDestroy {
-  private pool: Pool;
-  public db: NodePgDatabase<typeof schema>;
+export class DrizzleService implements OnModuleDestroy {
   private readonly logger = new Logger(DrizzleService.name);
+  private readonly pool: Pool;
+  readonly db: NodePgDatabase<typeof schema>;
 
-  constructor(private configService: ConfigService) {
-    const connectionString = this.configService.get<string>('DATABASE_URL');
-
+  constructor(config: ConfigService) {
     this.pool = new Pool({
-      connectionString,
-      //ssl: {
-      //  rejectUnauthorized: false, // Ignora verificación de certificado (opcional según el proveedor)
-      //},
-      max: 2,
+      connectionString: config.getOrThrow<string>('DATABASE_URL'),
+      max: config.getOrThrow<number>('DB_POOL_MAX'),
+      connectionTimeoutMillis: 5000,
       idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 2000,
+      options: '-c search_path=public',
     });
-
-    this.pool.on('error', (err) => {
-      this.logger.error(`
-        \nDrizzle: Failed to connect to the database: : \n${err.message}`);
-    });
-
-    // Inicializar Drizzle
-    this.db = drizzle(this.pool, { schema }) as NodePgDatabase<typeof schema>;
+    this.pool.on('error', (error: Error) => this.logger.error(error.message));
+    this.db = drizzle(this.pool, { schema });
   }
 
-  async onModuleInit() {
-    // Verificar conexión a la Base de Datos
-    try {
-      await this.pool.query('SELECT 1');
-      this.logger.debug('Drizzle: connected successfully');
-    } catch (error) {
-      this.logger.error(`
-        \nDrizzle: Failed to connect to the database: ${error}`);
-        setTimeout(async () => {
-          try {
-            await this.pool.query('SELECT 1');
-            this.logger.debug('Drizzle: reconnected successfully');
-          } catch (err) {
-            this.logger.error('Drizzle: reconnection failed');
-          }
-        }, 5000);
-    }
-  }
-
-  async onModuleDestroy() {
+  async onModuleDestroy(): Promise<void> {
     await this.pool.end();
-    this.logger.debug('Drizzle: disconnected successfully');
+  }
+
+  async transaction<T>(work: (client: PoolClient) => Promise<T>): Promise<T> {
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await work(client);
+      await client.query('COMMIT');
+      return result;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 }

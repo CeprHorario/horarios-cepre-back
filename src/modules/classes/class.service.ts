@@ -4,8 +4,6 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '@database/prisma/prisma.service';
-//Si algun dia borran el domingo para que sea mas mantenible este codigo xd
-//import { Weekday } from '@prisma/client'; // Importamos el enum Weekday
 
 const WEEKDAYS_COUNT = 6;
 
@@ -23,12 +21,12 @@ import { Role } from '@modules/auth/decorators/authorization.decorator';
 import { parsedScheduleJson } from '@database/prisma/data/utils';
 import { ScheduleService } from '@modules/schedules/schedules.service';
 
-import * as rawScheduleBio from '@database/prisma/data/schedules/bio.json';
-import * as rawScheduleIng from '@database/prisma/data/schedules/ing.json';
-import * as rawScheduleSoc from '@database/prisma/data/schedules/soc.json';
-import * as rawScheduleExtra from '@database/prisma/data/schedules/extra.json';
+import rawScheduleBio from '@database/prisma/data/schedules/bio.json';
+import rawScheduleIng from '@database/prisma/data/schedules/ing.json';
+import rawScheduleSoc from '@database/prisma/data/schedules/soc.json';
+import rawScheduleExtra from '@database/prisma/data/schedules/extra.json';
 
-import { Weekday } from '@prisma/client';
+import { Weekday } from '../../generated/prisma/client';
 
 @Injectable()
 export class ClassService {
@@ -201,8 +199,7 @@ export class ClassService {
       },
     });
 
-    const classesWithStatus = await Promise.all(
-      classes.map(async (clas) => {
+    const classesWithStatus = classes.map((clas) => {
         // Para cada clase, calculamos el número esperado de horarios
         const totalPeriods = clas.shift?.hourSessions?.length || 0;
         const expectedSchedulesCount = totalPeriods * WEEKDAYS_COUNT;
@@ -240,8 +237,7 @@ export class ClassService {
         };
 
         return classWithoutSchedules;
-      }),
-    );
+      });
 
     return classesWithStatus.map((clas) => this.mapToClassDto(clas));
   }
@@ -372,7 +368,7 @@ export class ClassService {
   }
 
   // Metodo para mapear un objeto de tipo Class a un objeto de tipo ClassDto
-  private mapToClassDto(obj: any): ClassBaseDto {
+  private mapToClassDto(obj: { id: string; status?: string }): ClassBaseDto {
     return plainToInstance(ClassBaseDto, {
       ...obj,
       // Aseguramos que el estado se mantenga en la transformación

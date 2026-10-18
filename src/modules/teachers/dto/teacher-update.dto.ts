@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsString, IsOptional, IsEnum, IsBoolean, IsNumber } from 'class-validator';
-import { JobStatus } from '@prisma/client';
+import { JobStatus } from '../../../generated/prisma/client';
 
 export class TeacherUpdateDto {
   @ApiProperty({

@@ -10,6 +10,8 @@ import {
   ArrayNotEmpty,
   IsIn,
   IsDate,
+  IsOptional,
+  Max,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -85,6 +87,7 @@ export class ProcessAdmissionDto {
 
   @IsInt()
   @Min(2024)
+  @Max(2100)
   @ApiProperty({ example: 2025 })
   year: number;
 
@@ -101,7 +104,8 @@ export class ProcessAdmissionDto {
   @Type(() => Date)
   finished: Date;
 
+  @IsOptional()
   @ValidateNested()
   @Type(() => ConfigurationDto)
-  configuration: ConfigurationDto;
+  configuration?: ConfigurationDto;
 }

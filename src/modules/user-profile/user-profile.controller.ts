@@ -11,6 +11,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { UserProfileService } from './user-profile.service';
+import type { AuthenticatedRequest } from '@modules/auth/authenticated-request';
 import { CreateUserProfileDto } from './dto/create-user-profile.dto';
 import { UpdateUserProfileDto } from './dto/update-user-profile.dto';
 import {
@@ -29,8 +30,7 @@ export class UserProfileController {
     roles: [Role.ADMIN],
   })
   @Post()
-  create(@Req() req, @Body() createUserProfileDto: CreateUserProfileDto) {
-    console.log('Usuario autenticado:', req.user); // Debugging
+  create(@Req() req: AuthenticatedRequest, @Body() createUserProfileDto: CreateUserProfileDto) {
     const userId = req.user?.userId; // Verifica que exista
 
     if (!userId) {

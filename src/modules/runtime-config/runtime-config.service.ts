@@ -4,6 +4,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  OnModuleDestroy,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { FieldValue, Firestore, Timestamp } from '@google-cloud/firestore';
@@ -16,20 +17,20 @@ import {
 export const FIRESTORE_CLIENT = 'FIRESTORE_CLIENT';
 
 @Injectable()
-export class RuntimeConfigService {
+export class RuntimeConfigService implements OnModuleDestroy {
   private readonly logger = new Logger(RuntimeConfigService.name);
-  private readonly runtimeDocument = this.firestore
-    .collection('system_config')
-    .doc('runtime');
+  private readonly runtimeDocument: FirebaseFirestore.DocumentReference;
   private readonly cacheTtlMs: number;
   private cachedConfig: RuntimeConfig | null = null;
   private cacheExpiresAt = 0;
   private refreshPromise: Promise<RuntimeConfig | null> | null = null;
+  private generation = 0;
 
   constructor(
     @Inject(FIRESTORE_CLIENT) private readonly firestore: Firestore,
     configService: ConfigService,
   ) {
+    this.runtimeDocument = firestore.collection('system_config').doc('runtime');
     this.cacheTtlMs = Math.max(
       Number(configService.get('RUNTIME_CONFIG_CACHE_TTL_MS', 15000)),
       1000,
@@ -37,21 +38,18 @@ export class RuntimeConfigService {
   }
 
   async getCurrent(forceRefresh = false): Promise<RuntimeConfig | null> {
-    if (
-      !forceRefresh &&
-      this.cachedConfig &&
-      Date.now() < this.cacheExpiresAt
-    ) {
+    if (!forceRefresh && Date.now() < this.cacheExpiresAt) {
       return this.cachedConfig;
     }
 
     if (this.refreshPromise) return this.refreshPromise;
 
-    this.refreshPromise = this.loadCurrent();
+    const promise = this.loadCurrent(this.generation);
+    this.refreshPromise = promise;
     try {
-      return await this.refreshPromise;
+      return await promise;
     } finally {
-      this.refreshPromise = null;
+      if (this.refreshPromise === promise) this.refreshPromise = null;
     }
   }
 
@@ -184,6 +182,8 @@ export class RuntimeConfigService {
   }
 
   invalidateCache(): void {
+    this.generation++;
+    this.refreshPromise = null;
     this.cacheExpiresAt = 0;
   }
 
@@ -198,10 +198,16 @@ export class RuntimeConfigService {
     return updated;
   }
 
-  private async loadCurrent(): Promise<RuntimeConfig | null> {
+  async onModuleDestroy(): Promise<void> {
+    await this.firestore.terminate();
+  }
+
+  private async loadCurrent(generation: number): Promise<RuntimeConfig | null> {
     try {
       const snapshot = await this.runtimeDocument.get();
       if (!snapshot.exists) {
+        if (generation === this.generation)
+          this.cacheExpiresAt = Date.now() + this.cacheTtlMs;
         this.logger.warn(
           'Firestore document system_config/runtime does not exist; using compatibility fallback',
         );
@@ -209,10 +215,14 @@ export class RuntimeConfigService {
       }
 
       const config = this.decode(snapshot.data());
-      this.cachedConfig = config;
-      this.cacheExpiresAt = Date.now() + this.cacheTtlMs;
+      if (generation === this.generation) {
+        this.cachedConfig = config;
+        this.cacheExpiresAt = Date.now() + this.cacheTtlMs;
+      }
       return config;
     } catch (error) {
+      if (generation === this.generation)
+        this.cacheExpiresAt = Date.now() + this.cacheTtlMs;
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(
         `Unable to load runtime configuration; using last valid value: ${message}`,

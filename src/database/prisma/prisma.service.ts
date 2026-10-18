@@ -1,38 +1,57 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
-import { PrismaClientFactory } from './prisma-client.factory';
-import { AsyncLocalStorage } from 'async_hooks';
-
-import { initialDataSchema } from './data/seed';
-import { ConfigurationDto } from '@modules/admissions/dto/create-admission.dto';
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { PrismaClient } from '../../generated/prisma/client';
+import { Pool } from 'pg';
+import { RequestContext } from '../schema-manager/request-context';
+import { assertSchemaName } from '../schema-manager/schema-name';
 
 @Injectable()
-export class PrismaService {
+export class PrismaService implements OnModuleDestroy {
+  private readonly clients = new Map<string, PrismaClient>();
+  private readonly pool: Pool;
+
   constructor(
-    private factory: PrismaClientFactory,
-    private als: AsyncLocalStorage<{ schema: string }>,
-  ) {}
+    config: ConfigService,
+    private readonly context: RequestContext,
+  ) {
+    this.pool = new Pool({
+      connectionString: config.getOrThrow<string>('DATABASE_URL'),
+      max: config.getOrThrow<number>('DB_POOL_MAX'),
+      connectionTimeoutMillis: 5000,
+      idleTimeoutMillis: 30000,
+      application_name: 'cepr-prisma',
+    });
+    this.pool.on('error', (error: Error) =>
+      new Logger(PrismaService.name).error(error.message),
+    );
+  }
 
   getClient(): PrismaClient {
-    const schema = this.als.getStore()?.schema ?? 'default';
-    return this.factory.getClient(schema);
+    const schema = this.context.require().schema;
+    if (!schema) throw new Error('No authorized request schema');
+    return this.getClientForSchema(schema);
   }
 
   getClientForSchema(schema: string): PrismaClient {
-    return this.factory.getClient(schema);
+    assertSchemaName(schema);
+    let client = this.clients.get(schema);
+    if (!client) {
+      client = new PrismaClient({
+        adapter: new PrismaPg(this.pool, {
+          schema,
+          disposeExternalPool: false,
+        }),
+      });
+      this.clients.set(schema, client);
+    }
+    return client;
   }
 
-  async setMainClient(schema: string): Promise<PrismaClient> {
-    return await this.factory.setMainClient(schema);
-  }
-
-  async migrationInitialSchema(
-    schema: string,
-    conf: ConfigurationDto,
-  ): Promise<void> {
-    // 1: Realizamos las migraciones iniciales
-    const success = await initialDataSchema(schema, conf);
-    // 2: Establecemos el cliente principal para el nuevo esquema
-    if (success) await this.setMainClient(schema);
+  async onModuleDestroy(): Promise<void> {
+    await Promise.all(
+      [...this.clients.values()].map((client) => client.$disconnect()),
+    );
+    await this.pool.end();
   }
 }

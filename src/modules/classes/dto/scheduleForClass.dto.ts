@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Weekday } from '@prisma/client';
+import { Weekday } from '../../../generated/prisma/client';
 import { IsDate, IsEnum, IsNumber, IsString } from 'class-validator';
 
 export class ScheduleForClass {
