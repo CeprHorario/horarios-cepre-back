@@ -18,6 +18,10 @@ export class ClassForTeacherDto {
   name!: string;
 
   @Expose()
+  @ApiProperty({ example: 1, description: 'Turno del salón' })
+  shiftId!: number;
+
+  @Expose()
   @IsOptional()
   @ApiProperty({ type: [MonitorForTeacherDto] })
   monitor: MonitorForTeacherDto;

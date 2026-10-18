@@ -16,6 +16,7 @@ import { SupervisorGetSummaryDto } from './dto/supervisor-get-summary.dto';
 import { AssignMonitorDto } from './dto/assign-monitor.dto';
 import { SupervisorGetByIdDto } from './dto/supervisor-get-by-id.dto';
 import { Prisma } from '@prisma/client';
+import { deactivateUsers } from '@modules/shared/deactivate-users';
 
 @Injectable()
 export class SupervisorService {
@@ -291,10 +292,13 @@ export class SupervisorService {
         user: {
           select: {
             id: true,
+            email: true,
             userProfile: {
               select: {
                 firstName: true,
                 lastName: true,
+                phone: true,
+                personalEmail: true,
               },
             },
           },
@@ -318,6 +322,9 @@ export class SupervisorService {
     return monitors.map((monitor) =>
       plainToInstance(MonitorForSupervisorDto, {
         user_id: monitor.user.id,
+        email: monitor.user.email,
+        phone: monitor.user.userProfile?.phone ?? null,
+        personalEmail: monitor.user.userProfile?.personalEmail ?? null,
         profile: monitor.user?.userProfile
           ? {
               firstName: monitor.user.userProfile.firstName,
@@ -355,6 +362,19 @@ export class SupervisorService {
       throw new NotFoundException(`Supervisor with ID ${id} not found`);
     }
     return supervisor;
+  }
+
+  /** Eliminación lógica en bloque: todos o ninguno */
+  async deactivateMany(ids: string[]) {
+    return deactivateUsers(
+      this.prisma.getClient(),
+      ids,
+      (tx, ids) =>
+        tx.supervisor
+          .findMany({ where: { id: { in: ids } }, select: { userId: true } })
+          .then((rows) => rows.map((r) => r.userId)),
+      'supervisores',
+    );
   }
 
   async deactivate(id: string) {

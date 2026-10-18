@@ -1,4 +1,11 @@
-import { IsString, IsDate, IsNotEmpty, IsEnum } from 'class-validator';
+import {
+  IsString,
+  IsDate,
+  IsNotEmpty,
+  IsEnum,
+  IsBoolean,
+  IsNumber,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 
@@ -44,4 +51,12 @@ export class ScheduleDto {
   @IsString()
   @IsNotEmpty()
   courseName: string;
+
+  @ApiProperty({ description: 'Turno del bloque horario', example: 1 })
+  @IsNumber()
+  shiftId: number;
+
+  @ApiProperty({ description: 'Si el bloque ya tiene docente asignado' })
+  @IsBoolean()
+  hasTeacher: boolean;
 }

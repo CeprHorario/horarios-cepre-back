@@ -62,7 +62,8 @@ export class ClassService {
 
     const number = countClasses + 1 + 100 * body.shift_id;
 
-    const className = `${area.name[0]}-${number}-${area.name}`;
+    // Mismo formato que los salones generados por proceso: "B-301 Biomédicas"
+    const className = `${area.name[0]}-${number} ${area.name}`;
 
     // Validar si la clase ya existe en la base de datos
     const existingClass = await this.prisma.getClient().class.findFirst({
@@ -87,7 +88,24 @@ export class ClassService {
                   throw new BadRequestException('Area no válida');
                 })();
 
-    const userEmail = `${number}${area.name[0].toLowerCase()}@cepr.unsa.pe`;
+    const monitorData = body.monitor;
+    const userEmail =
+      monitorData?.email?.trim().toLowerCase() ||
+      `${number}${area.name[0].toLowerCase()}@cepr.unsa.pe`;
+    // El perfil exige nombres; sin ellos el monitor queda solo con su correo
+    const monitorProfile =
+      monitorData?.firstName && monitorData?.lastName
+        ? {
+            create: {
+              dni: monitorData.dni || null,
+              firstName: monitorData.firstName.trim(),
+              lastName: monitorData.lastName.trim(),
+              phone: monitorData.phone || null,
+              phonesAdditional: monitorData.phonesAdditional || [],
+              personalEmail: monitorData.personalEmail || null,
+            },
+          }
+        : undefined;
     const classResult = await this.prisma
       .getClient()
       .$transaction(async (px) => {
@@ -104,6 +122,7 @@ export class ClassService {
                   create: {
                     email: userEmail,
                     role: Role.MONITOR,
+                    userProfile: monitorProfile,
                   },
                 },
               },

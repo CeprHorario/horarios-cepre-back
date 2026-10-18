@@ -26,6 +26,7 @@ import { CreateSupervisorWithUserDto } from './dto/create-supervisor.dto';
 import { MonitorForSupervisorDto } from '@modules/monitors/dto/monitorForSupervisor.dto';
 import { SupervisorGetSummaryDto } from './dto/supervisor-get-summary.dto';
 import { AssignMonitorDto } from './dto/assign-monitor.dto';
+import { DeactivateManyDto } from '@modules/shared/dto/deactivate-many.dto';
 
 @Controller('supervisors')
 @UseGuards(JwtAuthGuard)
@@ -129,6 +130,15 @@ export class SupervisorController {
   })
   delete(@Param('id') id: string) {
     return this.supervisorService.delete(id);
+  }
+
+  @Patch('deactivate')
+  @Authorization({
+    permission: 'supervisor.deactivateMany',
+    description: 'Eliminar (lógicamente) varios supervisores a la vez',
+  })
+  deactivateMany(@Body() body: DeactivateManyDto) {
+    return this.supervisorService.deactivateMany(body.ids);
   }
 
   @Patch(':id/deactivate')

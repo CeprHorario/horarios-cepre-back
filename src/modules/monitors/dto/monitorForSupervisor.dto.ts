@@ -19,6 +19,20 @@ export class MonitorForSupervisorDto {
   profile: { firstName: string; lastName: string } | null;
 
   @Expose()
+  @ApiProperty({ example: '101b@cepr.unsa.pe' })
+  email: string;
+
+  @Expose()
+  @IsOptional()
+  @ApiProperty({ example: '987654321', required: false })
+  phone?: string | null;
+
+  @Expose()
+  @IsOptional()
+  @ApiProperty({ example: 'personal@ejemplo.com', required: false })
+  personalEmail?: string | null;
+
+  @Expose()
   @IsOptional()
   @ApiProperty({ type: [ClassForSupervisorDto] })
   classes?: ClassForSupervisorDto;

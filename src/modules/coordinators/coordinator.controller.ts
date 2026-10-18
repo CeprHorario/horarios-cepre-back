@@ -16,6 +16,7 @@ import {
   CreateCoordinatorDto,
   UpdateCoordinatorDto,
 } from './dto';
+import { DeactivateManyDto } from '@modules/shared/dto/deactivate-many.dto';
 
 @ApiTags('Coordinators')
 @Controller('coordinators')
@@ -64,6 +65,15 @@ export class CoordinatorController {
   @ApiOperation({ summary: 'Actualizar un coordinador' })
   update(@Param('id') id: string, @Body() data: UpdateCoordinatorDto) {
     return this.coordinatorService.update(id, data);
+  }
+
+  @Patch('deactivate')
+  @Authorization({
+    permission: 'coordinator.deactivateMany',
+    description: 'Eliminar (lógicamente) varios coordinadores a la vez',
+  })
+  deactivateMany(@Body() body: DeactivateManyDto) {
+    return this.coordinatorService.deactivateMany(body.ids);
   }
 
   @Patch(':id/deactivate')

@@ -36,6 +36,7 @@ import { TeacherGetByIdDto } from './dto/teacher-get-by-id.dto';
 import { ScheduleTeacherDto } from './dto/schedule-teacher.dto';
 import { TeacherFilteredDto } from '@modules/teachers/dto/teacherFiltered.dto';
 import { getCoordinatorCourseId } from '@modules/auth/utils/coordinator-role';
+import { DeactivateManyDto } from '@modules/shared/dto/deactivate-many.dto';
 
 @ApiTags('Teachers')
 @Controller('teachers')
@@ -259,6 +260,15 @@ export class TeacherController {
   @ApiBody({ type: [CreateTeacherDto] })
   async createTeachersFromJson(@Body() importTeacherDto: CreateTeacherDto[]) {
     return this.teacherService.createManyTeachers(importTeacherDto);
+  }
+
+  @Patch('deactivate')
+  @Authorization({
+    permission: 'teacher.deactivateMany',
+    description: 'Eliminar (lógicamente) varios docentes a la vez',
+  })
+  deactivateMany(@Body() body: DeactivateManyDto) {
+    return this.teacherService.deactivateMany(body.ids);
   }
 
   @Patch(':id/deactivate')

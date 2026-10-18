@@ -26,6 +26,7 @@ import { UpdateMonitorAsAdminDto } from './dto/updateMonitorAsAdmin.dto';
 import { MonitorGetSummaryDto } from './dto/monitor-get-summary.dto';
 import { ApiResponse, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { MonitorWithoutSupervisorDto } from './dto/monitorWithoutSupervisor.dto';
+import { DeactivateManyDto } from '@modules/shared/dto/deactivate-many.dto';
 
 @Controller('monitors')
 export class MonitorController {
@@ -89,7 +90,7 @@ export class MonitorController {
 
   @Get()
   @Authorization({
-    permission: 'monitor.list',
+    permission: 'monitor.listAll',
     description: 'Obtener un monitor por ID',
   })
   @ApiOperation({ summary: 'Obtener todos los monitores activos' })
@@ -223,7 +224,7 @@ export class MonitorController {
   @Get('/datos/teachers')
   @Authorization({
     roles: [Role.MONITOR, Role.ADMIN, Role.SUPERVISOR],
-    permission: 'monitor.listTeachersByMonitor',
+    permission: 'monitor.listTeachersData',
     description: 'Cargar los docentes de un monitor',
   })
   async getTeachersByMonitor(@Req() req): Promise<TeacherResponseDto[]> {
@@ -235,7 +236,7 @@ export class MonitorController {
   @Get('/:userId/teachers')
   @Authorization({
     roles: [Role.MONITOR, Role.SUPERVISOR, Role.ADMIN],
-    permission: 'monitor.listTeachersByMonitor',
+    permission: 'monitor.listTeachersByUser',
     description: 'Cargar los docentes de un monitor',
   })
   async getTeachersByMonitorParam(
@@ -245,6 +246,15 @@ export class MonitorController {
       throw new UnauthorizedException('No se pudo obtener el ID del usuario');
     }
     return this.monitorService.getTeachersByMonitor(userId);
+  }
+
+  @Patch('deactivate')
+  @Authorization({
+    permission: 'monitor.deactivateMany',
+    description: 'Eliminar (lógicamente) varios monitores a la vez',
+  })
+  deactivateMany(@Body() body: DeactivateManyDto) {
+    return this.monitorService.deactivateMany(body.ids);
   }
 
   @Patch(':id/deactivate')

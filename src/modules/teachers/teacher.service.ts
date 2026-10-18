@@ -19,6 +19,7 @@ import { Prisma } from '@prisma/client';
 import { ScheduleTeacherDto } from './dto/schedule-teacher.dto';
 import { TeacherFilteredDto } from '@modules/teachers/dto/teacherFiltered.dto';
 import { JobStatus } from '@prisma/client';
+import { deactivateUsers } from '@modules/shared/deactivate-users';
 
 @Injectable()
 export class TeacherService {
@@ -457,6 +458,19 @@ export class TeacherService {
       console.error('Error al crear usuarios:', error);
       throw new Error('Error creando profesores. No se creó ningún profesor.');
     }
+  }
+
+  /** Eliminación lógica en bloque: todos o ninguno */
+  async deactivateMany(ids: string[]) {
+    return deactivateUsers(
+      this.prisma.getClient(),
+      ids,
+      (tx, ids) =>
+        tx.teacher
+          .findMany({ where: { id: { in: ids } }, select: { userId: true } })
+          .then((rows) => rows.map((r) => r.userId)),
+      'docentes',
+    );
   }
 
   async deactivate(id: string) {

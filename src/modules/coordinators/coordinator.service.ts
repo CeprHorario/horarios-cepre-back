@@ -14,6 +14,7 @@ import {
   CreateCoordinatorDto,
   UpdateCoordinatorDto,
 } from './dto';
+import { deactivateUsers } from '@modules/shared/deactivate-users';
 
 @Injectable()
 export class CoordinatorService {
@@ -124,6 +125,28 @@ export class CoordinatorService {
     });
 
     return this.mapToDto(user);
+  }
+
+  /** Eliminación lógica en bloque: todos o ninguno */
+  async deactivateMany(ids: string[]) {
+    return deactivateUsers(
+      this.prisma.getClient(),
+      ids,
+      (tx, ids) =>
+        tx.user
+          .findMany({
+            where: {
+              id: { in: ids },
+              OR: [
+                { role: COORDINATOR_ROLE },
+                { role: { startsWith: `${COORDINATOR_ROLE}-` } },
+              ],
+            },
+            select: { id: true },
+          })
+          .then((rows) => rows.map((r) => r.id)),
+      'coordinadores',
+    );
   }
 
   async deactivate(id: string): Promise<CoordinatorResponseDto> {

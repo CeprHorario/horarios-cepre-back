@@ -139,8 +139,8 @@ export class ScheduleController {
   }
 
   @Authorization({
-    permission: 'schedule.delete',
-    description: 'Eliminar un horario por id',
+    permission: 'schedule.assignTeacher',
+    description: 'Asignar profesor a horarios',
   })
   @Patch('/asignar/profesor')
   async assignTeacherToSchedules(
@@ -171,7 +171,7 @@ export class ScheduleController {
   }
 
   @Authorization({
-    permission: 'schedule.delete',
+    permission: 'schedule.unassignTeacher',
     description: 'Desasignar profesor de horarios',
   })
   @Patch('/desasignar/profesor')

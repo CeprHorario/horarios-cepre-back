@@ -20,6 +20,7 @@ import { MonitorGetSummaryDto } from './dto/monitor-get-summary.dto';
 import { MonitorWithoutSupervisorDto } from './dto/monitorWithoutSupervisor.dto';
 import { MonitorGetByIdDto } from './dto/monitor-get-by-id.dto';
 import { Prisma } from '@prisma/client';
+import { deactivateUsers } from '@modules/shared/deactivate-users';
 
 @Injectable()
 export class MonitorService {
@@ -351,17 +352,11 @@ export class MonitorService {
           select: {
             startTime: true,
             endTime: true,
+            shiftId: true,
           },
         },
-        teacher: {
-          select: {
-            courses: {
-              select: {
-                name: true,
-              },
-            },
-          },
-        },
+        course: { select: { name: true } },
+        teacherId: true,
       },
     });
 
@@ -371,11 +366,14 @@ export class MonitorService {
       );
     }
 
+    // El curso sale del propio bloque: un bloque sin docente sigue teniendo curso
     return schedules.map((schedule) => ({
       weekday: schedule.weekday as Weekday,
       startTime: schedule.hourSession.startTime,
       endTime: schedule.hourSession.endTime,
-      courseName: schedule.teacher?.courses?.name || 'Sin asignar',
+      shiftId: schedule.hourSession.shiftId,
+      courseName: schedule.course?.name || 'Sin asignar',
+      hasTeacher: Boolean(schedule.teacherId),
     }));
   }
 
@@ -410,6 +408,19 @@ export class MonitorService {
       urlMeet: obj.monitor?.classes?.urlMeet,
       urlClassroom: obj.monitor?.classes?.urlClassroom,
     });
+  }
+
+  /** Eliminación lógica en bloque: todos o ninguno */
+  async deactivateMany(ids: string[]) {
+    return deactivateUsers(
+      this.prisma.getClient(),
+      ids,
+      (tx, ids) =>
+        tx.monitor
+          .findMany({ where: { id: { in: ids } }, select: { userId: true } })
+          .then((rows) => rows.map((r) => r.userId)),
+      'monitores',
+    );
   }
 
   async deactivate(id: string) {
