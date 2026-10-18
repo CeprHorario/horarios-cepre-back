@@ -1,4 +1,3 @@
-/* eslint-disable prettier/prettier */
 import {
   Injectable,
   NotFoundException,
@@ -19,7 +18,7 @@ import { UpdateMonitorAsAdminDto } from './dto/updateMonitorAsAdmin.dto';
 import { MonitorGetSummaryDto } from './dto/monitor-get-summary.dto';
 import { MonitorWithoutSupervisorDto } from './dto/monitorWithoutSupervisor.dto';
 import { MonitorGetByIdDto } from './dto/monitor-get-by-id.dto';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '../../generated/prisma/client';
 
 @Injectable()
 export class MonitorService {
@@ -168,7 +167,7 @@ export class MonitorService {
         throw error;
       }
       console.error('Error en findOne:', error); // Agregar un log para depuración
-      throw new Error('Ocurrió un error inesperado al buscar el monitor');
+      throw new Error('Ocurrió un error inesperado al buscar el monitor', { cause: error });
     }
   }
 

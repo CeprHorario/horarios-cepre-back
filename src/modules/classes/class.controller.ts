@@ -14,7 +14,6 @@ import {
   Patch,
 } from '@nestjs/common';
 import { ClassService } from './class.service';
-//import { Prisma } from '@prisma/client';
 import { UpdateClassDto, ClassBaseDto, ClassForTeacherDto } from './dto';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
@@ -25,6 +24,7 @@ import { ScheduleForClass } from './dto/scheduleForClass.dto';
 import { TeacherResponseDto } from '@modules/monitors/dto/teacher-response.dto';
 import { CreateClassDataDto } from './dto/CreateClassData.dto';
 import { getCoordinatorCourseId } from '@modules/auth/utils/coordinator-role';
+import type { AuthenticatedRequest } from '@modules/auth/authenticated-request';
 
 @Controller('classes')
 @ApiTags('Classes')
@@ -57,7 +57,7 @@ export class ClassController {
   })
   async getSchedulesByClassId(
     @Param('classId', ParseUUIDPipe) classId: string,
-    @Req() req,
+    @Req() req: AuthenticatedRequest,
   ): Promise<ScheduleForClass[]> {
     return await this.classService.getSchedulesByClassId(
       classId,
@@ -77,7 +77,7 @@ export class ClassController {
   })
   async getTeachersByClassId(
     @Param('classId', ParseUUIDPipe) classId: string,
-    @Req() req,
+    @Req() req: AuthenticatedRequest,
   ): Promise<TeacherResponseDto[]> {
     return await this.classService.getTeachersByClassId(
       classId,
@@ -97,7 +97,7 @@ export class ClassController {
     summary: 'Obtener todas las clases',
     description: 'Get all classes',
   })
-  findAll(@Req() req): Promise<ClassBaseDto[]> {
+  findAll(@Req() req: AuthenticatedRequest): Promise<ClassBaseDto[]> {
     return this.classService.findAll(getCoordinatorCourseId(req.user?.role));
   }
 
@@ -112,8 +112,7 @@ export class ClassController {
     summary: 'Obtener la clase del profito',
     description: 'Get all classes',
   })
-  getClassOfTeacher(@Req() req): Promise<ClassForTeacherDto[]> {
-    console.log('Usuario autenticado:', req.user); // Debugging
+  getClassOfTeacher(@Req() req: AuthenticatedRequest): Promise<ClassForTeacherDto[]> {
     const userId = req.user?.userId; // Verifica que exista
 
     if (!userId) {
@@ -134,7 +133,7 @@ export class ClassController {
   })
   findOne(
     @Param('id', ParseUUIDPipe) id: string,
-    @Req() req,
+    @Req() req: AuthenticatedRequest,
   ): Promise<ClassBaseDto> {
     return this.classService.findOne(
       id,

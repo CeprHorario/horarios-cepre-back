@@ -4,8 +4,8 @@
   "sourceRoot": "src",
   "compilerOptions": {
     "deleteOutDir": true,
-    "plugins": [
-      "@nestjs/swagger"
-    ]
+    "plugins": ["@nestjs/swagger"],
+    "assets": ["database/prisma/migrations/**/*.sql"],
+    "watchAssets": true
   }
 }

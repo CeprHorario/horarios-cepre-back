@@ -1,6 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@database/prisma/prisma.service';
-//import { /*Area, AreaCourseHour, Prisma */} from '@prisma/client';
 
 import {
   CreateAreaCourseHourDto,

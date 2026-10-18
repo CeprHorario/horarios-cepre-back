@@ -32,8 +32,8 @@ export class HourSessionService {
       });
     } catch (error) {
       throw new HttpException(
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-        `Error al crear la sesión: ${error.message}`,
+         
+        `Error al crear la sesión: ${error instanceof Error ? error.message : String(error)}`,
         HttpStatus.BAD_REQUEST,
       );
     }
@@ -46,8 +46,8 @@ export class HourSessionService {
       });
     } catch (error) {
       throw new HttpException(
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-        `Error al obtener las sesiones: ${error.message}`,
+         
+        `Error al obtener las sesiones: ${error instanceof Error ? error.message : String(error)}`,
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
@@ -65,8 +65,8 @@ export class HourSessionService {
       return session;
     } catch (error) {
       throw new HttpException(
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-        `Error al buscar la sesión: ${error.message}`,
+         
+        `Error al buscar la sesión: ${error instanceof Error ? error.message : String(error)}`,
         HttpStatus.BAD_REQUEST,
       );
     }
@@ -103,8 +103,8 @@ export class HourSessionService {
       });
     } catch (error) {
       throw new HttpException(
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-        `Error al actualizar la sesión: ${error.message}`,
+         
+        `Error al actualizar la sesión: ${error instanceof Error ? error.message : String(error)}`,
         HttpStatus.BAD_REQUEST,
       );
     }
@@ -117,8 +117,8 @@ export class HourSessionService {
         .hourSession.delete({ where: { id } });
     } catch (error) {
       throw new HttpException(
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-        `Error al eliminar la sesión: ${error.message}`,
+         
+        `Error al eliminar la sesión: ${error instanceof Error ? error.message : String(error)}`,
         HttpStatus.BAD_REQUEST,
       );
     }

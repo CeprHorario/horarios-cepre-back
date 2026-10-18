@@ -1,6 +1,6 @@
 //CAMBIAR POR DTOS  A FUTURO
 import { ApiProperty } from '@nestjs/swagger';
-import { Sede, Shift } from '@prisma/client';
+import { Sede, Shift } from '../../../generated/prisma/client';
 
 import {
   IsNotEmpty,

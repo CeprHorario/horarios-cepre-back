@@ -1,0 +1,40 @@
+name: cepr-bck-v1
+
+services:
+  backend:
+    image: node:24.22.0-trixie
+    working_dir: /app
+    user: node
+    init: true
+    command: sh -c "npm ci --no-audit --no-fund && npm run start:dev"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      NODE_ENV: development
+      PORT: '8080'
+      DATABASE_URL: postgresql://${POSTGRES_USER:-cepr}:${POSTGRES_PASSWORD:-cepr_dev}@db:5432/${POSTGRES_DB:-cepr}
+    ports:
+      - '127.0.0.1:${PORT:-8080}:8080'
+    volumes:
+      - .:/app
+    depends_on:
+      db:
+        condition: service_healthy
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-cepr}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cepr_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-cepr}
+    ports:
+      - '127.0.0.1:${POSTGRES_PORT:-5432}:5432'
+    volumes:
+      - ./.volumes/postgres:/var/lib/postgresql
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"
+      interval: 5s
+      timeout: 3s
+      retries: 10

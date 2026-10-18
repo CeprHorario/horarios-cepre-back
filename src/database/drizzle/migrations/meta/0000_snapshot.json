@@ -1,5 +1,5 @@
 {
-  "id": "e3e2dba0-fce4-46de-9d15-71205b91c58c",
+  "id": "13f9729c-2677-4f47-80bc-1dfb1fbbf3fc",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -33,6 +33,20 @@
           "notNull": true,
           "default": true
         },
+        "started": {
+          "name": "started",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "finished": {
+          "name": "finished",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
         "description": {
           "name": "description",
           "type": "varchar(255)",
@@ -45,6 +59,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "structure_version": {
+          "name": "structure_version",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
         }
       },
       "indexes": {
@@ -112,12 +132,8 @@
           "name": "observations_admission_process_id_admission_processes_id_fk",
           "tableFrom": "observations",
           "tableTo": "admission_processes",
-          "columnsFrom": [
-            "admission_process_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["admission_process_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -184,9 +200,7 @@
         "permissions_name_unique": {
           "name": "permissions_name_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "name"
-          ]
+          "columns": ["name"]
         }
       },
       "policies": {},
@@ -299,12 +313,8 @@
           "name": "roles_permissions_role_id_roles_id_fk",
           "tableFrom": "roles_permissions",
           "tableTo": "roles",
-          "columnsFrom": [
-            "role_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["role_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -312,12 +322,8 @@
           "name": "roles_permissions_permission_id_permissions_id_fk",
           "tableFrom": "roles_permissions",
           "tableTo": "permissions",
-          "columnsFrom": [
-            "permission_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["permission_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -325,10 +331,7 @@
       "compositePrimaryKeys": {
         "roles_permissions_role_id_permission_id_pk": {
           "name": "roles_permissions_role_id_permission_id_pk",
-          "columns": [
-            "role_id",
-            "permission_id"
-          ]
+          "columns": ["role_id", "permission_id"]
         }
       },
       "uniqueConstraints": {},

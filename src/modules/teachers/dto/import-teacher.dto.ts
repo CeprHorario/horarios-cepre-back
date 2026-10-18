@@ -10,7 +10,7 @@ import {
   IsArray,
   IsNumber,
 } from 'class-validator';
-import { JobStatus } from '@prisma/client';
+import { JobStatus } from '../../../generated/prisma/client';
 
 export class CreateTeacherDto {
   @ApiProperty({ example: 'profesor1@ejemplo.com' })

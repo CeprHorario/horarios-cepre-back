@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Expose } from 'class-transformer';
-import { JobStatus } from '@prisma/client';
+import { JobStatus } from '../../../generated/prisma/client';
 
 export class TeacherGetSummaryDto {
   @ApiProperty({

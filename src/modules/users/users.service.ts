@@ -3,7 +3,7 @@ import { PrismaService } from '@database/prisma/prisma.service';
 import { UserBaseDto } from './dto';
 import { CreateUserDto } from './dto/index';
 import { plainToInstance } from 'class-transformer';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '../../generated/prisma/client';
 import { Role } from '@modules/auth/decorators/authorization.decorator';
 
 @Injectable()

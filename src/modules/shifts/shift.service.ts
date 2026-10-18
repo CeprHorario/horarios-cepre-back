@@ -6,7 +6,7 @@ import {
 import { PrismaService } from '@database/prisma/prisma.service';
 import { CreateShiftDto, UpdateShiftDto } from './dto/index';
 import { CreateHourSessionDto } from '@modules/hour-session/dto';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '../../generated/prisma/client';
 
 @Injectable()
 export class ShiftService {
@@ -100,8 +100,8 @@ export class ShiftService {
       });
     } catch (error) {
       throw new BadRequestException(
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-        'Error al actualizar el turno: ' + error.message,
+         
+        'Error al actualizar el turno: ' + (error instanceof Error ? error.message : String(error)),
       );
     }
   }
@@ -125,8 +125,8 @@ export class ShiftService {
         }
       }
       throw new BadRequestException(
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-        'Error al eliminar el turno: ' + error.message,
+         
+        'Error al eliminar el turno: ' + (error instanceof Error ? error.message : String(error)),
       );
     }
   }

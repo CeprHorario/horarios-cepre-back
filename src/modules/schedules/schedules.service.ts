@@ -7,7 +7,7 @@ import { PrismaService } from '@database/prisma/prisma.service';
 import { ScheduleBaseDto, CreateScheduleDto, UpdateScheduleDto } from './dto';
 import { plainToInstance } from 'class-transformer';
 import { LoadScheduleDto } from './dto';
-import { Weekday } from '@prisma/client';
+import { Weekday, Prisma } from '../../generated/prisma/client';
 import { Role } from '@modules/auth/decorators/authorization.decorator';
 
 @Injectable()
@@ -31,8 +31,6 @@ export class ScheduleService {
   }
 
   async getPublicScheduleByTeacher(email: string, dni: string) {
-    console.log('email', email);
-    console.log('dni', dni);
     if (!(email && dni)) {
       throw new NotFoundException('Se debe proporcionar un email o un DNI');
     }
@@ -153,7 +151,8 @@ export class ScheduleService {
   }
 
   async assignTeacherToSchedules(classroomIds: string[], teacherId: string) {
-    const teacher = await this.prisma.getClient().teacher.findUnique({
+    return this.assignmentTransaction(async (prisma) => {
+    const teacher = await prisma.teacher.findUnique({
       where: { id: teacherId },
       include: { schedules: true, courses: true },
     });
@@ -168,7 +167,7 @@ export class ScheduleService {
       throw new Error('El profesor ha alcanzado su límite de horas');
     }
 
-    const schedulesToAssign = await this.prisma.getClient().schedule.findMany({
+    const schedulesToAssign = await prisma.schedule.findMany({
       where: {
         classId: { in: classroomIds },
         courseId: courseId,
@@ -191,12 +190,10 @@ export class ScheduleService {
       );
     }
 
-    const updatedSchedules = await this.prisma
-      .getClient()
-      .$transaction(async (prisma) => {
         const updatedSchedules = await prisma.schedule.updateMany({
           where: {
             id: { in: schedulesToAssign.map((schedule) => schedule.id) },
+            teacherId: null,
           },
           data: { teacherId: teacher.id },
         });
@@ -204,22 +201,21 @@ export class ScheduleService {
         await prisma.teacher.update({
           where: { id: teacher.id },
           data: {
-            scheduledHours: newTotalScheduledHours,
+            scheduledHours: { increment: updatedSchedules.count },
           },
         });
 
         return updatedSchedules;
       });
-
-    return updatedSchedules;
   }
 
   async unassignTeacherFromSchedules(
     classroomIds: string[],
     teacherId: string,
   ) {
+    return this.assignmentTransaction(async (prisma) => {
     // Primero verificamos que el profesor exista
-    const teacher = await this.prisma.getClient().teacher.findUnique({
+    const teacher = await prisma.teacher.findUnique({
       where: { id: teacherId },
     });
 
@@ -228,9 +224,7 @@ export class ScheduleService {
     }
 
     // Obtenemos los horarios que coinciden con los IDs de clase y el profesor especificado
-    const schedulesToUnassign = await this.prisma
-      .getClient()
-      .schedule.findMany({
+    const schedulesToUnassign = await prisma.schedule.findMany({
         where: {
           classId: { in: classroomIds },
           teacherId: teacherId, // Solo los horarios del profesor especificado
@@ -243,12 +237,6 @@ export class ScheduleService {
       );
     }
 
-    const totalHoursToRemove = schedulesToUnassign.length;
-
-    // Realizamos las actualizaciones en una transacción
-    const updatedSchedules = await this.prisma
-      .getClient()
-      .$transaction(async (prisma) => {
         // Actualizamos los horarios para quitar el profesor
         const updatedSchedules = await prisma.schedule.updateMany({
           where: {
@@ -267,7 +255,7 @@ export class ScheduleService {
         if (currentTeacher) {
           const newScheduledHours = Math.max(
             0,
-            currentTeacher.scheduledHours - totalHoursToRemove,
+             currentTeacher.scheduledHours - updatedSchedules.count,
           );
           await prisma.teacher.update({
             where: { id: teacherId },
@@ -277,8 +265,17 @@ export class ScheduleService {
 
         return updatedSchedules;
       });
+  }
 
-    return updatedSchedules;
+  private async assignmentTransaction<T>(operation: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
+    // Ponytail: at most 3 retries under contention; use a queue if sustained contention requires more.
+    for (let retry = 0; ; retry++) {
+      try {
+        return await this.prisma.getClient().$transaction(operation, { isolationLevel: 'Serializable' });
+      } catch (error) {
+        if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2034' || retry >= 3) throw error;
+      }
+    }
   }
 
   async findAvailableClassrooms(
@@ -293,7 +290,7 @@ export class ScheduleService {
       horario.map((slot) => `${slot.id_hour_session}-${slot.weekday}`),
     );
 
-    const classroomFilter: any = {
+    const classroomFilter: Prisma.ClassWhereInput = {
       schedules: {
         some: {
           courseId: id_course,

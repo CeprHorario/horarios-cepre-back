@@ -14,15 +14,19 @@ import { Role } from '@modules/auth/decorators/authorization.decorator';
 import { TeacherGetSummaryDto } from './dto/teacher-get-summary.dto';
 import { TeacherUpdateDto } from './dto/teacher-update.dto';
 import { TeacherGetByIdDto } from './dto/teacher-get-by-id.dto';
-//import { Teacher } from '@prisma/client';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '../../generated/prisma/client';
 import { ScheduleTeacherDto } from './dto/schedule-teacher.dto';
 import { TeacherFilteredDto } from '@modules/teachers/dto/teacherFiltered.dto';
-import { JobStatus } from '@prisma/client';
+import { JobStatus } from '../../generated/prisma/client';
+import { RequestContext } from '@database/schema-manager/request-context';
+import { assertSchemaName } from '@database/schema-manager/schema-name';
 
 @Injectable()
 export class TeacherService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly context: RequestContext,
+  ) {}
 
   // ─────── CRUD ───────
   async createTeacher(
@@ -214,7 +218,7 @@ export class TeacherService {
         throw error;
       }
       console.error('Error en findOne:', error); // Agregar un log para depuración
-      throw new Error('Ocurrió un error inesperado al buscar el profesor');
+      throw new Error('Ocurrió un error inesperado al buscar el profesor', { cause: error });
     }
   }
 
@@ -455,7 +459,7 @@ export class TeacherService {
       };
     } catch (error) {
       console.error('Error al crear usuarios:', error);
-      throw new Error('Error creando profesores. No se creó ningún profesor.');
+      throw new Error('Error creando profesores. No se creó ningún profesor.', { cause: error });
     }
   }
 
@@ -769,8 +773,11 @@ export class TeacherService {
     }
 
     // Buscar profesores que tengan horas disponibles
+    const schema = this.context.require().schema;
+    if (!schema) throw new Error('No authorized request schema');
+    assertSchemaName(schema);
     const ids = await this.prisma.getClient().$queryRaw<{ id: string }[]>`
-      SELECT id FROM "teachers"
+      SELECT id FROM ${Prisma.raw(`"${schema}"."teachers"`)}
       WHERE course_id = ${body.courseId} AND (max_hours - scheduled_hours) >= ${body.hourSessions.length}
     `;
     if (ids.length === 0) return { data: [], page, limit };

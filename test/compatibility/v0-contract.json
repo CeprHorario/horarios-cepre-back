@@ -1,0 +1,1916 @@
+{
+  "sources": {
+    "src/modules/admissions/admissions.controller.ts": "8845f566f7f23419ffea270e639bfec418d4d957699e29608aa3e4f7a53c58b1",
+    "src/modules/area-course-hour/area-course-hour.controller.ts": "66b31ef75a44a0f410acf7f05066f082dc4d352f14204565a66d24f51e31b8b2",
+    "src/modules/areas/area.controller.ts": "9b387027e7e633da8b402edefc55ca2fbb9e44849e2b1ec5b3d439d0c527165e",
+    "src/modules/auth/auth.controller.ts": "c11dea144b97375b848e5f4fee94191e59d1c0ba27f5147a8668ea5b55df2745",
+    "src/modules/classes/class.controller.ts": "e72787c663c8299b5661d9c83e40e72f154c2fa376f8fd66746b66c84370bea4",
+    "src/modules/coordinators/coordinator.controller.ts": "76097cbd7a59244804492ec05235e6b9e0ca4f38f2c127f7a70aa182e6ad2fd3",
+    "src/modules/courses/course.controller.ts": "8311170774caeeb02b23ff378e1b1167eb1c6591a04024827bbbc75d1d79c082",
+    "src/modules/hour-session/hour-session.controller.ts": "d2c0202df1041cb8b87f8a0df7f21609bf0ad652c1ed893f2de246ef577fe979",
+    "src/modules/monitors/monitor.controller.ts": "cb7fa7517897353eaa30538f58ef2269755dd01e63335fd19aa77fff7c3fbab0",
+    "src/modules/permissions/permissions.controller.ts": "9d8e4d62659994b7d7229f0656628ab856172e37c41563691d821976f930d8ca",
+    "src/modules/roles/roles.controller.ts": "95aff8d498a7f05bef6a002527196183cb478cb50035a928cbb1f3f2a3f8c47f",
+    "src/modules/runtime-config/runtime-config.controller.ts": "5db9fbd21744c51bce69684e9a3ed0170d1cf665427d2e94ccbc39de21024dcb",
+    "src/modules/schedules/schedules.controller.ts": "e136c5edab09e544be59d114b2af208d427d6b897af5f686066eb838dd129645",
+    "src/modules/sedes/sede.controller.ts": "f80213d3906856c1613cac8e20c8ee7fd1649acbad2fd03b39d3491a35e440cc",
+    "src/modules/shifts/shift.controller.ts": "093125565256ac77e4d1e7080cfdc58f7725fc1749ae3104f209bde5e4e949ad",
+    "src/modules/supervisors/supervisor.controller.ts": "79cb6898f018b23018e775c49e0c79c7afe29fbac7027994d76c920d6496fcc0",
+    "src/modules/teachers/teacher.controller.ts": "8c603b4d76eabd3c79b89d0e69cd110c02f492d849b938f2c2577c6d1dbf16d9",
+    "src/modules/user-profile/user-profile.controller.ts": "ff63381a6cca0211e9df0762fca5866e8cc7b55f039253b11c187284629e23ad",
+    "src/modules/users/users.controller.ts": "2d0424b5e05656925a0ca748ca75e66d820ee1cf8bb633b1d77d66fceb79537c"
+  },
+  "endpoints": [
+    {
+      "method": "POST",
+      "path": "/api/admissions",
+      "controller": "AdmissionsController",
+      "handler": "create",
+      "source": "src/modules/admissions/admissions.controller.ts",
+      "line": 20,
+      "status": "HttpStatus.CREATED",
+      "public": false,
+      "authorization": "{\n    permission: 'admission.create-with-data',\n    description: 'Crear un nuevo proceso de admisión con datos iniciales',\n  }",
+      "parameters": [
+        "@Body() body: ProcessAdmissionDto"
+      ],
+      "implementation": "{\n    return await this.service.create(body);\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admissions",
+      "controller": "AdmissionsController",
+      "handler": "getAll",
+      "source": "src/modules/admissions/admissions.controller.ts",
+      "line": 34,
+      "status": "HttpStatus.OK",
+      "public": false,
+      "authorization": "{\n    permission: 'admission.getAll',\n    description:\n      'Obtener todos los procesos de admisión con sus observaciones y el actual',\n  }",
+      "parameters": [],
+      "implementation": "{\n    return await this.service.getAllRelations();\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admissions/current",
+      "controller": "AdmissionsController",
+      "handler": "getCurrent",
+      "source": "src/modules/admissions/admissions.controller.ts",
+      "line": 63,
+      "status": "HttpStatus.OK",
+      "public": false,
+      "authorization": "{\n    permission: 'admission.getCurrent',\n    description: 'Obtener el proceso de admisión actual con sus observaciones',\n  }",
+      "parameters": [],
+      "implementation": "{\n    return await this.service.getCurrentWithObservations();\n  }"
+    },
+    {
+      "method": "POST",
+      "path": "/api/admissions/current",
+      "controller": "AdmissionsController",
+      "handler": "setCurrent",
+      "source": "src/modules/admissions/admissions.controller.ts",
+      "line": 77,
+      "status": "HttpStatus.OK",
+      "public": false,
+      "authorization": "{\n    permission: 'admission.setCurrent',\n    description: 'Establecer el proceso de admisión actual',\n  }",
+      "parameters": [
+        "@Body('name') name: string"
+      ],
+      "implementation": "{\n    return await this.service.setCurrent(name);\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admissions/:name",
+      "controller": "AdmissionsController",
+      "handler": "getOneWithObservations",
+      "source": "src/modules/admissions/admissions.controller.ts",
+      "line": 91,
+      "status": "HttpStatus.OK",
+      "public": false,
+      "authorization": "{\n    permission: 'admission.getOneByName',\n    description: 'Obtener un proceso de admisión por nombre',\n  }",
+      "parameters": [
+        "@Param('name') name: string"
+      ],
+      "implementation": "{\n    return await this.service.getOneWithObservations(name);\n  }"
+    },
+    {
+      "method": "POST",
+      "path": "/api/area-course-hours",
+      "controller": "AreaCourseHourController",
+      "handler": "create",
+      "source": "src/modules/area-course-hour/area-course-hour.controller.ts",
+      "line": 30,
+      "status": "HttpStatus.CREATED",
+      "public": false,
+      "authorization": "{\n    permission: 'area-course-hour.create',\n    description: 'Crear una nueva hora de curso-area',\n  }",
+      "parameters": [
+        "@Body() createAreaCourseHourDto: CreateAreaCourseHourDto"
+      ],
+      "implementation": "{\n    return this.areaCourseHourService.create(createAreaCourseHourDto);\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/area-course-hours",
+      "controller": "AreaCourseHourController",
+      "handler": "findAllAreas",
+      "source": "src/modules/area-course-hour/area-course-hour.controller.ts",
+      "line": 46,
+      "status": "HttpStatus.OK",
+      "public": false,
+      "authorization": "{\n    permission: 'area-course-hour.list',\n    description: 'Obtener todas las horas de curso-area',\n  }",
+      "parameters": [
+        "@Req() req"
+      ],
+      "implementation": "{\n    return this.areaCourseHourService.findAll(\n      getCoordinatorCourseId(req.user?.role),\n    );\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/area-course-hours/:id",
+      "controller": "AreaCourseHourController",
+      "handler": "findOneArea",
+      "source": "src/modules/area-course-hour/area-course-hour.controller.ts",
+      "line": 62,
+      "status": "HttpStatus.OK",
+      "public": false,
+      "authorization": "{\n    permission: 'area-course-hour.getById',\n    description: 'Obtener una hora de curso-area por id',\n  }",
+      "parameters": [
+        "@Param('id', ParseIntPipe) id: number",
+        "@Req() req"
+      ],
+      "implementation": "{\n    return this.areaCourseHourService.findOne(\n      id,\n      getCoordinatorCourseId(req.user?.role),\n    );\n  }"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/area-course-hours/:id",
+      "controller": "AreaCourseHourController",
+      "handler": "update",
+      "source": "src/modules/area-course-hour/area-course-hour.controller.ts",
+      "line": 82,
+      "status": "HttpStatus.OK",
+      "public": false,
+      "authorization": "{\n    permission: 'area-course-hour.update',\n    description: 'Actualizar una hora de curso-area por id',\n  }",
+      "parameters": [
+        "@Param('id', ParseIntPipe) id: number",
+        "@Body() updateAreaCourseHourDto: UpdateAreaCourseHourDto"
+      ],
+      "implementation": "{\n    return await this.areaCourseHourService.update(id, updateAreaCourseHourDto);\n  }"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/area-course-hours/:id",
+      "controller": "AreaCourseHourController",
+      "handler": "deleteArea",
+      "source": "src/modules/area-course-hour/area-course-hour.controller.ts",
+      "line": 99,
+      "status": "HttpStatus.NO_CONTENT",
+      "public": false,
+      "authorization": "{\n    permission: 'area-course-hour.delete',\n    description: 'Eliminar una hora de curso-area por id',\n  }",
+      "parameters": [
+        "@Param('id', ParseIntPipe) id: number"
+      ],
+      "implementation": "{\n    return this.areaCourseHourService.delete(id);\n  }"
+    },
+    {
+      "method": "POST",
+      "path": "/api/areas",
+      "controller": "AreaController",
+      "handler": "create",
+      "source": "src/modules/areas/area.controller.ts",
+      "line": 29,
+      "status": "HttpStatus.CREATED",
+      "public": false,
+      "authorization": "{\n    roles: [Role.TEACHER, Role.SUPERVISOR, Role.MONITOR],\n    permission: 'area.create',\n    description: 'Crear un nuevo area',\n  }",
+      "parameters": [
+        "@Body() createAreaDto: CreateAreaDto"
+      ],
+      "implementation": "{\n    return this.areaService.create(createAreaDto);\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/areas",
+      "controller": "AreaController",
+      "handler": "findAll",
+      "source": "src/modules/areas/area.controller.ts",
+      "line": 44,
+      "status": "HttpStatus.OK",
+      "public": false,
+      "authorization": "{\n    roles: [Role.TEACHER, Role.SUPERVISOR],\n    permission: 'area.list',\n  }",
+      "parameters": [],
+      "implementation": "{\n    return this.areaService.findAll();\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/areas/:id",
+      "controller": "AreaController",
+      "handler": "findOne",
+      "source": "src/modules/areas/area.controller.ts",
+      "line": 58,
+      "status": "HttpStatus.OK",
+      "public": false,
+      "authorization": "{\n    roles: [Role.SUPERVISOR],\n    permission: 'area.getById',\n  }",
+      "parameters": [
+        "@Param('id', ParseIntPipe) id: number"
+      ],
+      "implementation": "{\n    return this.areaService.findOne(id);\n  }"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/areas/:id",
+      "controller": "AreaController",
+      "handler": "update",
+      "source": "src/modules/areas/area.controller.ts",
+      "line": 72,
+      "status": "HttpStatus.OK",
+      "public": false,
+      "authorization": "{\n    roles: [Role.TEACHER, Role.SUPERVISOR],\n    permission: 'area.updateById',\n  }",
+      "parameters": [
+        "@Param('id', ParseIntPipe) id: number",
+        "@Body() updateAreaDto: UpdateAreaDto"
+      ],
+      "implementation": "{\n    return await this.areaService.update(id, updateAreaDto);\n  }"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/areas/:id",
+      "controller": "AreaController",
+      "handler": "delete",
+      "source": "src/modules/areas/area.controller.ts",
+      "line": 89,
+      "status": "HttpStatus.NO_CONTENT",
+      "public": false,
+      "authorization": "{\n    roles: [Role.MONITOR, Role.SUPERVISOR],\n    permission: 'area.deleteById',\n  }",
+      "parameters": [
+        "@Param('id', ParseIntPipe) id: number"
+      ],
+      "implementation": "{\n    return this.areaService.delete(id);\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/google",
+      "controller": "AuthController",
+      "handler": "googleAuth",
+      "source": "src/modules/auth/auth.controller.ts",
+      "line": 27,
+      "status": "200",
+      "public": true,
+      "authorization": null,
+      "parameters": [],
+      "implementation": "{\n    // Redirige al usuario a la pantalla de autenticación de Google\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/google/redirect",
+      "controller": "AuthController",
+      "handler": "googleAuthRedirect",
+      "source": "src/modules/auth/auth.controller.ts",
+      "line": 35,
+      "status": "200",
+      "public": true,
+      "authorization": null,
+      "parameters": [
+        "@Req() req",
+        "@Res() res"
+      ],
+      "implementation": "{\n    try {\n      const token =\n        req.user?.token ||\n        (() => {\n          throw new Error();\n        })();\n      console.log(token);\n      res.send(`\n        <script>\n          window.opener.postMessage(${JSON.stringify({ token })}, \"*\");\n          window.close();\n        </script>\n      `);\n    } catch {\n      res.send(`\n        <script>\n          window.opener.postMessage(${JSON.stringify({\n            error: 'error_authenticating',\n          })}, \"*\");\n          window.close();\n        </script>\n      `);\n    }\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/user-info",
+      "controller": "AuthController",
+      "handler": "getUserInfo",
+      "source": "src/modules/auth/auth.controller.ts",
+      "line": 65,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    roles: [Role.SUPERVISOR, Role.MONITOR, Role.TEACHER, Role.ADMIN],\n    permission: 'auth.userInfo',\n    description: 'Obtiene la informaciÃ³n del usuario autenticado',\n  }",
+      "parameters": [
+        "@Headers('authorization') authHeader: string"
+      ],
+      "implementation": "{\n    if (!authHeader) {\n      throw new UnauthorizedException('Token no proporcionado');\n    }\n\n    const token = authHeader.replace('Bearer ', '');\n    return this.authService.getUserInfoFromToken(token);\n  }"
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/sync-authorizations",
+      "controller": "AuthController",
+      "handler": "syncAuthorizations",
+      "source": "src/modules/auth/auth.controller.ts",
+      "line": 80,
+      "status": "201",
+      "public": true,
+      "authorization": null,
+      "parameters": [],
+      "implementation": "{\n    return this.syncAuthorizationService.syncAuthorization();\n  }"
+    },
+    {
+      "method": "POST",
+      "path": "/api/classes",
+      "controller": "ClassController",
+      "handler": "create",
+      "source": "src/modules/classes/class.controller.ts",
+      "line": 34,
+      "status": "HttpStatus.CREATED",
+      "public": false,
+      "authorization": "{\n    permission: 'class.createwithSchedule',\n    description: 'Crear una nueva clase con su respectivo horario',\n  }",
+      "parameters": [
+        "@Body() body: CreateClassDataDto"
+      ],
+      "implementation": "{\n    return this.classService.create(body);\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/classes/:classId/schedules",
+      "controller": "ClassController",
+      "handler": "getSchedulesByClassId",
+      "source": "src/modules/classes/class.controller.ts",
+      "line": 48,
+      "status": "HttpStatus.OK",
+      "public": false,
+      "authorization": "{\n    permission: 'class.getSchedulesByClassId',\n    description: 'Obtener horarios de una clase por su ID',\n  }",
+      "parameters": [
+        "@Param('classId', ParseUUIDPipe) classId: string",
+        "@Req() req"
+      ],
+      "implementation": "{\n    return await this.classService.getSchedulesByClassId(\n      classId,\n      getCoordinatorCourseId(req.user?.role),\n    );\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/classes/:classId/teachers",
+      "controller": "ClassController",
+      "handler": "getTeachersByClassId",
+      "source": "src/modules/classes/class.controller.ts",
+      "line": 68,
+      "status": "HttpStatus.OK",
+      "public": false,
+      "authorization": "{\n    permission: 'class.getTeachersByClassId',\n    description: 'Obtener docentes de una clase por su ID',\n  }",
+      "parameters": [
+        "@Param('classId', ParseUUIDPipe) classId: string",
+        "@Req() req"
+      ],
+      "implementation": "{\n    return await this.classService.getTeachersByClassId(\n      classId,\n      getCoordinatorCourseId(req.user?.role),\n    );\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/classes",
+      "controller": "ClassController",
+      "handler": "findAll",
+      "source": "src/modules/classes/class.controller.ts",
+      "line": 90,
+      "status": "HttpStatus.OK",
+      "public": false,
+      "authorization": "{\n    permission: 'class.list',\n    description: 'Obtener todas las clases',\n  }",
+      "parameters": [
+        "@Req() req"
+      ],
+      "implementation": "{\n    return this.classService.findAll(getCoordinatorCourseId(req.user?.role));\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/classes/getClassOfTeacher",
+      "controller": "ClassController",
+      "handler": "getClassOfTeacher",
+      "source": "src/modules/classes/class.controller.ts",
+      "line": 104,
+      "status": "HttpStatus.OK",
+      "public": false,
+      "authorization": "{\n    roles: [Role.TEACHER],\n    permission: 'class.listByTeacher',\n    description: 'Obtener todas las clases del docente',\n  }",
+      "parameters": [
+        "@Req() req"
+      ],
+      "implementation": "{\n    console.log('Usuario autenticado:', req.user); // Debugging\n    const userId = req.user?.userId; // Verifica que exista\n\n    if (!userId) {\n      throw new BadRequestException('No se encontró el userId en la solicitud');\n    }\n    return this.classService.findClassesOfTeacher(userId);\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/classes/:id",
+      "controller": "ClassController",
+      "handler": "findOne",
+      "source": "src/modules/classes/class.controller.ts",
+      "line": 125,
+      "status": "HttpStatus.OK",
+      "public": false,
+      "authorization": "{\n    permission: 'class.getById',\n    description: 'Obtener una clase por id',\n  }",
+      "parameters": [
+        "@Param('id', ParseUUIDPipe) id: string",
+        "@Req() req"
+      ],
+      "implementation": "{\n    return this.classService.findOne(\n      id,\n      getCoordinatorCourseId(req.user?.role),\n    );\n  }"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/classes/:id",
+      "controller": "ClassController",
+      "handler": "update",
+      "source": "src/modules/classes/class.controller.ts",
+      "line": 145,
+      "status": "HttpStatus.OK",
+      "public": false,
+      "authorization": "{\n    permission: 'class.updateById',\n    description: 'Actualizar una clase por id',\n  }",
+      "parameters": [
+        "@Param('id', ParseUUIDPipe) id: string",
+        "@Body() updateClassDto: UpdateClassDto"
+      ],
+      "implementation": "{\n    return await this.classService.update(id, updateClassDto);\n  }"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/classes/:id/meet-link",
+      "controller": "ClassController",
+      "handler": "updateMeetLink",
+      "source": "src/modules/classes/class.controller.ts",
+      "line": 162,
+      "status": "HttpStatus.OK",
+      "public": false,
+      "authorization": "{\n    roles: [Role.MONITOR, Role.SUPERVISOR, Role.ADMIN],\n    permission: 'class.updateMeetLink',\n    description: 'Actualizar el enlace de Google Meet para una clase',\n  }",
+      "parameters": [
+        "@Param('id', ParseUUIDPipe) id: string",
+        "@Body('urlMeet') urlMeet: string"
+      ],
+      "implementation": "{\n    return await this.classService.updateMeetLink(id, urlMeet);\n  }"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/classes/:id/classroom-link",
+      "controller": "ClassController",
+      "handler": "updateClassroomLink",
+      "source": "src/modules/classes/class.controller.ts",
+      "line": 180,
+      "status": "HttpStatus.OK",
+      "public": false,
+      "authorization": "{\n    roles: [Role.MONITOR, Role.SUPERVISOR, Role.ADMIN],\n    permission: 'class.updateClassroomLink',\n    description: 'Actualizar el enlace de Google Classroom para una clase',\n  }",
+      "parameters": [
+        "@Param('id', ParseUUIDPipe) id: string",
+        "@Body('urlClassroom') urlClassroom: string"
+      ],
+      "implementation": "{\n    return await this.classService.updateClassroomLink(id, urlClassroom);\n  }"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/classes/:id",
+      "controller": "ClassController",
+      "handler": "deleteArea",
+      "source": "src/modules/classes/class.controller.ts",
+      "line": 198,
+      "status": "HttpStatus.NO_CONTENT",
+      "public": false,
+      "authorization": "{\n    permission: 'class.deleteById',\n    description: 'Eliminar una clase por id',\n  }",
+      "parameters": [
+        "@Param('id', ParseUUIDPipe) id: string"
+      ],
+      "implementation": "{\n    return this.classService.delete(id);\n  }"
+    },
+    {
+      "method": "POST",
+      "path": "/api/coordinators",
+      "controller": "CoordinatorController",
+      "handler": "create",
+      "source": "src/modules/coordinators/coordinator.controller.ts",
+      "line": 25,
+      "status": "201",
+      "public": false,
+      "authorization": "{\n    permission: 'coordinator.create',\n    description: 'Crear un nuevo coordinador',\n  }",
+      "parameters": [
+        "@Body() data: CreateCoordinatorDto"
+      ],
+      "implementation": "{\n    return this.coordinatorService.create(data);\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/coordinators",
+      "controller": "CoordinatorController",
+      "handler": "findAll",
+      "source": "src/modules/coordinators/coordinator.controller.ts",
+      "line": 36,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    permission: 'coordinator.list',\n    description: 'Obtener coordinadores activos',\n  }",
+      "parameters": [
+        "@Query('page') page: number = 1",
+        "@Query('limit') limit: number = 20"
+      ],
+      "implementation": "{\n    return this.coordinatorService.findAll(Number(page), Number(limit));\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/coordinators/:id",
+      "controller": "CoordinatorController",
+      "handler": "findOne",
+      "source": "src/modules/coordinators/coordinator.controller.ts",
+      "line": 49,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    permission: 'coordinator.get',\n    description: 'Obtener un coordinador por su id de usuario',\n  }",
+      "parameters": [
+        "@Param('id') id: string"
+      ],
+      "implementation": "{\n    return this.coordinatorService.findOne(id);\n  }"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/coordinators/:id",
+      "controller": "CoordinatorController",
+      "handler": "update",
+      "source": "src/modules/coordinators/coordinator.controller.ts",
+      "line": 59,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    permission: 'coordinator.update',\n    description: 'Actualizar un coordinador',\n  }",
+      "parameters": [
+        "@Param('id') id: string",
+        "@Body() data: UpdateCoordinatorDto"
+      ],
+      "implementation": "{\n    return this.coordinatorService.update(id, data);\n  }"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/coordinators/:id/deactivate",
+      "controller": "CoordinatorController",
+      "handler": "deactivate",
+      "source": "src/modules/coordinators/coordinator.controller.ts",
+      "line": 69,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    permission: 'coordinator.deactivate',\n    description: 'Desactivar un coordinador',\n  }",
+      "parameters": [
+        "@Param('id') id: string"
+      ],
+      "implementation": "{\n    return this.coordinatorService.deactivate(id);\n  }"
+    },
+    {
+      "method": "POST",
+      "path": "/api/courses",
+      "controller": "CourseController",
+      "handler": "create",
+      "source": "src/modules/courses/course.controller.ts",
+      "line": 28,
+      "status": "201",
+      "public": false,
+      "authorization": "{\n    permission: 'courses.create',\n    description: 'crear un nuevo curso',\n  }",
+      "parameters": [
+        "@Body() createCourseDto: CreateCourseDto"
+      ],
+      "implementation": "{\n    try {\n      return await this.courseService.create(createCourseDto);\n      // eslint-disable-next-line @typescript-eslint/no-unused-vars\n    } catch (error) {\n      throw new HttpException(\n        'Error al crear el curso',\n        HttpStatus.BAD_REQUEST,\n      );\n    }\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/courses",
+      "controller": "CourseController",
+      "handler": "findAll",
+      "source": "src/modules/courses/course.controller.ts",
+      "line": 49,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    roles: [Role.SUPERVISOR, Role.MONITOR],\n    permission: 'courses.list',\n    description: 'Obtener todos los cursos',\n  }",
+      "parameters": [
+        "@Req() req"
+      ],
+      "implementation": "{\n    return await this.courseService.findAll(\n      getCoordinatorCourseId(req.user?.role),\n    );\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/courses/:id",
+      "controller": "CourseController",
+      "handler": "findOne",
+      "source": "src/modules/courses/course.controller.ts",
+      "line": 66,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    permission: 'courses.searchId',\n    description: 'Obtener un curso por id',\n  }",
+      "parameters": [
+        "@Param('id', ParseIntPipe) id: number",
+        "@Req() req"
+      ],
+      "implementation": "{\n    const coordinatorCourseId = getCoordinatorCourseId(req.user?.role);\n    if (coordinatorCourseId !== undefined && coordinatorCourseId !== id) {\n      throw new HttpException('Curso no autorizado', HttpStatus.FORBIDDEN);\n    }\n\n    const course = await this.courseService.findOne(id);\n    if (!course) {\n      throw new HttpException('Curso no encontrado', HttpStatus.NOT_FOUND);\n    }\n    return course;\n  }"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/courses/:id",
+      "controller": "CourseController",
+      "handler": "update",
+      "source": "src/modules/courses/course.controller.ts",
+      "line": 87,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    permission: 'courses.update',\n    description: 'Actualizar un curso',\n  }",
+      "parameters": [
+        "@Param('id', ParseIntPipe) id: number",
+        "@Body() updateCourseDto: UpdateCourseDto"
+      ],
+      "implementation": "{\n    const updatedCourse = await this.courseService.update(id, updateCourseDto);\n    if (!updatedCourse) {\n      throw new HttpException('Curso no encontrado', HttpStatus.NOT_FOUND);\n    }\n    return updatedCourse;\n  }"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/courses/:id",
+      "controller": "CourseController",
+      "handler": "remove",
+      "source": "src/modules/courses/course.controller.ts",
+      "line": 107,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    permission: 'courses.delete',\n    description: 'Eliminar un curso',\n  }",
+      "parameters": [
+        "@Param('id', ParseIntPipe) id: number"
+      ],
+      "implementation": "{\n    const deleted = await this.courseService.remove(id);\n    if (!deleted) {\n      throw new HttpException('Curso no encontrado', HttpStatus.NOT_FOUND);\n    }\n    return { message: 'Curso eliminado correctamente' };\n  }"
+    },
+    {
+      "method": "POST",
+      "path": "/api/hour-sessions",
+      "controller": "HourSessionController",
+      "handler": "create",
+      "source": "src/modules/hour-session/hour-session.controller.ts",
+      "line": 26,
+      "status": "HttpStatus.CREATED",
+      "public": false,
+      "authorization": "{\n    permission: 'hour-session.create',\n    description: 'Crear una nueva sesión de hora',\n  }",
+      "parameters": [
+        "@Body() createHourSessionDto: CreateHourSessionDto"
+      ],
+      "implementation": "{\n    return this.hourSessionService.create(createHourSessionDto);\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/hour-sessions",
+      "controller": "HourSessionController",
+      "handler": "findAll",
+      "source": "src/modules/hour-session/hour-session.controller.ts",
+      "line": 39,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    roles: [Role.SUPERVISOR, Role.MONITOR, Role.TEACHER, Role.ADMIN],\n    permission: 'hour-session.list',\n    description: 'Listar las horas de sesión',\n  }",
+      "parameters": [],
+      "implementation": "{\n    return this.hourSessionService.findAll();\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/hour-sessions/:id",
+      "controller": "HourSessionController",
+      "handler": "findOne",
+      "source": "src/modules/hour-session/hour-session.controller.ts",
+      "line": 54,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    permission: 'hour-session.searchId',\n    description: 'Buscar una hora de sesión',\n  }",
+      "parameters": [
+        "@Param('id', ParseIntPipe) id: number"
+      ],
+      "implementation": "{\n    return this.hourSessionService.findOne(id);\n  }"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/hour-sessions/:id",
+      "controller": "HourSessionController",
+      "handler": "update",
+      "source": "src/modules/hour-session/hour-session.controller.ts",
+      "line": 66,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    permission: 'hour-session.update',\n    description: 'Actualizar una sesión de hora',\n  }",
+      "parameters": [
+        "@Param('id', ParseIntPipe) id: number",
+        "@Body() updateHourSessionDto: UpdateHourSessionDto"
+      ],
+      "implementation": "{\n    return this.hourSessionService.update(id, updateHourSessionDto);\n  }"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/hour-sessions/:id",
+      "controller": "HourSessionController",
+      "handler": "remove",
+      "source": "src/modules/hour-session/hour-session.controller.ts",
+      "line": 82,
+      "status": "HttpStatus.NO_CONTENT",
+      "public": false,
+      "authorization": "{\n    permission: 'hour-session.delete',\n    description: 'Eliminar una sesión de hora',\n  }",
+      "parameters": [
+        "@Param('id', ParseIntPipe) id: number"
+      ],
+      "implementation": "{\n    return this.hourSessionService.remove(id);\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/monitors/information",
+      "controller": "MonitorController",
+      "handler": "getInformation",
+      "source": "src/modules/monitors/monitor.controller.ts",
+      "line": 34,
+      "status": "HttpStatus.OK",
+      "public": false,
+      "authorization": "{\n    roles: [Role.MONITOR],\n    permission: 'monitor.getInformation',\n    description: 'Obtener información del monitor autenticado',\n  }",
+      "parameters": [
+        "@Req() req"
+      ],
+      "implementation": "{\n    if (!req.user || req?.user.role !== Role.MONITOR) {\n      throw new UnauthorizedException('No eres moni');\n    }\n    return this.monitorService.getInformationByMonitor(req.user.userId);\n  }"
+    },
+    {
+      "method": "POST",
+      "path": "/api/monitors",
+      "controller": "MonitorController",
+      "handler": "create",
+      "source": "src/modules/monitors/monitor.controller.ts",
+      "line": 48,
+      "status": "201",
+      "public": false,
+      "authorization": "{\n    permission: 'monitor.create',\n    description: 'Crear un nuevo monitor',\n  }",
+      "parameters": [
+        "@Body() createMonitorDto: CreateMonitorDto"
+      ],
+      "implementation": "{\n    return this.monitorService.create(createMonitorDto);\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/monitors/filtered",
+      "controller": "MonitorController",
+      "handler": "findAllWithSupervisor",
+      "source": "src/modules/monitors/monitor.controller.ts",
+      "line": 57,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    permission: 'monitor.list',\n    description: 'Obtener todos los monitores activos',\n  }",
+      "parameters": [
+        "@Query('has_supervisor', new ParseBoolPipe()) hasSupervisor: boolean",
+        "@Query('page') page: number = 1",
+        "@Query('limit') limit: number = 20",
+        "@Query('shiftId') shiftId?: number",
+        "@Query('areaId') areaId?: number"
+      ],
+      "implementation": "{\n    return this.monitorService.findAllWithSupervisor(\n      hasSupervisor,\n      shiftId,\n      page,\n      limit,\n      areaId,\n    );\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/monitors",
+      "controller": "MonitorController",
+      "handler": "findAll",
+      "source": "src/modules/monitors/monitor.controller.ts",
+      "line": 90,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    permission: 'monitor.list',\n    description: 'Obtener un monitor por ID',\n  }",
+      "parameters": [
+        "@Query('page') page: number = 1",
+        "@Query('limit') limit: number = 20",
+        "@Query('shift_id') shiftId?: number",
+        "@Query('area_id') areaId?: number"
+      ],
+      "implementation": "{\n    return this.monitorService.findAllBasicInfo(\n      Number(page),\n      Number(limit),\n      areaId !== undefined ? Number(areaId) : undefined,\n      shiftId !== undefined ? Number(shiftId) : undefined,\n    );\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/monitors/search",
+      "controller": "MonitorController",
+      "handler": "search",
+      "source": "src/modules/monitors/monitor.controller.ts",
+      "line": 121,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    permission: 'monitor.search',\n    description:\n      'Buscar monitores por nombre, apellido, email, teléfono o aula',\n  }",
+      "parameters": [
+        "@Query('query') query: string",
+        "@Query('page') page: number = 1",
+        "@Query('limit') limit: number = 20"
+      ],
+      "implementation": "{\n    return this.monitorService.search(query, Number(page), Number(limit));\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/monitors/:id/",
+      "controller": "MonitorController",
+      "handler": "findOne",
+      "source": "src/modules/monitors/monitor.controller.ts",
+      "line": 167,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    permission: 'monitor.getById',\n    description: 'Obtener un monitor por ID',\n  }",
+      "parameters": [
+        "@Param('id') id: string"
+      ],
+      "implementation": "{\n    return this.monitorService.findOne(id);\n  }"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/monitors/:id",
+      "controller": "MonitorController",
+      "handler": "updateMonitorAsAdmin",
+      "source": "src/modules/monitors/monitor.controller.ts",
+      "line": 176,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    roles: [Role.MONITOR, Role.SUPERVISOR, Role.ADMIN],\n    permission: 'monitor.updateAsAdmin',\n    description: 'Actualizar datos de un monitor como administrador',\n  }",
+      "parameters": [
+        "@Param('id') id: string",
+        "@Body() updateMonitorDto: UpdateMonitorAsAdminDto"
+      ],
+      "implementation": "{\n    return this.monitorService.updateMonitorAsAdmin(id, updateMonitorDto);\n  }"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/monitors/:id",
+      "controller": "MonitorController",
+      "handler": "delete",
+      "source": "src/modules/monitors/monitor.controller.ts",
+      "line": 189,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    permission: 'monitor.delete',\n    description: 'Eliminar un monitor',\n  }",
+      "parameters": [
+        "@Param('id') id: string"
+      ],
+      "implementation": "{\n    return this.monitorService.delete(id);\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/monitors/cargar/horario",
+      "controller": "MonitorController",
+      "handler": "getSchedule",
+      "source": "src/modules/monitors/monitor.controller.ts",
+      "line": 198,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    roles: [Role.MONITOR, Role.ADMIN],\n    permission: 'monitor.loadSchedule',\n    description: 'Cargar el horario de un monitor',\n  }",
+      "parameters": [
+        "@Req() req"
+      ],
+      "implementation": "{\n    console.log('Usuario autenticado:', req.user);\n    const userId = req.user?.userId;\n    return this.monitorService.getSchedule(userId);\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/monitors/:userId/horario",
+      "controller": "MonitorController",
+      "handler": "getScheduleByParam",
+      "source": "src/modules/monitors/monitor.controller.ts",
+      "line": 210,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    roles: [Role.MONITOR, Role.SUPERVISOR, Role.ADMIN],\n    permission: 'monitor.listTeachersByMonitor',\n    description: 'Cargar los docentes de un monitor',\n  }",
+      "parameters": [
+        "@Param('userId') userId: string"
+      ],
+      "implementation": "{\n    if (!userId) {\n      throw new UnauthorizedException('No se pudo obtener el ID del usuario');\n    }\n    return this.monitorService.getSchedule(userId);\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/monitors/datos/teachers",
+      "controller": "MonitorController",
+      "handler": "getTeachersByMonitor",
+      "source": "src/modules/monitors/monitor.controller.ts",
+      "line": 223,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    roles: [Role.MONITOR, Role.ADMIN, Role.SUPERVISOR],\n    permission: 'monitor.listTeachersByMonitor',\n    description: 'Cargar los docentes de un monitor',\n  }",
+      "parameters": [
+        "@Req() req"
+      ],
+      "implementation": "{\n    console.log('Usuario autenticado:', req.user);\n    const userId = req.user?.userId;\n    return this.monitorService.getTeachersByMonitor(userId);\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/monitors/:userId/teachers",
+      "controller": "MonitorController",
+      "handler": "getTeachersByMonitorParam",
+      "source": "src/modules/monitors/monitor.controller.ts",
+      "line": 235,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    roles: [Role.MONITOR, Role.SUPERVISOR, Role.ADMIN],\n    permission: 'monitor.listTeachersByMonitor',\n    description: 'Cargar los docentes de un monitor',\n  }",
+      "parameters": [
+        "@Param('userId') userId: string"
+      ],
+      "implementation": "{\n    if (!userId) {\n      throw new UnauthorizedException('No se pudo obtener el ID del usuario');\n    }\n    return this.monitorService.getTeachersByMonitor(userId);\n  }"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/monitors/:id/deactivate",
+      "controller": "MonitorController",
+      "handler": "deactivateMonitor",
+      "source": "src/modules/monitors/monitor.controller.ts",
+      "line": 250,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    permission: 'monitor.deactivate',\n    description: 'Desactivar un monitor por su id',\n  }",
+      "parameters": [
+        "@Param('id') id: string"
+      ],
+      "implementation": "{\n    return this.monitorService.deactivate(id);\n  }"
+    },
+    {
+      "method": "POST",
+      "path": "/api/permissions",
+      "controller": "PermissionsController",
+      "handler": "create",
+      "source": "src/modules/permissions/permissions.controller.ts",
+      "line": 24,
+      "status": "HttpStatus.CREATED",
+      "public": false,
+      "authorization": "{\n    permission: 'permission.create',\n    description: 'Crear un nuevo permiso',\n  }",
+      "parameters": [
+        "@Body() createPermissionDto: CreatePermissionDto"
+      ],
+      "implementation": "{\n    return this.permissionsService.create(createPermissionDto);\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/permissions",
+      "controller": "PermissionsController",
+      "handler": "getAll",
+      "source": "src/modules/permissions/permissions.controller.ts",
+      "line": 40,
+      "status": "HttpStatus.OK",
+      "public": false,
+      "authorization": "{\n    permission: 'permission.list',\n    description: 'Listar todos los permisos',\n  }",
+      "parameters": [],
+      "implementation": "{\n    return this.permissionsService.getAll();\n  }"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/permissions/:id",
+      "controller": "PermissionsController",
+      "handler": "update",
+      "source": "src/modules/permissions/permissions.controller.ts",
+      "line": 54,
+      "status": "HttpStatus.OK",
+      "public": false,
+      "authorization": "{\n    permission: 'permission.update',\n    description: 'Actualizar un permiso',\n  }",
+      "parameters": [
+        "@Param('id', ParseIntPipe) id: number",
+        "@Body() updatePermissionDto: CreatePermissionDto"
+      ],
+      "implementation": "{\n    return this.permissionsService.update(id, updatePermissionDto);\n  }"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/permissions/:id",
+      "controller": "PermissionsController",
+      "handler": "deletePermission",
+      "source": "src/modules/permissions/permissions.controller.ts",
+      "line": 71,
+      "status": "HttpStatus.NO_CONTENT",
+      "public": false,
+      "authorization": "{\n    permission: 'permission.delete',\n    description: 'Eliminar un permiso',\n  }",
+      "parameters": [
+        "@Param('id', ParseIntPipe) id: number"
+      ],
+      "implementation": "{\n    return this.permissionsService.delete(id);\n  }"
+    },
+    {
+      "method": "POST",
+      "path": "/api/roles",
+      "controller": "RolesController",
+      "handler": "create",
+      "source": "src/modules/roles/roles.controller.ts",
+      "line": 24,
+      "status": "HttpStatus.CREATED",
+      "public": false,
+      "authorization": "{\n    permission: 'role.create',\n    description: 'Crear un nuevo rol',\n  }",
+      "parameters": [
+        "@Body() createRoleDto: CreateRoleDto"
+      ],
+      "implementation": "{\n    return this.rolesService.create(createRoleDto);\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/roles",
+      "controller": "RolesController",
+      "handler": "getAll",
+      "source": "src/modules/roles/roles.controller.ts",
+      "line": 38,
+      "status": "HttpStatus.OK",
+      "public": false,
+      "authorization": "{\n    permission: 'role.list',\n    description: 'Listar todos los roles',\n  }",
+      "parameters": [],
+      "implementation": "{\n    return this.rolesService.getAll();\n  }"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/roles/:id",
+      "controller": "RolesController",
+      "handler": "update",
+      "source": "src/modules/roles/roles.controller.ts",
+      "line": 52,
+      "status": "HttpStatus.OK",
+      "public": false,
+      "authorization": "{\n    permission: 'role.update',\n    description: 'Actualizar un rol',\n  }",
+      "parameters": [
+        "@Param('id', ParseIntPipe) id: number",
+        "@Body() updateRoleDto: UpdateRoleDto"
+      ],
+      "implementation": "{\n    return this.rolesService.update(id, updateRoleDto);\n  }"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/roles/:id",
+      "controller": "RolesController",
+      "handler": "deleteRole",
+      "source": "src/modules/roles/roles.controller.ts",
+      "line": 69,
+      "status": "HttpStatus.NO_CONTENT",
+      "public": false,
+      "authorization": "{\n    permission: 'role.delete',\n    description: 'Eliminar un rol',\n  }",
+      "parameters": [
+        "@Param('id', ParseIntPipe) id: number"
+      ],
+      "implementation": "{\n    return this.rolesService.delete(id);\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/roles/:name",
+      "controller": "RolesController",
+      "handler": "getRoleWithPermissions",
+      "source": "src/modules/roles/roles.controller.ts",
+      "line": 84,
+      "status": "HttpStatus.OK",
+      "public": false,
+      "authorization": "{\n    permission: 'role.getByName',\n    description: 'Obtener un rol por nombre',\n  }",
+      "parameters": [
+        "@Param('name') name: string"
+      ],
+      "implementation": "{\n    return this.rolesService.getAllPermissionsByRolName(name);\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/roles/permissions",
+      "controller": "RolesController",
+      "handler": "getAllWithPermissions",
+      "source": "src/modules/roles/roles.controller.ts",
+      "line": 98,
+      "status": "HttpStatus.OK",
+      "public": false,
+      "authorization": "{\n    permission: 'role.listWithPermissions',\n    description: 'Obtener todos los roles con sus permisos',\n  }",
+      "parameters": [],
+      "implementation": "{\n    return this.rolesService.getAllWithPermissions();\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/system/status",
+      "controller": "RuntimeConfigController",
+      "handler": "getStatus",
+      "source": "src/modules/runtime-config/runtime-config.controller.ts",
+      "line": 33,
+      "status": "200",
+      "public": true,
+      "authorization": null,
+      "parameters": [],
+      "implementation": "{\n    const config = await this.runtimeConfig.getCurrent();\n    return {\n      maintenance: config?.maintenance.enabled ?? false,\n      message:\n        config?.maintenance.message ??\n        'El sistema se encuentra temporalmente en mantenimiento',\n      endsAt: config?.maintenance.endsAt ?? null,\n    };\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/system/runtime-config",
+      "controller": "RuntimeConfigController",
+      "handler": "getRuntimeConfig",
+      "source": "src/modules/runtime-config/runtime-config.controller.ts",
+      "line": 48,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    roles: [Role.ADMIN],\n    permission: 'system.runtime-config.read',\n    description: 'Obtener la configuración operativa',\n  }",
+      "parameters": [],
+      "implementation": "{\n    const config = await this.runtimeConfig.getCurrent(true);\n    if (!config) {\n      throw new NotFoundException(\n        'No existe la configuración system_config/runtime en Firestore',\n      );\n    }\n    return config;\n  }"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/system/runtime-config",
+      "controller": "RuntimeConfigController",
+      "handler": "updateRuntimeConfig",
+      "source": "src/modules/runtime-config/runtime-config.controller.ts",
+      "line": 64,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    roles: [Role.ADMIN],\n    permission: 'system.runtime-config.update',\n    description: 'Actualizar la configuración operativa',\n  }",
+      "parameters": [
+        "@Body() body: UpdateRuntimeConfigDto",
+        "@Req() req: Request & { user: { userId: string; email: string } }"
+      ],
+      "implementation": "{\n    await this.validateSchemas(\n      body.schemaRouting.adminSchema,\n      body.schemaRouting.userSchema,\n    );\n\n    return this.runtimeConfig.update(\n      {\n        expectedVersion: body.expectedVersion,\n        maintenance: {\n          enabled: body.maintenance.enabled,\n          message: body.maintenance.message,\n          endsAt: body.maintenance.endsAt ?? null,\n        },\n        schemaRouting: {\n          adminSchema: body.schemaRouting.adminSchema,\n          userSchema: body.schemaRouting.userSchema,\n        },\n        changeReason: body.changeReason,\n      },\n      { id: req.user.userId, email: req.user.email },\n    );\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/system/runtime-config/history",
+      "controller": "RuntimeConfigController",
+      "handler": "getHistory",
+      "source": "src/modules/runtime-config/runtime-config.controller.ts",
+      "line": 97,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    roles: [Role.ADMIN],\n    permission: 'system.runtime-config.history',\n    description: 'Obtener el historial de configuración operativa',\n  }",
+      "parameters": [
+        "@Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number"
+      ],
+      "implementation": "{\n    return this.runtimeConfig.getHistory(limit);\n  }"
+    },
+    {
+      "method": "POST",
+      "path": "/api/system/runtime-config/rollback/:version",
+      "controller": "RuntimeConfigController",
+      "handler": "rollback",
+      "source": "src/modules/runtime-config/runtime-config.controller.ts",
+      "line": 109,
+      "status": "201",
+      "public": false,
+      "authorization": "{\n    roles: [Role.ADMIN],\n    permission: 'system.runtime-config.rollback',\n    description: 'Restaurar una configuración anterior',\n  }",
+      "parameters": [
+        "@Param('version', ParseIntPipe) version: number",
+        "@Req() req: Request & { user: { userId: string; email: string } }"
+      ],
+      "implementation": "{\n    return this.runtimeConfig.rollback(version, {\n      id: req.user.userId,\n      email: req.user.email,\n    });\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/system/schemas",
+      "controller": "RuntimeConfigController",
+      "handler": "getSchemas",
+      "source": "src/modules/runtime-config/runtime-config.controller.ts",
+      "line": 125,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    roles: [Role.ADMIN],\n    permission: 'system.schemas.list',\n    description: 'Listar schemas disponibles para enrutamiento',\n  }",
+      "parameters": [],
+      "implementation": "{\n    return this.schemaManager.getAllWithCache();\n  }"
+    },
+    {
+      "method": "POST",
+      "path": "/api/schedules/load-with-courses",
+      "controller": "ScheduleController",
+      "handler": "loadWithCourses",
+      "source": "src/modules/schedules/schedules.controller.ts",
+      "line": 35,
+      "status": "HttpStatus.CREATED",
+      "public": false,
+      "authorization": null,
+      "parameters": [
+        "data: LoadScheduleDto"
+      ],
+      "implementation": "{\n    return this.scheduleService.loadWithCourses(data);\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/schedules/public/teachers",
+      "controller": "ScheduleController",
+      "handler": "getPublicScheduleByTeacher",
+      "source": "src/modules/schedules/schedules.controller.ts",
+      "line": 45,
+      "status": "HttpStatus.OK",
+      "public": true,
+      "authorization": null,
+      "parameters": [
+        "@Query('email') email: string",
+        "@Query('dni') dni: string"
+      ],
+      "implementation": "{\n    return await this.scheduleService.getPublicScheduleByTeacher(email, dni);\n  }"
+    },
+    {
+      "method": "POST",
+      "path": "/api/schedules",
+      "controller": "ScheduleController",
+      "handler": "create",
+      "source": "src/modules/schedules/schedules.controller.ts",
+      "line": 60,
+      "status": "HttpStatus.CREATED",
+      "public": false,
+      "authorization": "{\n    permission: 'schedule.create',\n    description: 'Crear un nuevo horario',\n  }",
+      "parameters": [
+        "@Body() createScheduleDto: CreateScheduleDto"
+      ],
+      "implementation": "{\n    return this.scheduleService.create(createScheduleDto);\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/schedules",
+      "controller": "ScheduleController",
+      "handler": "findAll",
+      "source": "src/modules/schedules/schedules.controller.ts",
+      "line": 76,
+      "status": "HttpStatus.OK",
+      "public": false,
+      "authorization": "{\n    permission: 'schedule.list',\n    description: 'Listar todos los horarios',\n  }",
+      "parameters": [
+        "@Req() req"
+      ],
+      "implementation": "{\n    return this.scheduleService.findAll(getCoordinatorCourseId(req.user?.role));\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/schedules/:id",
+      "controller": "ScheduleController",
+      "handler": "findOne",
+      "source": "src/modules/schedules/schedules.controller.ts",
+      "line": 90,
+      "status": "HttpStatus.OK",
+      "public": false,
+      "authorization": "{\n    permission: 'schedule.getById',\n    description: 'Obtener un horario por id',\n  }",
+      "parameters": [
+        "@Param('id', ParseIntPipe) id: number",
+        "@Req() req"
+      ],
+      "implementation": "{\n    return this.scheduleService.findOne(\n      id,\n      getCoordinatorCourseId(req.user?.role),\n    );\n  }"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/schedules/:id",
+      "controller": "ScheduleController",
+      "handler": "update",
+      "source": "src/modules/schedules/schedules.controller.ts",
+      "line": 110,
+      "status": "HttpStatus.OK",
+      "public": false,
+      "authorization": "{\n    permission: 'schedule.update',\n    description: 'Actualizar un horario por id',\n  }",
+      "parameters": [
+        "@Param('id', ParseIntPipe) id: number",
+        "@Body() UpdateScheduleDto: UpdateScheduleDto"
+      ],
+      "implementation": "{\n    return this.scheduleService.update(id, UpdateScheduleDto);\n  }"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/schedules/:id",
+      "controller": "ScheduleController",
+      "handler": "delete",
+      "source": "src/modules/schedules/schedules.controller.ts",
+      "line": 127,
+      "status": "HttpStatus.NO_CONTENT",
+      "public": false,
+      "authorization": "{\n    permission: 'schedule.delete',\n    description: 'Eliminar un horario por id',\n  }",
+      "parameters": [
+        "@Param('id', ParseIntPipe) id: number"
+      ],
+      "implementation": "{\n    return this.scheduleService.delete(id);\n  }"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/schedules/asignar/profesor",
+      "controller": "ScheduleController",
+      "handler": "assignTeacherToSchedules",
+      "source": "src/modules/schedules/schedules.controller.ts",
+      "line": 141,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    permission: 'schedule.delete',\n    description: 'Eliminar un horario por id',\n  }",
+      "parameters": [
+        "@Body() assignTeacherDto: { classroomIds: string[]; teacherId: string }"
+      ],
+      "implementation": "{\n    const { classroomIds, teacherId } = assignTeacherDto;\n\n    if (!Array.isArray(classroomIds) || classroomIds.length === 0) {\n      throw new BadRequestException(\n        'Se deben proporcionar al menos un ID de salón.',\n      );\n    }\n\n    try {\n      const updatedSchedules =\n        await this.scheduleService.assignTeacherToSchedules(\n          classroomIds,\n          teacherId,\n        );\n\n      return {\n        message: 'Profesor asignado correctamente a los horarios',\n        updatedSchedules,\n      };\n    } catch (error) {\n      throw new BadRequestException(error.message);\n    }\n  }"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/schedules/desasignar/profesor",
+      "controller": "ScheduleController",
+      "handler": "unassignTeacherFromSchedules",
+      "source": "src/modules/schedules/schedules.controller.ts",
+      "line": 173,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    permission: 'schedule.delete',\n    description: 'Desasignar profesor de horarios',\n  }",
+      "parameters": [
+        "@Body() unassignTeacherDto: { classroomIds: string[]; teacherId: string }"
+      ],
+      "implementation": "{\n    const { classroomIds, teacherId } = unassignTeacherDto;\n\n    if (!Array.isArray(classroomIds) || classroomIds.length === 0) {\n      throw new BadRequestException(\n        'Se deben proporcionar al menos un ID de salón.',\n      );\n    }\n\n    if (!teacherId) {\n      throw new BadRequestException(\n        'Se debe proporcionar el ID del profesor a desasignar.',\n      );\n    }\n\n    try {\n      const updatedSchedules =\n        await this.scheduleService.unassignTeacherFromSchedules(\n          classroomIds,\n          teacherId,\n        );\n\n      return {\n        message: 'Profesor desasignado correctamente',\n        updatedSchedules,\n      };\n    } catch (error) {\n      throw new BadRequestException(error.message);\n    }\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/schedules/salones/disponibles",
+      "controller": "ScheduleController",
+      "handler": "getAvailableClassrooms",
+      "source": "src/modules/schedules/schedules.controller.ts",
+      "line": 211,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    roles: [Role.ADMIN],\n    permission: 'schedule.getAvailableClassrooms',\n    description: 'Obtener aulas disponibles',\n  }",
+      "parameters": [
+        "@Query('course_id', ParseIntPipe) courseId: number",
+        "@Query('horario') horario: string",
+        "@Query('page', ParseIntPipe) page: number = 1",
+        "@Query('pageSize', ParseIntPipe) pageSize: number = 10",
+        "@Query('area_id') areaId?: number",
+        "@Query('shift_id') shiftId?: number",
+        "@Req() req?"
+      ],
+      "implementation": "{\n    const coordinatorCourseId = getCoordinatorCourseId(req.user?.role);\n    if (coordinatorCourseId !== undefined && coordinatorCourseId !== courseId) {\n      throw new ForbiddenException('Curso no autorizado');\n    }\n\n    try {\n      const parsedHorario = JSON.parse(horario) as Array<{\n        id_hour_session: number;\n        weekday: Weekday;\n      }>;\n\n      if (!Array.isArray(parsedHorario)) {\n        throw new BadRequestException('El horario debe ser un array');\n      }\n\n      return this.scheduleService.findAvailableClassrooms(\n        courseId,\n        parsedHorario,\n        page,\n        pageSize,\n        areaId ? Number(areaId) : undefined,\n        shiftId ? Number(shiftId) : undefined,\n      );\n    } catch (error) {\n      if (error instanceof SyntaxError) {\n        throw new BadRequestException(\n          'Formato de horario inválido. Debe ser un JSON válido',\n        );\n      }\n      throw error;\n    }\n  }"
+    },
+    {
+      "method": "POST",
+      "path": "/api/sedes",
+      "controller": "SedeController",
+      "handler": "create",
+      "source": "src/modules/sedes/sede.controller.ts",
+      "line": 23,
+      "status": "HttpStatus.CREATED",
+      "public": false,
+      "authorization": "{\n    permission: 'sede.create',\n    description: 'Crear un nueva sede',\n  }",
+      "parameters": [
+        "@Body() createSedeDto: CreateSedeDto"
+      ],
+      "implementation": "{\n    return this.sedeService.create(createSedeDto);\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/sedes",
+      "controller": "SedeController",
+      "handler": "findAll",
+      "source": "src/modules/sedes/sede.controller.ts",
+      "line": 36,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    permission: 'sede.list',\n    description: 'Lista de la sedes',\n  }",
+      "parameters": [],
+      "implementation": "{\n    return this.sedeService.findAll();\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/sedes/:id",
+      "controller": "SedeController",
+      "handler": "findOne",
+      "source": "src/modules/sedes/sede.controller.ts",
+      "line": 50,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    permission: 'sede.searchId',\n    description: 'Busca sede por id',\n  }",
+      "parameters": [
+        "@Param('id', ParseIntPipe) id: number"
+      ],
+      "implementation": "{\n    return this.sedeService.findOne(id);\n  }"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/sedes/:id",
+      "controller": "SedeController",
+      "handler": "update",
+      "source": "src/modules/sedes/sede.controller.ts",
+      "line": 62,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    permission: 'sede.update',\n    description: 'Edita una sede',\n  }",
+      "parameters": [
+        "@Param('id', ParseIntPipe) id: number",
+        "@Body() updateSedeDto: UpdateSedeDto"
+      ],
+      "implementation": "{\n    return this.sedeService.update(id, updateSedeDto);\n  }"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/sedes/:id",
+      "controller": "SedeController",
+      "handler": "remove",
+      "source": "src/modules/sedes/sede.controller.ts",
+      "line": 78,
+      "status": "HttpStatus.NO_CONTENT",
+      "public": false,
+      "authorization": "{\n    permission: 'sede.delete',\n    description: 'Eliminar una sede',\n  }",
+      "parameters": [
+        "@Param('id', ParseIntPipe) id: number"
+      ],
+      "implementation": "{\n    return this.sedeService.remove(id);\n  }"
+    },
+    {
+      "method": "POST",
+      "path": "/api/shifts",
+      "controller": "ShiftController",
+      "handler": "create",
+      "source": "src/modules/shifts/shift.controller.ts",
+      "line": 23,
+      "status": "HttpStatus.CREATED",
+      "public": false,
+      "authorization": "{\n    permission: 'shift.create',\n    description: 'Crear un nuevo turno',\n  }",
+      "parameters": [
+        "@Body() createShiftDto: CreateShiftDto"
+      ],
+      "implementation": "{\n    return this.shiftService.create(createShiftDto);\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/shifts",
+      "controller": "ShiftController",
+      "handler": "findAll",
+      "source": "src/modules/shifts/shift.controller.ts",
+      "line": 34,
+      "status": "HttpStatus.OK",
+      "public": false,
+      "authorization": "{\n    permission: 'shift.getAll',\n    description: 'Obtener todos los turnos',\n  }",
+      "parameters": [],
+      "implementation": "{\n    return this.shiftService.findAll();\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/shifts/:id",
+      "controller": "ShiftController",
+      "handler": "findOne",
+      "source": "src/modules/shifts/shift.controller.ts",
+      "line": 45,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    permission: 'shift.searchId',\n    description: 'Busca un turno por id',\n  }",
+      "parameters": [
+        "@Param('id', ParseIntPipe) id: number"
+      ],
+      "implementation": "{\n    return this.shiftService.findOne(id);\n  }"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/shifts/:id",
+      "controller": "ShiftController",
+      "handler": "update",
+      "source": "src/modules/shifts/shift.controller.ts",
+      "line": 55,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    permission: 'shift.update',\n    description: 'Editar un turno',\n  }",
+      "parameters": [
+        "@Param('id', ParseIntPipe) id: number",
+        "@Body() updateShiftDto: UpdateShiftDto"
+      ],
+      "implementation": "{\n    return this.shiftService.update(id, updateShiftDto);\n  }"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/shifts/:id",
+      "controller": "ShiftController",
+      "handler": "remove",
+      "source": "src/modules/shifts/shift.controller.ts",
+      "line": 68,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    permission: 'shift.delete',\n    description: 'Eliminar un turno',\n  }",
+      "parameters": [
+        "@Param('id', ParseIntPipe) id: number"
+      ],
+      "implementation": "{\n    return this.shiftService.remove(id);\n  }"
+    },
+    {
+      "method": "POST",
+      "path": "/api/supervisors",
+      "controller": "SupervisorController",
+      "handler": "create",
+      "source": "src/modules/supervisors/supervisor.controller.ts",
+      "line": 35,
+      "status": "201",
+      "public": false,
+      "authorization": "{\n    permission: 'supervisor.create',\n    description: 'Crear un nuevo supervisor',\n  }",
+      "parameters": [
+        "@Body() createSupervisorrDto: CreateSupervisorWithUserDto"
+      ],
+      "implementation": "{\n    return this.supervisorService.createSupervisor(createSupervisorrDto);\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/supervisors",
+      "controller": "SupervisorController",
+      "handler": "findAll",
+      "source": "src/modules/supervisors/supervisor.controller.ts",
+      "line": 44,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    permission: 'supervisor.list',\n    description: 'Obtiene los supervisores',\n  }",
+      "parameters": [
+        "@Query('page') page: number = 1",
+        "@Query('limit') limit: number = 20"
+      ],
+      "implementation": "{\n    return this.supervisorService.findAll(Number(page), Number(limit));\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/supervisors/getMonitors",
+      "controller": "SupervisorController",
+      "handler": "getMonitors",
+      "source": "src/modules/supervisors/supervisor.controller.ts",
+      "line": 68,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    roles: [Role.SUPERVISOR],\n    permission: 'supervisor.getMonitors',\n    description: 'Obtiene los monitores de este supervisor',\n  }",
+      "parameters": [
+        "@Req() req"
+      ],
+      "implementation": "{\n    console.log('Usuario autenticado:', req.user); // Debugging\n    const user = req?.user; // Verifica que exista\n\n    if (user.role !== Role.SUPERVISOR) {\n      throw new BadRequestException('No eres un supervisor');\n    }\n    return this.supervisorService.getMonitors(user.userId);\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/supervisors/:id",
+      "controller": "SupervisorController",
+      "handler": "findOne",
+      "source": "src/modules/supervisors/supervisor.controller.ts",
+      "line": 91,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    permission: 'supervisor.get',\n    description: 'Obtener un supervisor por su ID',\n  }",
+      "parameters": [
+        "@Param('id') id: string"
+      ],
+      "implementation": "{\n    return this.supervisorService.findOne(id);\n  }"
+    },
+    {
+      "method": "POST",
+      "path": "/api/supervisors/:id/updateProfile",
+      "controller": "SupervisorController",
+      "handler": "updateProfile",
+      "source": "src/modules/supervisors/supervisor.controller.ts",
+      "line": 100,
+      "status": "HttpStatus.OK",
+      "public": false,
+      "authorization": "{\n    permission: 'supervisor.updateProfile',\n    description: 'Actualizar el perfil de un supervisor',\n  }",
+      "parameters": [
+        "@Param('id') id: string",
+        "@Body() data: UpdateSupervisorWithProfileDto"
+      ],
+      "implementation": "{\n    return this.supervisorService.updateSupervisorWithProfile(id, data);\n  }"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/supervisors/:id",
+      "controller": "SupervisorController",
+      "handler": "update",
+      "source": "src/modules/supervisors/supervisor.controller.ts",
+      "line": 113,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    permission: 'supervisor.update',\n    description: 'Actualizar un supervisor',\n  }",
+      "parameters": [
+        "@Param('id') id: string",
+        "@Body() updateSupervisorDto: UpdateSupervisorWithProfileDto"
+      ],
+      "implementation": "{\n    return this.supervisorService.update(id, updateSupervisorDto);\n  }"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/supervisors/:id",
+      "controller": "SupervisorController",
+      "handler": "delete",
+      "source": "src/modules/supervisors/supervisor.controller.ts",
+      "line": 125,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    permission: 'supervisor.delete',\n    description: 'Eliminar un supervisor',\n  }",
+      "parameters": [
+        "@Param('id') id: string"
+      ],
+      "implementation": "{\n    return this.supervisorService.delete(id);\n  }"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/supervisors/:id/deactivate",
+      "controller": "SupervisorController",
+      "handler": "deactivateSupervisor",
+      "source": "src/modules/supervisors/supervisor.controller.ts",
+      "line": 134,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    permission: 'supervisor.deactivate',\n    description: 'Desactivar un supervisor por su id',\n  }",
+      "parameters": [
+        "@Param('id') id: string"
+      ],
+      "implementation": "{\n    return this.supervisorService.deactivate(id);\n  }"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/supervisors/assignMonitor",
+      "controller": "SupervisorController",
+      "handler": "assignMonitor",
+      "source": "src/modules/supervisors/supervisor.controller.ts",
+      "line": 143,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    permission: 'supervisor.assignMonitor',\n    description: 'Asignar o desasignar un monitor a un supervisor',\n  }",
+      "parameters": [
+        "@Body() assignMonitorDto: AssignMonitorDto"
+      ],
+      "implementation": "{\n    return this.supervisorService.assignMonitor(assignMonitorDto);\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/supervisors/:id/monitors",
+      "controller": "SupervisorController",
+      "handler": "getSupervisorMonitors",
+      "source": "src/modules/supervisors/supervisor.controller.ts",
+      "line": 153,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    roles: [Role.SUPERVISOR],\n    permission: 'supervisor.monitors',\n    description: 'Obtiene los monitores de este supervisor',\n  }",
+      "parameters": [
+        "@Param('id') id: string"
+      ],
+      "implementation": "{\n    return this.supervisorService.getSupervisorMonitors(id);\n  }"
+    },
+    {
+      "method": "POST",
+      "path": "/api/teachers/available",
+      "controller": "TeacherController",
+      "handler": "getFilteredTeachers",
+      "source": "src/modules/teachers/teacher.controller.ts",
+      "line": 45,
+      "status": "HttpStatus.OK",
+      "public": false,
+      "authorization": "{\n    permission: 'teacher.available',\n    description: 'Obtener profesores disponibles para un curso y horarios',\n  }",
+      "parameters": [
+        "@Query('page') page: number = 1",
+        "@Query('limit') limit: number = 10",
+        "@Body() data: TeacherFilteredDto"
+      ],
+      "implementation": "{\n    return await this.teacherService.getFilteredTeachers(data, page, limit);\n  }"
+    },
+    {
+      "method": "POST",
+      "path": "/api/teachers",
+      "controller": "TeacherController",
+      "handler": "create",
+      "source": "src/modules/teachers/teacher.controller.ts",
+      "line": 63,
+      "status": "201",
+      "public": false,
+      "authorization": "{\n    permission: 'teacher.create',\n    description: 'Crear un nuevo profesor',\n  }",
+      "parameters": [
+        "@Body() createTeacherDto: CreateTeacherWithUserDto"
+      ],
+      "implementation": "{\n    return this.teacherService.createTeacher(createTeacherDto);\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/teachers",
+      "controller": "TeacherController",
+      "handler": "findAll",
+      "source": "src/modules/teachers/teacher.controller.ts",
+      "line": 73,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    permission: 'teacher.list',\n    description: 'Obtiene todos los profesores',\n  }",
+      "parameters": [
+        "@Query('page') page: number = 1",
+        "@Query('limit') limit: number = 20",
+        "@Query('courseId') courseId?: number",
+        "@Req() req?"
+      ],
+      "implementation": "{\n    return this.teacherService.findAll(\n      page,\n      limit,\n      getCoordinatorCourseId(req.user?.role) ?? courseId,\n    );\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/teachers/search",
+      "controller": "TeacherController",
+      "handler": "search",
+      "source": "src/modules/teachers/teacher.controller.ts",
+      "line": 115,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    permission: 'teacher.search',\n    description: 'Buscar profesores',\n  }",
+      "parameters": [
+        "@Query('query') query: string",
+        "@Query('page') page: number = 1",
+        "@Query('limit') limit: number = 20",
+        "@Req() req?"
+      ],
+      "implementation": "{\n    return this.teacherService.search(\n      query,\n      Number(page),\n      Number(limit),\n      getCoordinatorCourseId(req.user?.role),\n    );\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/teachers/export",
+      "controller": "TeacherController",
+      "handler": "exportTeachers",
+      "source": "src/modules/teachers/teacher.controller.ts",
+      "line": 164,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    permission: 'teacher.export',\n    description: 'Exportar profesores a Excel',\n  }",
+      "parameters": [
+        "@Res() res: Response",
+        "@Req() req"
+      ],
+      "implementation": "{\n    const buffer = await this.teacherService.exportToExcel(\n      getCoordinatorCourseId(req.user?.role),\n    );\n    const filename = `docentes_ceprunsa_${new Date().toISOString().slice(0, 10)}.xlsx`;\n    res.set({\n      'Content-Type':\n        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',\n      'Content-Disposition': `attachment; filename=\"${filename}\"`,\n      'Content-Length': buffer.length,\n    });\n    res.end(buffer);\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/teachers/:id",
+      "controller": "TeacherController",
+      "handler": "findOne",
+      "source": "src/modules/teachers/teacher.controller.ts",
+      "line": 192,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    permission: 'teacher.getById',\n    description: 'Obtener un profesor por su id',\n  }",
+      "parameters": [
+        "@Param('id') id: string",
+        "@Req() req"
+      ],
+      "implementation": "{\n    const teacher = await this.teacherService.findOne(\n      id,\n      getCoordinatorCourseId(req.user?.role),\n    );\n    if (!teacher) {\n      throw new NotFoundException(`Profesor con ID ${id} no encontrado`);\n    }\n    return teacher;\n  }"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/teachers/:id",
+      "controller": "TeacherController",
+      "handler": "update",
+      "source": "src/modules/teachers/teacher.controller.ts",
+      "line": 222,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    permission: 'teacher.update',\n    description: 'Actualizar un profesor por su id',\n  }",
+      "parameters": [
+        "@Param('id') id: string",
+        "@Body() updateTeacherDto: TeacherUpdateDto"
+      ],
+      "implementation": "{\n    return this.teacherService.update(id, updateTeacherDto);\n  }"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/teachers/:id",
+      "controller": "TeacherController",
+      "handler": "delete",
+      "source": "src/modules/teachers/teacher.controller.ts",
+      "line": 242,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    permission: 'teacher.delete',\n    description: 'Eliminar un profesor por su id',\n  }",
+      "parameters": [
+        "@Param('id') id: string"
+      ],
+      "implementation": "{\n    return this.teacherService.delete(id);\n  }"
+    },
+    {
+      "method": "POST",
+      "path": "/api/teachers/json",
+      "controller": "TeacherController",
+      "handler": "createTeachersFromJson",
+      "source": "src/modules/teachers/teacher.controller.ts",
+      "line": 251,
+      "status": "201",
+      "public": false,
+      "authorization": "{\n    permission: 'teacher.importjson',\n    description: 'Crear profesores desde un archivo JSON',\n  }",
+      "parameters": [
+        "@Body() importTeacherDto: CreateTeacherDto[]"
+      ],
+      "implementation": "{\n    return this.teacherService.createManyTeachers(importTeacherDto);\n  }"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/teachers/:id/deactivate",
+      "controller": "TeacherController",
+      "handler": "deactivateTeacher",
+      "source": "src/modules/teachers/teacher.controller.ts",
+      "line": 264,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    permission: 'teacher.deactivate',\n    description: 'Desactivar un teacher por su id',\n  }",
+      "parameters": [
+        "@Param('id') id: string"
+      ],
+      "implementation": "{\n    return this.teacherService.deactivate(id);\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/teachers/:teacherId/schedules",
+      "controller": "TeacherController",
+      "handler": "getTeacherSchedules",
+      "source": "src/modules/teachers/teacher.controller.ts",
+      "line": 273,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    permission: 'teacher.getSchedules',\n    description: 'Obtener los horarios y aulas donde enseña un profesor',\n  }",
+      "parameters": [
+        "@Param('teacherId') teacherId: string",
+        "@Req() req"
+      ],
+      "implementation": "{\n    return this.teacherService.getTeacherSchedules(\n      teacherId,\n      getCoordinatorCourseId(req.user?.role),\n    );\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/teachers/by-course/:courseId",
+      "controller": "TeacherController",
+      "handler": "findByCourse",
+      "source": "src/modules/teachers/teacher.controller.ts",
+      "line": 301,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    permission: 'teacher.listByCourse',\n    description: 'Listar profesores por curso',\n  }",
+      "parameters": [
+        "@Param('courseId') courseId: string",
+        "@Query('page') page: number = 1",
+        "@Query('limit') limit: number = 20",
+        "@Req() req?"
+      ],
+      "implementation": "{\n    const coordinatorCourseId = getCoordinatorCourseId(req.user?.role);\n    if (\n      coordinatorCourseId !== undefined &&\n      coordinatorCourseId !== Number(courseId)\n    ) {\n      throw new ForbiddenException('Curso no autorizado');\n    }\n\n    return this.teacherService.findByCourse(\n      String(coordinatorCourseId ?? courseId),\n      Number(page),\n      Number(limit),\n    );\n  }"
+    },
+    {
+      "method": "POST",
+      "path": "/api/user-profiles",
+      "controller": "UserProfileController",
+      "handler": "create",
+      "source": "src/modules/user-profile/user-profile.controller.ts",
+      "line": 27,
+      "status": "201",
+      "public": false,
+      "authorization": "{\n    permission: 'userProfile.create',\n    roles: [Role.ADMIN],\n  }",
+      "parameters": [
+        "@Req() req",
+        "@Body() createUserProfileDto: CreateUserProfileDto"
+      ],
+      "implementation": "{\n    console.log('Usuario autenticado:', req.user); // Debugging\n    const userId = req.user?.userId; // Verifica que exista\n\n    if (!userId) {\n      throw new BadRequestException('No se encontró el userId en la solicitud');\n    }\n\n    return this.userProfileService.create(userId, createUserProfileDto);\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/user-profiles",
+      "controller": "UserProfileController",
+      "handler": "findAll",
+      "source": "src/modules/user-profile/user-profile.controller.ts",
+      "line": 43,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    permission: 'userProfile.list',\n    roles: [Role.ADMIN],\n  }",
+      "parameters": [],
+      "implementation": "{\n    return this.userProfileService.findAll();\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/user-profiles/:id",
+      "controller": "UserProfileController",
+      "handler": "findOne",
+      "source": "src/modules/user-profile/user-profile.controller.ts",
+      "line": 52,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    permission: 'userProfile.getById',\n    description: 'Obtener un perfil de usuario por su id',\n  }",
+      "parameters": [
+        "@Param('id') id: string"
+      ],
+      "implementation": "{\n    return this.userProfileService.findOne(id);\n  }"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/user-profiles/:id",
+      "controller": "UserProfileController",
+      "handler": "update",
+      "source": "src/modules/user-profile/user-profile.controller.ts",
+      "line": 61,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    permission: 'userProfile.update',\n    description: 'Actualizar un perfil de usuario por su id',\n  }",
+      "parameters": [
+        "@Param('id') id: string",
+        "@Body() updateUserProfileDto: UpdateUserProfileDto"
+      ],
+      "implementation": "{\n    return this.userProfileService.update(id, updateUserProfileDto);\n  }"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/user-profiles/:id",
+      "controller": "UserProfileController",
+      "handler": "remove",
+      "source": "src/modules/user-profile/user-profile.controller.ts",
+      "line": 73,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    permission: 'userProfile.delete',\n    description: 'Eliminar un perfil de usuario por su id',\n  }",
+      "parameters": [
+        "@Param('id') id: string"
+      ],
+      "implementation": "{\n    return this.userProfileService.remove(id);\n  }"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/user-profiles/:id/deactivate",
+      "controller": "UserProfileController",
+      "handler": "deactivateUserProfile",
+      "source": "src/modules/user-profile/user-profile.controller.ts",
+      "line": 82,
+      "status": "200",
+      "public": false,
+      "authorization": "{\n    permission: 'userProfile.deactivate',\n    description: 'Desactivar un perfil de usuario por su id',\n  }",
+      "parameters": [
+        "@Param('id') id: string"
+      ],
+      "implementation": "{\n    return this.userProfileService.deactivate(id);\n  }"
+    },
+    {
+      "method": "GET",
+      "path": "/api/users",
+      "controller": "UsersController",
+      "handler": "getUsers",
+      "source": "src/modules/users/users.controller.ts",
+      "line": 22,
+      "status": "HttpStatus.OK",
+      "public": false,
+      "authorization": "{\n    permission: 'users.list',\n    description: 'Obtener todos los usuarios',\n  }",
+      "parameters": [
+        "@Query('page', new DefaultValuePipe(0), ParseIntPipe) skip: number",
+        "@Query('limit', new DefaultValuePipe(10), ParseIntPipe) take: number"
+      ],
+      "implementation": "{\n    return this.userService.users({\n      skip,\n      take,\n    });\n  }"
+    },
+    {
+      "method": "POST",
+      "path": "/api/users",
+      "controller": "UsersController",
+      "handler": "createUser",
+      "source": "src/modules/users/users.controller.ts",
+      "line": 42,
+      "status": "HttpStatus.CREATED",
+      "public": false,
+      "authorization": "{\n    permission: 'users.create',\n    description: 'Crear un nuevo usuario',\n  }",
+      "parameters": [
+        "@Body() data: CreateUserDto"
+      ],
+      "implementation": "{\n    return await this.userService.createUser(data);\n  }"
+    },
+    {
+      "method": "POST",
+      "path": "/api/users/create-many",
+      "controller": "UsersController",
+      "handler": "createManyUsers",
+      "source": "src/modules/users/users.controller.ts",
+      "line": 56,
+      "status": "HttpStatus.CREATED",
+      "public": false,
+      "authorization": "{\n    permission: 'users.createMany',\n    description: 'Crear muchos usuarios',\n  }",
+      "parameters": [
+        "@Body() data: CreateUserDto[]"
+      ],
+      "implementation": "{\n    return await this.userService.createManyUsers(data);\n  }"
+    }
+  ]
+}

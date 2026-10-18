@@ -20,6 +20,20 @@ import { Authorization } from '@modules/auth/decorators/authorization.decorator'
 export class RolesController {
   constructor(private readonly rolesService: RolesService) {}
 
+  @Get('permissions')
+  @HttpCode(HttpStatus.OK)
+  @Authorization({
+    permission: 'role.listWithPermissions',
+    description: 'Obtener todos los roles con sus permisos',
+  })
+  @ApiOperation({
+    summary: 'Obtener todos los roles con sus permisos',
+    description: 'Get all roles with their permissions',
+  })
+  getAllWithPermissions() {
+    return this.rolesService.getAllWithPermissions();
+  }
+
   // ─────── CRUD ───────
   @Post()
   @HttpCode(HttpStatus.CREATED)
@@ -93,19 +107,5 @@ export class RolesController {
   })
   getRoleWithPermissions(@Param('name') name: string) {
     return this.rolesService.getAllPermissionsByRolName(name);
-  }
-
-  @Get('permissions')
-  @HttpCode(HttpStatus.OK)
-  @Authorization({
-    permission: 'role.listWithPermissions',
-    description: 'Obtener todos los roles con sus permisos',
-  })
-  @ApiOperation({
-    summary: 'Obtener todos los roles con sus permisos',
-    description: 'Get all roles with their permissions',
-  })
-  getAllWithPermissions() {
-    return this.rolesService.getAllWithPermissions();
   }
 }

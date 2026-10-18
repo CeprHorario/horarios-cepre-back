@@ -9,7 +9,7 @@ import {
   IsBoolean,
   IsEnum,
 } from 'class-validator';
-import { User, JobStatus } from '@prisma/client';
+import { User, JobStatus } from '../../../generated/prisma/client';
 import { ApiProperty } from '@nestjs/swagger';
 import { CourseDto } from '@modules/courses/dto';
 

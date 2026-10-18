@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, BadRequestException, InternalServerError
 import { PrismaService } from '@database/prisma/prisma.service';
 import { CreateAreaDto, UpdateAreaDto, AreaBaseDto } from './dto';
 import { plainToInstance } from 'class-transformer';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '../../generated/prisma/client';
 
 @Injectable()
 export class AreaService {

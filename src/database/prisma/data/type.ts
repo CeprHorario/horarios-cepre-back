@@ -1,9 +1,6 @@
-import { Prisma } from '@prisma/client';
-import { UUID } from 'crypto';
-import { Class } from '@prisma/client';
+import { Prisma, Class } from '../../../generated/prisma/client';
 
 export interface DataInitial {
-  users: User[];
   areas: Area[];
   sedes: Sede[];
   shifts: Shift[];
@@ -21,8 +18,7 @@ export type InDataMonitors = {
 
 export interface DataMonitor {
   user: User;
-  monitor: Monitor;
-  classes: Class;
+  classes: Omit<Class, 'id' | 'monitorId'>;
 }
 
 export interface AreaCourseHours {
@@ -54,9 +50,7 @@ export interface ShiftStr {
   endTime: string;
 }
 
-export interface User extends Prisma.UserCreateInput {
-  id: UUID;
-}
+export type User = Prisma.UserCreateInput;
 
 export interface Area extends Prisma.AreaCreateInput {
   id?: number;
@@ -75,11 +69,6 @@ export interface Shift {
 
 export interface Course extends Prisma.CourseCreateInput {
   id?: number;
-}
-
-export interface Monitor {
-  id?: UUID;
-  userId: UUID;
 }
 
 export interface AreaCourse {

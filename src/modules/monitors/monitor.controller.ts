@@ -15,6 +15,7 @@ import {
   ParseBoolPipe,
 } from '@nestjs/common';
 import { MonitorService } from './monitor.service';
+import type { AuthenticatedRequest } from '@modules/auth/authenticated-request';
 import { CreateMonitorDto, MonitorInformationDto } from './dto';
 import { ScheduleDto } from './dto/schedule.dto';
 import {
@@ -38,8 +39,8 @@ export class MonitorController {
     description: 'Obtener información del monitor autenticado',
   })
   @HttpCode(HttpStatus.OK)
-  getInformation(@Req() req): Promise<MonitorInformationDto> {
-    if (!req.user || req?.user.role !== Role.MONITOR) {
+  getInformation(@Req() req: AuthenticatedRequest): Promise<MonitorInformationDto> {
+    if (!req.user || req?.user.role !== String(Role.MONITOR)) {
       throw new UnauthorizedException('No eres moni');
     }
     return this.monitorService.getInformationByMonitor(req.user.userId);
@@ -201,8 +202,7 @@ export class MonitorController {
     permission: 'monitor.loadSchedule',
     description: 'Cargar el horario de un monitor',
   })
-  getSchedule(@Req() req): Promise<ScheduleDto[]> {
-    console.log('Usuario autenticado:', req.user);
+  getSchedule(@Req() req: AuthenticatedRequest): Promise<ScheduleDto[]> {
     const userId = req.user?.userId;
     return this.monitorService.getSchedule(userId);
   }
@@ -226,8 +226,7 @@ export class MonitorController {
     permission: 'monitor.listTeachersByMonitor',
     description: 'Cargar los docentes de un monitor',
   })
-  async getTeachersByMonitor(@Req() req): Promise<TeacherResponseDto[]> {
-    console.log('Usuario autenticado:', req.user);
+  async getTeachersByMonitor(@Req() req: AuthenticatedRequest): Promise<TeacherResponseDto[]> {
     const userId = req.user?.userId;
     return this.monitorService.getTeachersByMonitor(userId);
   }

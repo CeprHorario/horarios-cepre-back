@@ -19,6 +19,7 @@ import {
   Role,
 } from '@modules/auth/decorators/authorization.decorator';
 import { getCoordinatorCourseId } from '@modules/auth/utils/coordinator-role';
+import type { AuthenticatedRequest } from '@modules/auth/authenticated-request';
 
 @ApiTags('Courses')
 @Controller('courses')
@@ -57,7 +58,7 @@ export class CourseController {
     status: 200,
     description: 'Lista de cursos obtenida con éxito.',
   })
-  async findAll(@Req() req) {
+  async findAll(@Req() req: AuthenticatedRequest) {
     return await this.courseService.findAll(
       getCoordinatorCourseId(req.user?.role),
     );
@@ -71,7 +72,7 @@ export class CourseController {
   @ApiOperation({ summary: 'Obtener un curso por ID' })
   @ApiResponse({ status: 200, description: 'Curso encontrado.' })
   @ApiResponse({ status: 404, description: 'Curso no encontrado.' })
-  async findOne(@Param('id', ParseIntPipe) id: number, @Req() req) {
+  async findOne(@Param('id', ParseIntPipe) id: number, @Req() req: AuthenticatedRequest) {
     const coordinatorCourseId = getCoordinatorCourseId(req.user?.role);
     if (coordinatorCourseId !== undefined && coordinatorCourseId !== id) {
       throw new HttpException('Curso no autorizado', HttpStatus.FORBIDDEN);

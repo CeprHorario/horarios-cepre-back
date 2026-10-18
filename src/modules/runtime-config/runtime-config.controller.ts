@@ -10,6 +10,7 @@ import {
   Post,
   Query,
   Req,
+  SetMetadata,
 } from '@nestjs/common';
 import { Request } from 'express';
 import {
@@ -24,6 +25,7 @@ import { UpdateRuntimeConfigDto } from './dto/update-runtime-config.dto';
 import { RuntimeConfigService } from './runtime-config.service';
 
 @Controller('system')
+@SchemaRoutingBypass()
 export class RuntimeConfigController {
   constructor(
     private readonly runtimeConfig: RuntimeConfigService,
@@ -31,6 +33,7 @@ export class RuntimeConfigController {
   ) {}
 
   @Get('status')
+  @SetMetadata('runtimeConfigBypass', true)
   @Unauthenticated()
   @MaintenanceBypass()
   @SchemaRoutingBypass()

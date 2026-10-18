@@ -2,7 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { IsNotEmpty, IsNumber, IsOptional, IsPositive } from 'class-validator';
 
 //CAMBIAR POR DTOS  A FUTURO
-import { Course, Area } from '@prisma/client';
+import { Course, Area } from '../../../generated/prisma/client';
 
 // DTO con todas las propiedades
 export class AreaCourseHourDto {

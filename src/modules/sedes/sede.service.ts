@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, InternalServerErrorException } from '@nestjs/common';
 import { PrismaService } from '@database/prisma/prisma.service';
 import { CreateSedeDto, UpdateSedeDto } from './dto/index';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '../../generated/prisma/client';
 @Injectable()
 export class SedeService {
   constructor(private readonly prisma: PrismaService) {}
@@ -9,9 +9,8 @@ export class SedeService {
   async create(data: CreateSedeDto) {
     try {
       return await this.prisma.getClient().sede.create({ data });
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (error) {
-      throw new Error('Error al crear la sede');
+      throw new Error('Error al crear la sede', { cause: error });
     }
   }
 

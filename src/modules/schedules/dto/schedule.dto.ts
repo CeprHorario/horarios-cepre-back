@@ -6,7 +6,7 @@ import {
   IsString,
   IsUUID,
 } from 'class-validator';
-import { Course, Weekday } from '@prisma/client';
+import { Course, Weekday } from '../../../generated/prisma/client';
 import { ApiProperty } from '@nestjs/swagger';
 import { ClassDto } from '@modules/classes/dto';
 import { HourSessionDto } from '@modules/hour-session/dto';

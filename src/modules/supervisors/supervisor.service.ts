@@ -15,7 +15,7 @@ import { UpdateSupervisorWithProfileDto } from './dto/update-supervisor-with-pro
 import { SupervisorGetSummaryDto } from './dto/supervisor-get-summary.dto';
 import { AssignMonitorDto } from './dto/assign-monitor.dto';
 import { SupervisorGetByIdDto } from './dto/supervisor-get-by-id.dto';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '../../generated/prisma/client';
 
 @Injectable()
 export class SupervisorService {
@@ -169,7 +169,7 @@ export class SupervisorService {
         throw error;
       }
       console.error('Error en findOne:', error); // Agregar un log para depuración
-      throw new Error('Ocurrió un error inesperado al buscar el profesor');
+      throw new Error('Ocurrió un error inesperado al buscar el profesor', { cause: error });
     }
   }
 
