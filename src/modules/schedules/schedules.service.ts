@@ -9,10 +9,43 @@ import { plainToInstance } from 'class-transformer';
 import { LoadScheduleDto } from './dto';
 import { Weekday, Prisma } from '../../generated/prisma/client';
 import { Role } from '@modules/auth/decorators/authorization.decorator';
+import { covers, normalizeIntervals, overlaps, scheduleInterval } from './availability';
+import { SaveAvailabilityDto } from './dto/availability.dto';
 
 @Injectable()
 export class ScheduleService {
   constructor(private prisma: PrismaService) {}
+
+  async getAvailability(teacherId: string) {
+    const teacher = await this.prisma.getClient().teacher.findFirst({ where: { id: teacherId, user: { isActive: true } } });
+    if (!teacher) throw new NotFoundException('Docente no encontrado');
+    const intervals = await this.prisma.getClient().teacherAvailability.findMany({
+      where: { teacherId }, orderBy: [{ weekday: 'asc' }, { startMinute: 'asc' }],
+    });
+    return intervals.map(({ weekday, startMinute, endMinute }) => ({
+      weekday, start: this.formatMinute(startMinute), end: this.formatMinute(endMinute),
+    }));
+  }
+
+  async saveAvailability(teacherId: string, data: SaveAvailabilityDto) {
+    const minute = (time: string) => { const [h, m] = time.split(':').map(Number); return h * 60 + m; };
+    const intervals = normalizeIntervals(data.intervals.map(({ weekday, start, end }) => {
+      const startMinute = minute(start), endMinute = minute(end);
+      if (startMinute >= endMinute) throw new BadRequestException('La hora de fin debe ser posterior a la de inicio');
+      return { weekday, startMinute, endMinute };
+    }));
+    await this.assignmentTransaction(async (tx) => {
+      const teacher = await tx.teacher.findFirst({ where: { id: teacherId, user: { isActive: true } } });
+      if (!teacher) throw new NotFoundException('Docente no encontrado');
+      await tx.teacherAvailability.deleteMany({ where: { teacherId } });
+      if (intervals.length) await tx.teacherAvailability.createMany({ data: intervals.map((interval) => ({ teacherId, ...interval })) });
+    });
+    return intervals.map(({ weekday, startMinute, endMinute }) => ({ weekday, start: this.formatMinute(startMinute), end: this.formatMinute(endMinute) }));
+  }
+
+  private formatMinute(minute: number) {
+    return `${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`;
+  }
 
   async loadWithCourses(data: LoadScheduleDto) {
     const courses = await this.prisma
@@ -96,6 +129,7 @@ export class ScheduleService {
 
   // ─────── CRUD ───────
   async create(createScheduleDto: CreateScheduleDto): Promise<ScheduleBaseDto> {
+    if (createScheduleDto.teacherId) throw new BadRequestException('Cree el bloque sin docente y use la asignación de salones para validar disponibilidad y cruces');
     const schedule = await this.prisma.getClient().schedule.create({
       data: createScheduleDto,
       include: { clas: true, hourSession: true, teacher: true },
@@ -129,6 +163,9 @@ export class ScheduleService {
     id: number,
     updateScheduleDto: UpdateScheduleDto,
   ): Promise<ScheduleBaseDto> {
+    if (updateScheduleDto.teacherId !== undefined) throw new BadRequestException('Use la asignación o desasignación de salones para cambiar el docente');
+    const current = await this.prisma.getClient().schedule.findUnique({ where: { id } });
+    if (current?.teacherId) throw new BadRequestException('Desasigne el docente antes de modificar este bloque de horario');
     const schedule = await this.prisma.getClient().schedule.update({
       where: { id },
       data: updateScheduleDto,
@@ -154,10 +191,10 @@ export class ScheduleService {
     return this.assignmentTransaction(async (prisma) => {
     const teacher = await prisma.teacher.findUnique({
       where: { id: teacherId },
-      include: { schedules: true, courses: true },
+      include: { schedules: { include: { hourSession: true } }, courses: true, availabilities: true, user: true },
     });
 
-    if (!teacher) {
+    if (!teacher || !teacher.user.isActive) {
       throw new Error('Profesor no encontrado');
     }
 
@@ -171,14 +208,27 @@ export class ScheduleService {
       where: {
         classId: { in: classroomIds },
         courseId: courseId,
-        teacherId: null,
       },
+      include: { hourSession: true },
     });
+
+    if (new Set(schedulesToAssign.map((s) => s.classId)).size !== new Set(classroomIds).size || schedulesToAssign.some((s) => s.teacherId !== null)) {
+      throw new BadRequestException('Todos los bloques del curso deben estar libres en los salones seleccionados');
+    }
 
     if (schedulesToAssign.length === 0) {
       throw new Error(
         'No hay horarios disponibles para este curso y estos salones',
       );
+    }
+
+    const occupied = teacher.schedules.map(scheduleInterval);
+    const requested = schedulesToAssign.map(scheduleInterval);
+    for (const [index, interval] of requested.entries()) {
+      if (!covers(teacher.availabilities, interval)) throw new BadRequestException('El horario está fuera de la disponibilidad del docente');
+      if ([...occupied, ...requested.slice(0, index)].some((other) => overlaps(interval, other))) {
+        throw new BadRequestException('El horario se cruza con otra clase del docente');
+      }
     }
 
     const totalHoursToAdd = schedulesToAssign.length;
@@ -285,7 +335,15 @@ export class ScheduleService {
     pageSize: number = 10,
     areaId?: number,
     shiftId?: number,
+    teacherId?: string,
   ) {
+    if (!teacherId) throw new BadRequestException('Se requiere el docente para consultar salones compatibles');
+    const teacher = await this.prisma.getClient().teacher.findFirst({
+      where: { id: teacherId, courseId: id_course, user: { isActive: true } },
+      include: { availabilities: true, schedules: { include: { hourSession: true } } },
+    });
+    if (!teacher) throw new NotFoundException('Docente no encontrado para este curso');
+    const occupied = teacher.schedules.map(scheduleInterval);
     const availableTimeSlots = new Set(
       horario.map((slot) => `${slot.id_hour_session}-${slot.weekday}`),
     );
@@ -315,13 +373,14 @@ export class ScheduleService {
       where: {
         classId: { in: allClassroomIds },
         courseId: id_course,
-        teacherId: null,
       },
       select: {
         id: true,
         classId: true,
         hourSessionId: true,
         weekday: true,
+        hourSession: true,
+        teacherId: true,
       },
     });
 
@@ -329,8 +388,13 @@ export class ScheduleService {
       string,
       { hourSessionId: number; weekday: Weekday }[]
     >();
+    const incompatibleClassrooms = new Set<string>();
 
     for (const schedule of courseSchedules) {
+      const interval = scheduleInterval(schedule);
+      if (schedule.teacherId !== null || !covers(teacher.availabilities, interval) || occupied.some((other) => overlaps(interval, other))) {
+        incompatibleClassrooms.add(schedule.classId);
+      }
       if (!schedulesByClassroom.has(schedule.classId)) {
         schedulesByClassroom.set(schedule.classId, []);
       }
@@ -347,7 +411,7 @@ export class ScheduleService {
         availableTimeSlots.has(`${slot.hourSessionId}-${slot.weekday}`),
       );
 
-      if (allSlotsAvailable) {
+      if (allSlotsAvailable && !incompatibleClassrooms.has(classId)) {
         matchingClassroomIds.push(classId);
       }
     }

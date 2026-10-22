@@ -58,11 +58,24 @@ model Teacher {
   isCoordinator  Boolean    @default(false) @map("is_coordinator")
   jobStatus      JobStatus  @map("job_status")
   schedules      Schedule[]
+  availabilities TeacherAvailability[]
   courses        Course     @relation(fields: [courseId], references: [id])
   user           User       @relation(fields: [userId], references: [id])
 
   @@index([courseId])
   @@map("teachers")
+}
+
+model TeacherAvailability {
+  id          String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  teacherId   String   @map("teacher_id") @db.Uuid
+  weekday     Weekday
+  startMinute Int      @map("start_minute") @db.SmallInt
+  endMinute   Int      @map("end_minute") @db.SmallInt
+  teacher     Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+
+  @@unique([teacherId, weekday, startMinute, endMinute])
+  @@map("teacher_availabilities")
 }
 
 model Supervisor {

@@ -14,6 +14,7 @@ import {
   Query,
   Req,
   ForbiddenException,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import { ScheduleService } from './schedules.service';
 import { ScheduleBaseDto, CreateScheduleDto, UpdateScheduleDto } from './dto';
@@ -27,11 +28,24 @@ import { Weekday } from '../../generated/prisma/client';
 import { Unauthenticated } from '@modules/auth/decorators/unauthenticated.decorator';
 import { getCoordinatorCourseId } from '@modules/auth/utils/coordinator-role';
 import type { AuthenticatedRequest } from '@modules/auth/authenticated-request';
+import { SaveAvailabilityDto } from './dto/availability.dto';
 
 @Controller('schedules')
 @ApiTags('Schedules')
 export class ScheduleController {
   constructor(private readonly scheduleService: ScheduleService) {}
+
+  @Get('teachers/:teacherId/availability')
+  @Authorization({ adminOnly: true, permission: 'schedule.availability.get', description: 'Consultar disponibilidad del docente' })
+  getAvailability(@Param('teacherId', ParseUUIDPipe) teacherId: string) {
+    return this.scheduleService.getAvailability(teacherId);
+  }
+
+  @Put('teachers/:teacherId/availability')
+  @Authorization({ adminOnly: true, permission: 'schedule.availability.update', description: 'Guardar disponibilidad del docente' })
+  saveAvailability(@Param('teacherId', ParseUUIDPipe) teacherId: string, @Body() data: SaveAvailabilityDto) {
+    return this.scheduleService.saveAvailability(teacherId, data);
+  }
 
   @Post('load-with-courses')
   @HttpCode(HttpStatus.CREATED)
@@ -222,6 +236,7 @@ export class ScheduleController {
   async getAvailableClassrooms(
     @Query('course_id', ParseIntPipe) courseId: number,
     @Query('horario') horario: string,
+    @Query('teacher_id', ParseUUIDPipe) teacherId: string,
     @Query('page', ParseIntPipe) page: number = 1,
     @Query('pageSize', ParseIntPipe) pageSize: number = 10,
     @Query('area_id') areaId?: number,
@@ -250,6 +265,7 @@ export class ScheduleController {
         pageSize,
         areaId ? Number(areaId) : undefined,
         shiftId ? Number(shiftId) : undefined,
+        teacherId,
       );
     } catch (error) {
       if (error instanceof SyntaxError) {

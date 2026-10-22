@@ -80,6 +80,23 @@ Se migran `/api/admissions`, `/api/auth` y `/api/system`. JWT valida identidad y
 
 ## Comprobaciones
 
+### Disponibilidad del docente
+
+`teacher_availabilities` pertenece a cada esquema académico. Guarda docente, día e inicio/fin en minutos desde medianoche, sin zona horaria ni vínculo con un turno. La API usa `HH:mm` y normaliza intervalos contiguos o solapados. `GET` y `PUT /api/schedules/teachers/:teacherId/availability` son exclusivos del administrador; el PUT recibe `{ intervals: [{ weekday, start, end }] }` y reemplaza la disponibilidad en una transacción. Un arreglo vacío la limpia.
+
+La consulta de salones compatibles requiere `teacher_id`. Tanto esta consulta como la búsqueda de docentes y la asignación exigen cobertura completa y comprueban cruces reales entre turnos. La asignación usa una transacción serializable con reintentos. Cambiar la disponibilidad no elimina clases existentes. El CRUD de bloques no permite asignar docentes directamente ni modificar bloques ya asignados; se usan las operaciones de asignación/desasignación.
+
+La migración `202610220001_teacher_availability` se aplica con el runner académico habitual, después de respaldar la base. No se importan automáticamente datos de `localStorage`, porque las claves antiguas no identifican el proceso.
+
+Las pruebas PostgreSQL de disponibilidad crean y eliminan únicamente dos esquemas temporales propios. Para ejecutarlas en el entorno local desde la raíz del workspace:
+
+```bash
+docker compose exec -T back sh -c 'AVAILABILITY_TEST_DATABASE_URL="$DATABASE_URL" npm test -- --runInBand --runTestsByPath test/availability.e2e-spec.ts'
+docker compose exec -T front npm run test:availability
+```
+
+Comprobaciones generales:
+
 ```bash
 npm run typecheck
 npm run lint
