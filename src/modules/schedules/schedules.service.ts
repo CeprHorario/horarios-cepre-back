@@ -11,10 +11,23 @@ import { Weekday, Prisma } from '../../generated/prisma/client';
 import { Role } from '@modules/auth/decorators/authorization.decorator';
 import { covers, normalizeIntervals, overlaps, scheduleInterval } from './availability';
 import { SaveAvailabilityDto } from './dto/availability.dto';
+import { compatibleClassroomsSql } from './compatibility.sql';
 
 @Injectable()
 export class ScheduleService {
   constructor(private prisma: PrismaService) {}
+
+  async clearAvailability(teacherIds: string[]) {
+    return this.assignmentTransaction(async (tx) => {
+      const teachers = await tx.teacher.findMany({
+        where: { id: { in: teacherIds }, user: { isActive: true } }, select: { id: true },
+      });
+      if (teachers.length !== teacherIds.length)
+        throw new NotFoundException('Uno o más docentes no existen o están inactivos en este proceso');
+      const deleted = await tx.teacherAvailability.deleteMany({ where: { teacherId: { in: teacherIds } } });
+      return { teachers: teachers.length, intervals: deleted.count };
+    });
+  }
 
   async getAvailability(teacherId: string) {
     const teacher = await this.prisma.getClient().teacher.findFirst({ where: { id: teacherId, user: { isActive: true } } });
@@ -287,6 +300,10 @@ export class ScheduleService {
       );
     }
 
+    if (new Set(schedulesToUnassign.map((schedule) => schedule.classId)).size !== new Set(classroomIds).size) {
+      throw new BadRequestException('Algún salón no está asignado al docente; no se desasignó ninguno');
+    }
+
         // Actualizamos los horarios para quitar el profesor
         const updatedSchedules = await prisma.schedule.updateMany({
           where: {
@@ -340,95 +357,17 @@ export class ScheduleService {
     if (!teacherId) throw new BadRequestException('Se requiere el docente para consultar salones compatibles');
     const teacher = await this.prisma.getClient().teacher.findFirst({
       where: { id: teacherId, courseId: id_course, user: { isActive: true } },
-      include: { availabilities: true, schedules: { include: { hourSession: true } } },
-    });
-    if (!teacher) throw new NotFoundException('Docente no encontrado para este curso');
-    const occupied = teacher.schedules.map(scheduleInterval);
-    const availableTimeSlots = new Set(
-      horario.map((slot) => `${slot.id_hour_session}-${slot.weekday}`),
-    );
-
-    const classroomFilter: Prisma.ClassWhereInput = {
-      schedules: {
-        some: {
-          courseId: id_course,
-        },
-      },
-      ...(areaId ? { areaId } : {}),
-      ...(shiftId ? { shiftId } : {}),
-    };
-
-    const allClassroomsInAreas = await this.prisma.getClient().class.findMany({
-      where: classroomFilter,
       select: { id: true },
     });
-
-    const allClassroomIds = allClassroomsInAreas.map((c) => c.id);
-
-    if (allClassroomIds.length === 0) {
-      return [];
-    }
-
-    const courseSchedules = await this.prisma.getClient().schedule.findMany({
-      where: {
-        classId: { in: allClassroomIds },
-        courseId: id_course,
-      },
-      select: {
-        id: true,
-        classId: true,
-        hourSessionId: true,
-        weekday: true,
-        hourSession: true,
-        teacherId: true,
-      },
-    });
-
-    const schedulesByClassroom = new Map<
-      string,
-      { hourSessionId: number; weekday: Weekday }[]
-    >();
-    const incompatibleClassrooms = new Set<string>();
-
-    for (const schedule of courseSchedules) {
-      const interval = scheduleInterval(schedule);
-      if (schedule.teacherId !== null || !covers(teacher.availabilities, interval) || occupied.some((other) => overlaps(interval, other))) {
-        incompatibleClassrooms.add(schedule.classId);
-      }
-      if (!schedulesByClassroom.has(schedule.classId)) {
-        schedulesByClassroom.set(schedule.classId, []);
-      }
-      schedulesByClassroom.get(schedule.classId)!.push({
-        hourSessionId: schedule.hourSessionId,
-        weekday: schedule.weekday,
-      });
-    }
-
-    const matchingClassroomIds: string[] = [];
-
-    for (const [classId, slots] of schedulesByClassroom.entries()) {
-      const allSlotsAvailable = slots.every((slot) =>
-        availableTimeSlots.has(`${slot.hourSessionId}-${slot.weekday}`),
-      );
-
-      if (allSlotsAvailable && !incompatibleClassrooms.has(classId)) {
-        matchingClassroomIds.push(classId);
-      }
-    }
-
-    const startIndex = (page - 1) * pageSize;
-    const paginatedClassroomIds = matchingClassroomIds.slice(
-      startIndex,
-      startIndex + pageSize,
-    );
-
-    if (paginatedClassroomIds.length === 0) {
-      return [];
-    }
+    if (!teacher) throw new NotFoundException('Docente no encontrado para este curso');
+    const matching = await this.prisma.getClient().$queryRaw<{ id: string }[]>(compatibleClassroomsSql(this.prisma.getSchemaName(), {
+      courseId: id_course, teacherId, slots: horario, page, size: pageSize, areaId, shiftId,
+    }));
+    if (!matching.length) return [];
 
     const classrooms = await this.prisma.getClient().class.findMany({
       where: {
-        id: { in: paginatedClassroomIds },
+        id: { in: matching.map((row) => row.id) },
       },
       include: {
         sede: true,
@@ -452,6 +391,7 @@ export class ScheduleService {
       },
     });
 
-    return classrooms;
+    const byId = new Map(classrooms.map((classroom) => [classroom.id, classroom]));
+    return matching.flatMap((row) => { const classroom = byId.get(row.id); return classroom ? [classroom] : []; });
   }
 }

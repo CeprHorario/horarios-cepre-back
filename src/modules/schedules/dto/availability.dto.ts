@@ -1,6 +1,9 @@
 import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
+  ArrayMinSize,
+  ArrayUnique,
+  IsUUID,
   IsArray,
   IsEnum,
   Matches,
@@ -25,4 +28,13 @@ export class SaveAvailabilityDto {
   @ValidateNested({ each: true })
   @Type(() => AvailabilityIntervalDto)
   intervals!: AvailabilityIntervalDto[];
+}
+
+export class ClearAvailabilityDto {
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(500)
+  @ArrayUnique()
+  @IsUUID('all', { each: true })
+  teacherIds!: string[];
 }

@@ -5,7 +5,8 @@ import { applyStructure } from '../src/database/prisma/structure';
 import { RequestContext } from '../src/database/schema-manager/request-context';
 import { ScheduleService } from '../src/modules/schedules/schedules.service';
 import { TeacherService } from '../src/modules/teachers/teacher.service';
-import { Weekday } from '../src/generated/prisma/client';
+import { Prisma, Weekday } from '../src/generated/prisma/client';
+import { compatibleClassroomsSql } from '../src/modules/schedules/compatibility.sql';
 
 const suite = process.env.AVAILABILITY_TEST_DATABASE_URL
   ? describe
@@ -270,5 +271,254 @@ suite('Disponibilidad persistida y asignaciones en PostgreSQL', () => {
           .getClient()
           .teacher.findUniqueOrThrow({ where: { id: teacherId } }),
       ).toMatchObject({ scheduledHours: 1 });
+    }));
+
+  it('SQL une tramos contiguos, respeta huecos y pagina después de filtrar', async () =>
+    run(async () => {
+      const client = prisma.getClient();
+      const slots = sessionIds.map((id) => ({
+        id_hour_session: id,
+        weekday: Weekday.Lunes,
+      }));
+      await client.teacherAvailability.createMany({
+        data: [
+          { teacherId, weekday: 'Lunes', startMinute: 420, endMinute: 440 },
+          { teacherId, weekday: 'Lunes', startMinute: 440, endMinute: 460 },
+        ],
+      });
+      expect(
+        (
+          await service.findAvailableClassrooms(
+            1,
+            slots,
+            1,
+            50,
+            undefined,
+            undefined,
+            teacherId,
+          )
+        ).map((cls) => cls.id),
+      ).toEqual([classes[0]]);
+      const teachers = new TeacherService(prisma, context);
+      const request = {
+        courseId: 1,
+        hourSessions: [
+          { hourSessionId: sessionIds[0], weekday: Weekday.Lunes },
+        ],
+      };
+      expect(
+        (await teachers.getFilteredTeachers(request, 1, 50)).data.map(
+          (row) => row.id,
+        ),
+      ).toEqual([teacherId]);
+      await client.teacherAvailability.deleteMany();
+      await client.teacherAvailability.createMany({
+        data: [
+          { teacherId, weekday: 'Lunes', startMinute: 420, endMinute: 440 },
+          { teacherId, weekday: 'Lunes', startMinute: 445, endMinute: 460 },
+        ],
+      });
+      expect(
+        await service.findAvailableClassrooms(
+          1,
+          slots,
+          1,
+          50,
+          undefined,
+          undefined,
+          teacherId,
+        ),
+      ).toEqual([]);
+      expect((await teachers.getFilteredTeachers(request, 1, 50)).data).toEqual(
+        [],
+      );
+      await service.saveAvailability(teacherId, {
+        intervals: [{ weekday: Weekday.Lunes, start: '07:00', end: '08:40' }],
+      });
+      expect(
+        (
+          await service.findAvailableClassrooms(
+            1,
+            slots,
+            1,
+            1,
+            undefined,
+            undefined,
+            teacherId,
+          )
+        ).map((cls) => cls.id),
+      ).toEqual([classes[0]]);
+      expect(
+        (
+          await service.findAvailableClassrooms(
+            1,
+            slots,
+            2,
+            1,
+            undefined,
+            undefined,
+            teacherId,
+          )
+        ).map((cls) => cls.id),
+      ).toEqual([classes[1]]);
+      expect(
+        (
+          await service.findAvailableClassrooms(
+            1,
+            slots,
+            1,
+            50,
+            undefined,
+            3,
+            teacherId,
+          )
+        ).map((cls) => cls.id),
+      ).toEqual([classes[2]]);
+      expect(
+        await service.findAvailableClassrooms(
+          1,
+          [],
+          1,
+          50,
+          undefined,
+          undefined,
+          teacherId,
+        ),
+      ).toEqual([]);
+    }));
+
+  it('pagina docentes después de cobertura y filtra actividad, carga y cruces de la solicitud', async () =>
+    run(async () => {
+      const client = prisma.getClient();
+      const teachers = new TeacherService(prisma, context);
+      await teachers.createManyTeachers(
+        [1, 2].map((index) => ({
+          email: `paging${index}@example.com`,
+          dni: `2000000${index}`,
+          firstName: 'Pagina',
+          lastName: String(index),
+          courseId: 1,
+          jobStatus: 'PartTime',
+        })),
+      );
+      const last = await client.teacher.findFirstOrThrow({
+        where: { user: { email: 'paging2@example.com' } },
+      });
+      await service.saveAvailability(teacherId, {
+        intervals: [{ weekday: Weekday.Lunes, start: '07:00', end: '08:40' }],
+      });
+      await service.saveAvailability(last.id, {
+        intervals: [{ weekday: Weekday.Lunes, start: '07:00', end: '07:40' }],
+      });
+      const request = {
+        courseId: 1,
+        hourSessions: [
+          { hourSessionId: sessionIds[0], weekday: Weekday.Lunes },
+        ],
+      };
+      expect(
+        (await teachers.getFilteredTeachers(request, 1, 1)).data.map(
+          (row) => row.id,
+        ),
+      ).toEqual([teacherId]);
+      expect(
+        (await teachers.getFilteredTeachers(request, 2, 1)).data.map(
+          (row) => row.id,
+        ),
+      ).toEqual([last.id]);
+      await client.teacher.update({
+        where: { id: last.id },
+        data: { maxHours: 0 },
+      });
+      expect((await teachers.getFilteredTeachers(request, 2, 1)).data).toEqual(
+        [],
+      );
+      await client.teacher.update({
+        where: { id: last.id },
+        data: { maxHours: 20 },
+      });
+      await client.user.update({
+        where: { id: last.userId },
+        data: { isActive: false },
+      });
+      expect((await teachers.getFilteredTeachers(request, 2, 1)).data).toEqual(
+        [],
+      );
+      expect(
+        (
+          await teachers.getFilteredTeachers(
+            {
+              ...request,
+              hourSessions: [
+                ...request.hourSessions,
+                { hourSessionId: sessionIds[1], weekday: Weekday.Lunes },
+              ],
+            },
+            1,
+            50,
+          )
+        ).data,
+      ).toEqual([]);
+    }));
+
+  it('con 1000 salones solo hidrata la página y el plan SQL devuelve sus diez filas', async () =>
+    run(async () => {
+      const client = prisma.getClient();
+      const table = (name: string) => Prisma.raw(`"${schema}"."${name}"`);
+      await client.$executeRaw(Prisma.sql`
+      WITH inserted AS (
+        INSERT INTO ${table('classes')}(name,id_sede,area_id,shift_id)
+        SELECT 'Carga '||lpad(g::text,4,'0'),1,1,1 FROM generate_series(1,1000) g RETURNING id
+      ) INSERT INTO ${table('schedules')}(class_id,course_id,hour_session_id,weekday)
+        SELECT id,1,${sessionIds[0]},'MONDAY'::${table('Weekday')} FROM inserted
+    `);
+      await service.saveAvailability(teacherId, {
+        intervals: [{ weekday: Weekday.Lunes, start: '07:00', end: '07:40' }],
+      });
+      const slots = [
+        { id_hour_session: sessionIds[0], weekday: Weekday.Lunes },
+      ];
+      const allSchedules = jest.spyOn(client.schedule, 'findMany');
+      const hydration = jest.spyOn(client.class, 'findMany');
+      try {
+        const rows = await service.findAvailableClassrooms(
+          1,
+          slots,
+          3,
+          10,
+          undefined,
+          undefined,
+          teacherId,
+        );
+        expect(rows.map((row) => row.name)).toEqual(
+          Array.from(
+            { length: 10 },
+            (_, i) => `Carga ${String(i + 21).padStart(4, '0')}`,
+          ),
+        );
+        expect(allSchedules).not.toHaveBeenCalled();
+        expect(hydration).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: { id: { in: rows.map((row) => row.id) } },
+          }),
+        );
+        const plan = await client.$queryRaw<
+          {
+            'QUERY PLAN': {
+              Plan: { 'Actual Rows': number };
+              'Execution Time': number;
+            }[];
+          }[]
+        >(Prisma.sql`
+        EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) ${compatibleClassroomsSql(schema, { courseId: 1, teacherId, slots, page: 3, size: 10 })}
+      `);
+        expect(plan[0]['QUERY PLAN'][0].Plan['Actual Rows']).toBe(10);
+        expect(
+          Number.isFinite(plan[0]['QUERY PLAN'][0]['Execution Time']),
+        ).toBe(true);
+      } finally {
+        allSchedules.mockRestore();
+        hydration.mockRestore();
+      }
     }));
 });

@@ -28,12 +28,19 @@ import { Weekday } from '../../generated/prisma/client';
 import { Unauthenticated } from '@modules/auth/decorators/unauthenticated.decorator';
 import { getCoordinatorCourseId } from '@modules/auth/utils/coordinator-role';
 import type { AuthenticatedRequest } from '@modules/auth/authenticated-request';
-import { SaveAvailabilityDto } from './dto/availability.dto';
+import { ClearAvailabilityDto, SaveAvailabilityDto } from './dto/availability.dto';
+import { AssignTeacherDto } from './dto/assign-teacher.dto';
 
 @Controller('schedules')
 @ApiTags('Schedules')
 export class ScheduleController {
   constructor(private readonly scheduleService: ScheduleService) {}
+
+  @Post('teachers/availability/clear')
+  @Authorization({ adminOnly: true, permission: 'schedule.availability.update', description: 'Quitar disponibilidad de docentes seleccionados' })
+  clearAvailability(@Body() data: ClearAvailabilityDto) {
+    return this.scheduleService.clearAvailability(data.teacherIds);
+  }
 
   @Get('teachers/:teacherId/availability')
   @Authorization({ adminOnly: true, permission: 'schedule.availability.get', description: 'Consultar disponibilidad del docente' })
@@ -159,7 +166,7 @@ export class ScheduleController {
   })
   @Patch('/asignar/profesor')
   async assignTeacherToSchedules(
-    @Body() assignTeacherDto: { classroomIds: string[]; teacherId: string },
+    @Body() assignTeacherDto: AssignTeacherDto,
   ) {
     const { classroomIds, teacherId } = assignTeacherDto;
 
@@ -191,7 +198,7 @@ export class ScheduleController {
   })
   @Patch('/desasignar/profesor')
   async unassignTeacherFromSchedules(
-    @Body() unassignTeacherDto: { classroomIds: string[]; teacherId: string },
+    @Body() unassignTeacherDto: AssignTeacherDto,
   ) {
     const { classroomIds, teacherId } = unassignTeacherDto;
 

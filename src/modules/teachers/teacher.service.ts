@@ -20,9 +20,9 @@ import { TeacherFilteredDto } from '@modules/teachers/dto/teacherFiltered.dto';
 import { JobStatus } from '../../generated/prisma/client';
 import { RequestContext } from '@database/schema-manager/request-context';
 import { importLegacyTeachers } from './import-teachers';
-import { assertSchemaName } from '@database/schema-manager/schema-name';
 import { deactivateUsers } from '@modules/shared/deactivate-users';
-import { covers, overlaps, scheduleInterval } from '@modules/schedules/availability';
+import { overlaps, scheduleInterval } from '@modules/schedules/availability';
+import { compatibleTeachersSql, pagination } from '@modules/schedules/compatibility.sql';
 
 @Injectable()
 export class TeacherService {
@@ -97,6 +97,7 @@ export class TeacherService {
     page: number;
     limit: number;
   }> {
+    pagination(page, limit);
     const offset = (page - 1) * limit;
 
     const where: Prisma.TeacherWhereInput = {
@@ -375,6 +376,7 @@ export class TeacherService {
     page: number;
     limit: number;
   }> {
+    pagination(page, limit);
     const offset = (page - 1) * limit;
 
     const [teachers, total] = await this.prisma.getClient().$transaction([
@@ -494,6 +496,7 @@ export class TeacherService {
     page: number;
     limit: number;
   }> {
+    pagination(page, limit);
     const offset = (page - 1) * limit;
 
     const [teachers, total] = await this.prisma.getClient().$transaction([
@@ -634,6 +637,8 @@ export class TeacherService {
     page: number,
     limit: number,
   ) {
+    pagination(page, limit);
+    if (!body.hourSessions.length) return { data: [], page, limit };
     // Validar hourSessions
     const hourSessionIds = [
       ...new Set(body.hourSessions.map((h) => h.hourSessionId)),
@@ -645,37 +650,26 @@ export class TeacherService {
       throw new NotFoundException('Some hour sessions do not exist');
     }
 
-    // Buscar profesores que tengan horas disponibles
+    const bySessionId = new Map(sessions.map((session) => [session.id, session]));
+    const requested = body.hourSessions.map((slot) => scheduleInterval({ weekday: slot.weekday, hourSession: bySessionId.get(slot.hourSessionId)! }));
+    const sorted = [...requested].sort((a, b) => a.weekday.localeCompare(b.weekday) || a.startMinute - b.startMinute);
+    if (sorted.some((slot, index) => index > 0 && overlaps(slot, sorted[index - 1]))) return { data: [], page, limit };
+
     const schema = this.context.require().schema;
     if (!schema) throw new Error('No authorized request schema');
-    assertSchemaName(schema);
-    const ids = await this.prisma.getClient().$queryRaw<{ id: string }[]>`
-      SELECT id FROM ${Prisma.raw(`"${schema}"."teachers"`)}
-      WHERE course_id = ${body.courseId} AND (max_hours - scheduled_hours) >= ${body.hourSessions.length}
-    `;
+    const ids = await this.prisma.getClient().$queryRaw<{ id: string }[]>(compatibleTeachersSql(schema, { courseId: body.courseId, intervals: requested, page, size: limit }));
     if (ids.length === 0) return { data: [], page, limit };
 
     // Verificar si hay profesores disponibles
-    const offset = (page - 1) * limit;
     const teachers = await this.prisma.getClient().teacher.findMany({
       where: {
         id: { in: ids.map((t) => t.id) },
         user: { isActive: true },
-        AND: body.hourSessions.map(({ hourSessionId, weekday }) => ({
-          schedules: {
-            none: {
-              hourSessionId,
-              weekday,
-            },
-          },
-        })),
       },
       select: {
         id: true,
         jobStatus: true,
         isCoordinator: true,
-        availabilities: true,
-        schedules: { include: { hourSession: true } },
         user: {
           select: {
             email: true,
@@ -691,11 +685,8 @@ export class TeacherService {
       },
     });
 
-    const requested = body.hourSessions.map((slot) => scheduleInterval({ weekday: slot.weekday, hourSession: sessions.find((s) => s.id === slot.hourSessionId)! }));
-    const compatible = requested.some((slot, index) => requested.slice(0, index).some((other) => overlaps(slot, other))) ? [] : teachers.filter((teacher) =>
-      requested.every((slot) => covers(teacher.availabilities, slot) && !teacher.schedules.some((schedule) => overlaps(slot, scheduleInterval(schedule)))),
-    );
-    const data = compatible.slice(offset, offset + Number(limit)).map((teacher) =>
+    const byTeacherId = new Map(teachers.map((teacher) => [teacher.id, teacher]));
+    const data = ids.flatMap(({ id }) => { const teacher = byTeacherId.get(id); return teacher ? [
       plainToInstance(TeacherGetSummaryDto, {
         id: teacher.id,
         firstName: teacher.user?.userProfile?.firstName || '',
@@ -705,7 +696,7 @@ export class TeacherService {
         jobStatus: teacher.jobStatus || JobStatus.FullTime,
         isCoordinator: teacher.isCoordinator || false,
       }),
-    );
+    ] : []; });
 
     return { data, page, limit };
   }
