@@ -8,6 +8,20 @@
       "when": 1792284302033,
       "tag": "0000_nosy_slapstick",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1793058463507,
+      "tag": "0001_flimsy_hemingway",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793079870769,
+      "tag": "0002_pale_the_renegades",
+      "breakpoints": true
     }
   ]
 }

@@ -14,6 +14,23 @@ import {
 } from 'drizzle-orm/pg-core';
 import { relations, sql } from 'drizzle-orm';
 
+export const revokedTokens = pgTable(
+  'revoked_tokens',
+  {
+    tokenHash: varchar('token_hash', { length: 64 }).primaryKey(),
+    expiresAt: timestamp('expires_at', {
+      withTimezone: true,
+      mode: 'date',
+    }).notNull(),
+  },
+  (table) => [
+    uniqueIndex('revoked_tokens_expiry_hash_idx').on(
+      table.expiresAt,
+      table.tokenHash,
+    ),
+  ],
+);
+
 // Modelo AdmissionProcess
 export const admissionProcesses = pgTable(
   'admission_processes',
@@ -27,10 +44,17 @@ export const admissionProcesses = pgTable(
     description: varchar('description', { length: 255 }),
     createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
     structureVersion: varchar('structure_version', { length: 64 }).notNull(),
+    sessionMinutes: smallint('session_minutes').notNull().default(40),
+    breakMinutes: smallint('break_minutes').notNull().default(5),
   },
   (table) => [
     uniqueIndex('admission_process_name_unique').on(table.name),
     check('year', sql`${table.year} BETWEEN 2020 AND 2100`),
+    check(
+      'session_minutes_range',
+      sql`${table.sessionMinutes} BETWEEN 1 AND 180`,
+    ),
+    check('break_minutes_range', sql`${table.breakMinutes} BETWEEN 0 AND 120`),
   ],
 );
 
