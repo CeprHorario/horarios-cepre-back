@@ -6,6 +6,7 @@ import {
   DefaultValuePipe,
   Post,
   Body,
+  ParseArrayPipe,
   HttpStatus,
   HttpCode,
 } from '@nestjs/common';
@@ -64,7 +65,16 @@ export class UsersController {
     description: 'Create many users',
   })
   @ApiBody({ type: [CreateUserDto] })
-  async createManyUsers(@Body() data: CreateUserDto[]): Promise<UserBaseDto[]> {
+  async createManyUsers(
+    @Body(
+      new ParseArrayPipe({
+        items: CreateUserDto,
+        whitelist: true,
+        forbidNonWhitelisted: true,
+      }),
+    )
+    data: CreateUserDto[],
+  ): Promise<UserBaseDto[]> {
     return await this.userService.createManyUsers(data);
   }
 }

@@ -15,6 +15,7 @@ import {
   Req,
   ForbiddenException,
   ParseUUIDPipe,
+  GoneException,
 } from '@nestjs/common';
 import { ScheduleService } from './schedules.service';
 import { ScheduleBaseDto, CreateScheduleDto, UpdateScheduleDto } from './dto';
@@ -71,11 +72,12 @@ export class ScheduleController {
     summary: 'Obtener horarios públicos por profesor',
     description: 'Get public schedules by teacher',
   })
-  async getPublicScheduleByTeacher(
+  getPublicScheduleByTeacher(
     @Query('email') email: string,
     @Query('dni') dni: string,
   ) {
-    return await this.scheduleService.getPublicScheduleByTeacher(email, dni);
+    void email; void dni;
+    throw new GoneException('La consulta con DNI fue retirada. Inicia sesión para consultar tu horario.');
   }
 
   // ─────── CRUD ───────

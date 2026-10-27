@@ -51,6 +51,25 @@ describe('Configuración HTTP', () => {
       .expect(204)
       .expect('Access-Control-Allow-Origin', 'http://localhost:5173')
       .expect('Access-Control-Allow-Credentials', 'true')
-      .expect('Access-Control-Allow-Headers', 'Content-Type,Authorization');
+      .expect(
+        'Access-Control-Allow-Headers',
+        'Content-Type,Authorization,X-Requested-With',
+      );
+  });
+
+  it('rechaza cuerpos comprimidos antes del parser y no confía en el origen GCS compartido', async () => {
+    await request(app.getHttpServer())
+      .post('/api/users')
+      .set('Content-Encoding', 'gzip')
+      .send(Buffer.from('not-gzip'))
+      .expect(415);
+    const response = await request(app.getHttpServer())
+      .get('/api/health')
+      .set('Origin', 'https://storage.googleapis.com')
+      .expect(200);
+    expect(response.headers['access-control-allow-origin']).toBeUndefined();
+    expect(response.headers['x-powered-by']).toBeUndefined();
+    expect(response.headers['x-content-type-options']).toBe('nosniff');
+    expect(response.headers['cache-control']).toBe('no-store');
   });
 });

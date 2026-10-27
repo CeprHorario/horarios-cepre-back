@@ -40,7 +40,9 @@ export class MonitorController {
     description: 'Obtener información del monitor autenticado',
   })
   @HttpCode(HttpStatus.OK)
-  getInformation(@Req() req: AuthenticatedRequest): Promise<MonitorInformationDto> {
+  getInformation(
+    @Req() req: AuthenticatedRequest,
+  ): Promise<MonitorInformationDto> {
     if (!req.user || req?.user.role !== String(Role.MONITOR)) {
       throw new UnauthorizedException('No eres moni');
     }
@@ -177,7 +179,7 @@ export class MonitorController {
 
   @Put('/:id')
   @Authorization({
-    roles: [Role.MONITOR, Role.SUPERVISOR, Role.ADMIN],
+    adminOnly: true,
     permission: 'monitor.updateAsAdmin',
     description: 'Actualizar datos de un monitor como administrador',
   })
@@ -214,10 +216,14 @@ export class MonitorController {
     permission: 'monitor.listTeachersByMonitor',
     description: 'Cargar los docentes de un monitor',
   })
-  getScheduleByParam(@Param('userId') userId: string): Promise<ScheduleDto[]> {
+  async getScheduleByParam(
+    @Param('userId') userId: string,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<ScheduleDto[]> {
     if (!userId) {
       throw new UnauthorizedException('No se pudo obtener el ID del usuario');
     }
+    await this.monitorService.assertAccess(userId, req.user);
     return this.monitorService.getSchedule(userId);
   }
 
@@ -227,7 +233,9 @@ export class MonitorController {
     permission: 'monitor.listTeachersData',
     description: 'Cargar los docentes de un monitor',
   })
-  async getTeachersByMonitor(@Req() req: AuthenticatedRequest): Promise<TeacherResponseDto[]> {
+  async getTeachersByMonitor(
+    @Req() req: AuthenticatedRequest,
+  ): Promise<TeacherResponseDto[]> {
     const userId = req.user?.userId;
     return this.monitorService.getTeachersByMonitor(userId);
   }
@@ -240,10 +248,12 @@ export class MonitorController {
   })
   async getTeachersByMonitorParam(
     @Param('userId') userId: string,
+    @Req() req: AuthenticatedRequest,
   ): Promise<TeacherResponseDto[]> {
     if (!userId) {
       throw new UnauthorizedException('No se pudo obtener el ID del usuario');
     }
+    await this.monitorService.assertAccess(userId, req.user);
     return this.monitorService.getTeachersByMonitor(userId);
   }
 

@@ -24,6 +24,10 @@ import { ScheduleForClass } from './dto/scheduleForClass.dto';
 import { TeacherResponseDto } from '@modules/monitors/dto/teacher-response.dto';
 import { CreateClassDataDto } from './dto/CreateClassData.dto';
 import { CreateClassesDto } from './dto/create-classes.dto';
+import {
+  UpdateMeetLinkDto,
+  UpdateClassroomLinkDto,
+} from './dto/update-links.dto';
 import { getCoordinatorCourseId } from '@modules/auth/utils/coordinator-role';
 import type { AuthenticatedRequest } from '@modules/auth/authenticated-request';
 
@@ -175,7 +179,7 @@ export class ClassController {
   @Patch(':id/meet-link')
   @HttpCode(HttpStatus.OK)
   @Authorization({
-    roles: [Role.MONITOR, Role.SUPERVISOR, Role.ADMIN],
+    roles: [Role.MONITOR, Role.ADMIN],
     permission: 'class.updateMeetLink',
     description: 'Actualizar el enlace de Google Meet para una clase',
   })
@@ -185,15 +189,16 @@ export class ClassController {
   })
   async updateMeetLink(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body('urlMeet') urlMeet: string,
+    @Body() body: UpdateMeetLinkDto,
+    @Req() req: AuthenticatedRequest,
   ) {
-    return await this.classService.updateMeetLink(id, urlMeet);
+    return await this.classService.updateMeetLink(id, body.urlMeet, req.user);
   }
 
   @Patch(':id/classroom-link')
   @HttpCode(HttpStatus.OK)
   @Authorization({
-    roles: [Role.MONITOR, Role.SUPERVISOR, Role.ADMIN],
+    roles: [Role.MONITOR, Role.ADMIN],
     permission: 'class.updateClassroomLink',
     description: 'Actualizar el enlace de Google Classroom para una clase',
   })
@@ -203,9 +208,14 @@ export class ClassController {
   })
   async updateClassroomLink(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body('urlClassroom') urlClassroom: string,
+    @Body() body: UpdateClassroomLinkDto,
+    @Req() req: AuthenticatedRequest,
   ) {
-    return await this.classService.updateClassroomLink(id, urlClassroom);
+    return await this.classService.updateClassroomLink(
+      id,
+      body.urlClassroom,
+      req.user,
+    );
   }
 
   @Delete(':id')

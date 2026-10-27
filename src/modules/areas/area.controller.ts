@@ -29,7 +29,7 @@ export class AreaController {
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @Authorization({
-    roles: [Role.TEACHER, Role.SUPERVISOR, Role.MONITOR],
+    adminOnly: true,
     permission: 'area.create',
     description: 'Crear un nuevo area',
   })
@@ -72,7 +72,7 @@ export class AreaController {
   @Put(':id')
   @HttpCode(HttpStatus.OK)
   @Authorization({
-    roles: [Role.TEACHER, Role.SUPERVISOR],
+    adminOnly: true,
     permission: 'area.updateById',
   })
   @ApiOperation({
@@ -89,7 +89,7 @@ export class AreaController {
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @Authorization({
-    roles: [Role.MONITOR, Role.SUPERVISOR],
+    adminOnly: true,
     permission: 'area.deleteById',
   })
   @ApiOperation({

@@ -9,7 +9,7 @@ import {
 } from './decorators/authorization.decorator';
 import { DrizzleService } from '@database/drizzle/drizzle.service';
 import { permissions, roles, rolesPermissions } from '@database/drizzle/schema';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, notInArray, sql } from 'drizzle-orm';
 //import path from 'path';
 interface EndpointMetadata extends AuthorizationMetadata {
   method: string; // HTTP
@@ -30,8 +30,10 @@ export class SyncAuthorizationService {
     1: 'POST',
     2: 'PUT',
     3: 'DELETE', //4: 'ALL', 5: 'PATCH', 6: 'OPTIONS', 7: 'HEAD',
-    4: 'ALL',
-    5: 'PATCH',
+    4: 'PATCH',
+    5: 'ALL',
+    6: 'OPTIONS',
+    7: 'HEAD',
   };
 
   // async syncAuthorization() {
@@ -127,6 +129,25 @@ export class SyncAuthorizationService {
         const endpoint = endpoints[0];
         const permId = permissionIdMap[endpoint.permission];
         if (!permId) continue;
+        if (
+          endpoint.adminOnly ||
+          endpoints.some(
+            (item) => !['GET', 'HEAD', 'OPTIONS'].includes(item.method),
+          )
+        ) {
+          const allowedRoleIds = (endpoint.roles ?? [])
+            .map((role) => roleIdMap[role])
+            .filter((id): id is number => Boolean(id));
+          if (allowedRoleIds.length)
+            await tx
+              .delete(rolesPermissions)
+              .where(
+                and(
+                  eq(rolesPermissions.permissionId, permId),
+                  notInArray(rolesPermissions.roleId, allowedRoleIds),
+                ),
+              );
+        }
 
         for (const roleName of endpoint.roles ?? []) {
           const roleId = roleIdMap[roleName];

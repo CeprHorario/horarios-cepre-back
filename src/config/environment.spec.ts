@@ -49,6 +49,9 @@ describe('Variables de entorno', () => {
       { DB_POOL_MAX: '-1' },
       { NODE_ENV: 'unknown' },
       { REDIRECT_FRONT: 'javascript:alert(1)' },
+      { REDIRECT_FRONT: 'https://storage.googleapis.com/my-bucket/index.html' },
+      { NODE_ENV: 'production', REDIRECT_FRONT: 'http://frontend.example.com' },
+      { SESSION_SAME_SITE: 'invalid' },
     ]) {
       expect(() =>
         validateEnvironment({

@@ -49,6 +49,26 @@ export function validateEnvironment(
   ) {
     throw new Error('REDIRECT_FRONT debe ser una URL HTTP o HTTPS válida');
   }
+  const frontendUrl = new URL(frontend);
+  if (
+    ['storage.googleapis.com', 'storage.cloud.google.com'].includes(
+      frontendUrl.hostname,
+    ) ||
+    frontendUrl.username ||
+    frontendUrl.password ||
+    (nodeEnv === 'production' && frontendUrl.protocol !== 'https:')
+  )
+    throw new Error(
+      'REDIRECT_FRONT requiere un origen exclusivo y HTTPS en producción',
+    );
+  if (
+    environment.SESSION_SAME_SITE !== undefined &&
+    (typeof environment.SESSION_SAME_SITE !== 'string' ||
+      !['lax', 'none'].includes(environment.SESSION_SAME_SITE))
+  )
+    throw new Error('SESSION_SAME_SITE debe ser lax o none');
+  if (environment.SESSION_SAME_SITE === 'none' && nodeEnv !== 'production')
+    throw new Error('SESSION_SAME_SITE=none requiere HTTPS de producción');
   const secret = environment.JWT_SECRET;
   if (
     typeof secret !== 'string' ||

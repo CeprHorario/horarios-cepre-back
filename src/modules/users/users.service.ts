@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '@database/prisma/prisma.service';
 import { UserBaseDto } from './dto';
 import { CreateUserDto } from './dto/index';
@@ -15,6 +15,14 @@ export class UsersService {
     take?: number;
   }): Promise<UserBaseDto[]> {
     const { skip, take } = params;
+    if (
+      !Number.isSafeInteger(skip ?? 0) ||
+      (skip ?? 0) < 0 ||
+      !Number.isSafeInteger(take ?? 10) ||
+      (take ?? 10) < 1 ||
+      (take ?? 10) > 500
+    )
+      throw new BadRequestException('Paginación inválida; máximo 500 usuarios');
     const users = await this.prisma.getClient().user.findMany({
       skip,
       take,
@@ -59,32 +67,29 @@ export class UsersService {
   async createManyUsers(
     createUserDto: CreateUserDto[],
   ): Promise<UserBaseDto[]> {
-    const userData: Prisma.UserCreateInput[] = createUserDto.map((user) => {
-      const userInput: Prisma.UserCreateInput = {
-        email: user.email,
-        role: user.role,
-      };
-
-      switch (user.role) {
-        case Role.MONITOR:
-          userInput.monitor = { create: {} };
-          break;
-        case Role.SUPERVISOR:
-          userInput.supervisor = { create: {} };
-          break;
-      }
-
-      return userInput;
-    });
-
-    // Crear usuarios de forma individual para respetar las relaciones
-    const createdUsers = await Promise.all(
-      userData.map((user) =>
-        this.prisma.getClient().user.create({
-          data: user,
-        }),
-      ),
-    );
+    if (
+      !Array.isArray(createUserDto) ||
+      !createUserDto.length ||
+      createUserDto.length > 1000
+    )
+      throw new BadRequestException('Se requieren entre 1 y 1000 usuarios');
+    const createdUsers = await this.prisma
+      .getClient()
+      .$transaction(async (tx) => {
+        const users = await tx.user.createManyAndReturn({
+          data: createUserDto.map(({ email, role }) => ({ email, role })),
+        });
+        const monitors = users
+          .filter((user) => user.role === String(Role.MONITOR))
+          .map((user) => ({ userId: user.id }));
+        const supervisors = users
+          .filter((user) => user.role === String(Role.SUPERVISOR))
+          .map((user) => ({ userId: user.id }));
+        if (monitors.length) await tx.monitor.createMany({ data: monitors });
+        if (supervisors.length)
+          await tx.supervisor.createMany({ data: supervisors });
+        return users;
+      });
 
     return plainToInstance(UserBaseDto, createdUsers, {
       excludePrefixes: ['password', 'googleId', 'updatedAt', 'lastLogin'],

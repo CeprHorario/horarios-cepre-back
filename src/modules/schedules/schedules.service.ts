@@ -60,19 +60,7 @@ export class ScheduleService {
     return `${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`;
   }
 
-  async loadWithCourses(data: LoadScheduleDto) {
-    const courses = await this.prisma
-      .getClient()
-      .course.findMany({ select: { id: true, name: true } });
-    const hourSessions = await this.prisma
-      .getClient()
-      .hourSession.findMany({ select: { id: true, period: true } });
-
-    const result = {
-      courses,
-      hourSessions,
-    };
-    console.log(result);
+  loadWithCourses(data: LoadScheduleDto) {
     return data;
   }
 

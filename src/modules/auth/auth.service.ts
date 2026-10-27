@@ -6,6 +6,7 @@ import { Role } from '@modules/auth/decorators/authorization.decorator';
 import { RequestContext } from '@database/schema-manager/request-context';
 import { SchemaManagerService } from '@database/schema-manager/schema-manger.service';
 import type { Profile } from 'passport-google-oauth20';
+import { randomUUID } from 'node:crypto';
 import {
   COORDINATOR_ROLE,
   parseCoordinatorRole,
@@ -58,7 +59,7 @@ export class AuthService {
     }
 
     const payload = { email: user.email, id: user.id, role: user.role, schema };
-    const token = this.jwtService.sign(payload);
+    const token = this.jwtService.sign(payload, { jwtid: randomUUID() });
     return {
       token,
     };

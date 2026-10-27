@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '@database/prisma/prisma.service';
 
@@ -20,6 +21,7 @@ import { CreateClassDataDto } from './dto/CreateClassData.dto';
 import { CreateClassesDto } from './dto/create-classes.dto';
 import { createClassrooms } from './create-classrooms';
 import { ScheduleService } from '@modules/schedules/schedules.service';
+import type { ResourceActor } from '@modules/shared/resource-access';
 @Injectable()
 export class ClassService {
   constructor(
@@ -427,7 +429,7 @@ export class ClassService {
     }));
   }
 
-  async updateMeetLink(id: string, urlMeet: string) {
+  async updateMeetLink(id: string, urlMeet: string, actor: ResourceActor) {
     try {
       const classObj = await this.prisma.getClient().class.findUnique({
         where: { id },
@@ -437,30 +439,48 @@ export class ClassService {
         throw new NotFoundException(`Clase con ID ${id} no encontrada`);
       }
 
-      const updatedClass = await this.prisma.getClient().class.update({
-        where: { id },
-        data: { urlMeet },
-        select: {
-          id: true,
-          name: true,
-          urlMeet: true,
-        },
-      });
+      if (actor.role !== 'administrador' && actor.role !== 'monitor')
+        throw new ForbiddenException('Recurso no autorizado');
+      const [updatedClass] = await this.prisma
+        .getClient()
+        .class.updateManyAndReturn({
+          where: {
+            id,
+            ...(actor.role !== 'administrador' && {
+              monitor: { userId: actor.userId },
+            }),
+          },
+          data: { urlMeet },
+          select: {
+            id: true,
+            name: true,
+            urlMeet: true,
+          },
+        });
+
+      if (!updatedClass) throw new ForbiddenException('Recurso no autorizado');
 
       return {
         message: 'Enlace de Meet actualizado correctamente',
         class: updatedClass,
       };
     } catch (error) {
-      if (error instanceof NotFoundException) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException
+      ) {
         throw error;
       }
-      console.error('Error al actualizar enlace de Meet:', error);
+      console.error('Error al actualizar enlace de Meet:');
       throw new BadRequestException('Error al actualizar el enlace de Meet');
     }
   }
 
-  async updateClassroomLink(id: string, urlClassroom: string) {
+  async updateClassroomLink(
+    id: string,
+    urlClassroom: string,
+    actor: ResourceActor,
+  ) {
     try {
       const classObj = await this.prisma.getClient().class.findUnique({
         where: { id },
@@ -470,25 +490,39 @@ export class ClassService {
         throw new NotFoundException(`Clase con ID ${id} no encontrada`);
       }
 
-      const updatedClass = await this.prisma.getClient().class.update({
-        where: { id },
-        data: { urlClassroom },
-        select: {
-          id: true,
-          name: true,
-          urlClassroom: true,
-        },
-      });
+      if (actor.role !== 'administrador' && actor.role !== 'monitor')
+        throw new ForbiddenException('Recurso no autorizado');
+      const [updatedClass] = await this.prisma
+        .getClient()
+        .class.updateManyAndReturn({
+          where: {
+            id,
+            ...(actor.role !== 'administrador' && {
+              monitor: { userId: actor.userId },
+            }),
+          },
+          data: { urlClassroom },
+          select: {
+            id: true,
+            name: true,
+            urlClassroom: true,
+          },
+        });
+
+      if (!updatedClass) throw new ForbiddenException('Recurso no autorizado');
 
       return {
         message: 'Enlace de Classroom actualizado correctamente',
         class: updatedClass,
       };
     } catch (error) {
-      if (error instanceof NotFoundException) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException
+      ) {
         throw error;
       }
-      console.error('Error al actualizar enlace de Classroom:', error);
+      console.error('Error al actualizar enlace de Classroom:');
       throw new BadRequestException(
         'Error al actualizar el enlace de Classroom',
       );

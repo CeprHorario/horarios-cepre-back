@@ -16,7 +16,8 @@ export class DrizzleService implements OnModuleDestroy {
       max: config.getOrThrow<number>('DB_POOL_MAX'),
       connectionTimeoutMillis: 5000,
       idleTimeoutMillis: 30000,
-      options: '-c search_path=public',
+      options:
+        '-c search_path=public -c statement_timeout=30000 -c lock_timeout=5000',
     });
     this.pool.on('error', (error: Error) => this.logger.error(error.message));
     this.db = drizzle(this.pool, { schema });

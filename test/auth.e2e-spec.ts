@@ -18,6 +18,7 @@ import {
 import { MaintenanceBypass } from '../src/modules/runtime-config/decorators/maintenance-bypass.decorator';
 import { SchemaRoutingBypass } from '../src/database/schema-manager/schema-routing-bypass.decorator';
 import { GoogleStrategy } from '../src/modules/auth/strategies/google.strategy';
+import { TokenRevocationService } from '../src/modules/auth/token-revocation.service';
 import { getCoordinatorCourseId } from '../src/modules/auth/utils/coordinator-role';
 
 @Controller('auth-probe')
@@ -85,6 +86,11 @@ describe('Authentication boundaries', () => {
       imports: [AppModule],
       controllers: [AuthProbeController],
     })
+      .overrideProvider(TokenRevocationService)
+      .useValue({
+        assertActive: () => Promise.resolve(),
+        revoke: () => Promise.resolve(),
+      })
       .overrideProvider(PrismaService)
       .useValue({
         getClientForSchema: (schema: string) => ({
@@ -298,7 +304,7 @@ describe('Authentication boundaries', () => {
     await request(app.getHttpServer())
       .post('/api/auth-probe/write')
       .auth(token(), { type: 'bearer' })
-      .expect(201);
+      .expect(401);
     await request(app.getHttpServer())
       .post('/api/auth/sync-authorizations')
       .auth(token(), { type: 'bearer' })
@@ -325,14 +331,22 @@ describe('Authentication boundaries', () => {
     expect(success.text).toContain('http://localhost:5173');
     expect(success.text).not.toContain('"*"');
     expect(success.text).toContain('window.opener &&');
-    const issued = /"token":"([^"]+)"/.exec(success.text)?.[1];
+    expect(success.text).toContain('"authenticated":true');
+    expect(success.text).not.toContain('"token":');
+    const sessionCookie = (
+      success.headers['set-cookie'] as unknown as string[]
+    ).find((cookie) => cookie.startsWith('cepr-session='));
+    expect(sessionCookie).toContain('HttpOnly');
+    const issued = decodeURIComponent(
+      sessionCookie!.split(';')[0].slice('cepr-session='.length),
+    );
     expect(issued).toBeDefined();
     const claims = jwt.verify<{
       schema: string;
       role: string;
       exp: number;
       iat: number;
-    }>(issued!);
+    }>(issued);
     expect(claims.schema).toBe('alpha');
     expect(claims.role).toBe('coordinador-10');
     expect(claims.exp - claims.iat).toBe(28800);

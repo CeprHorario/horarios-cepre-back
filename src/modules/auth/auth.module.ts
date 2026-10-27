@@ -21,6 +21,7 @@ import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { SchemaManagerInterceptor } from '@database/schema-manager/schema-manager.interceptor';
 import { GoogleCallbackGuard } from './guards/google-auth.guard';
 import { OAuthStateStore } from './oauth-state.store';
+import { TokenRevocationService } from './token-revocation.service';
 
 @Module({
   imports: [
@@ -53,6 +54,7 @@ import { OAuthStateStore } from './oauth-state.store';
   controllers: [AuthController],
   providers: [
     AuthService,
+    TokenRevocationService,
     JwtStrategy,
     GoogleStrategy,
     GoogleCallbackGuard,

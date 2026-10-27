@@ -12,7 +12,7 @@ import {
   HttpCode,
   HttpStatus,
   Query,
-  Patch
+  Patch,
 } from '@nestjs/common';
 import { SupervisorService } from './supervisor.service';
 import type { AuthenticatedRequest } from '@modules/auth/authenticated-request';
@@ -173,8 +173,11 @@ export class SupervisorController {
     type: [MonitorForSupervisorDto],
   })
   @ApiResponse({ status: 404, description: 'Ta sin monitores.' })
-  getSupervisorMonitors(@Param('id') id: string) {
+  async getSupervisorMonitors(
+    @Param('id') id: string,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    await this.supervisorService.assertAccess(id, req.user);
     return this.supervisorService.getSupervisorMonitors(id);
   }
-  
 }

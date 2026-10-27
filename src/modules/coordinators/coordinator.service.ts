@@ -1,3 +1,5 @@
+
+import { pagination } from '@modules/schedules/compatibility.sql';
 import {
   ConflictException,
   Injectable,
@@ -58,6 +60,7 @@ export class CoordinatorService {
     page: number;
     limit: number;
   }> {
+    pagination(page, limit);
     const skip = (page - 1) * limit;
     const where = {
       isActive: true,

@@ -1,3 +1,4 @@
+import { pagination } from '@modules/schedules/compatibility.sql';
 import {
   Injectable,
   NotFoundException,
@@ -17,9 +18,16 @@ import { AssignMonitorDto } from './dto/assign-monitor.dto';
 import { SupervisorGetByIdDto } from './dto/supervisor-get-by-id.dto';
 import { Prisma } from '../../generated/prisma/client';
 import { deactivateUsers } from '@modules/shared/deactivate-users';
+import {
+  assertSupervisorAccess,
+  type ResourceActor,
+} from '@modules/shared/resource-access';
 
 @Injectable()
 export class SupervisorService {
+  assertAccess(id: string, actor: ResourceActor) {
+    return assertSupervisorAccess(this.prisma.getClient(), id, actor);
+  }
   constructor(private prisma: PrismaService) {}
 
   // ─────── CRUD ───────
@@ -67,6 +75,7 @@ export class SupervisorService {
     page: number;
     limit: number;
   }> {
+    pagination(page, limit);
     const offset = (page - 1) * limit;
 
     // Filtro para supervisores con usuarios activos
@@ -169,8 +178,10 @@ export class SupervisorService {
       ) {
         throw error;
       }
-      console.error('Error en findOne:', error); // Agregar un log para depuración
-      throw new Error('Ocurrió un error inesperado al buscar el profesor', { cause: error });
+      console.error('Error en findOne:'); // Agregar un log para depuración
+      throw new Error('Ocurrió un error inesperado al buscar el profesor', {
+        cause: error,
+      });
     }
   }
 
@@ -452,7 +463,7 @@ export class SupervisorService {
     }
   }
 
-  async getSupervisorMonitors(id: string): Promise<any> {
+  async getSupervisorMonitors(id: string) {
     // Primero obtenemos los datos del supervisor
     const supervisor = await this.prisma.getClient().supervisor.findUnique({
       where: { id },

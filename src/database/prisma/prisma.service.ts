@@ -21,6 +21,7 @@ export class PrismaService implements OnModuleDestroy {
       connectionTimeoutMillis: 5000,
       idleTimeoutMillis: 30000,
       application_name: 'cepr-prisma',
+      options: '-c statement_timeout=30000 -c lock_timeout=5000',
     });
     this.pool.on('error', (error: Error) =>
       new Logger(PrismaService.name).error(error.message),

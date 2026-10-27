@@ -221,7 +221,7 @@ export class TeacherService {
       ) {
         throw error;
       }
-      console.error('Error en findOne:', error); // Agregar un log para depuración
+      console.error('Error en findOne:'); // Agregar un log para depuración
       throw new Error('Ocurrió un error inesperado al buscar el profesor', { cause: error });
     }
   }

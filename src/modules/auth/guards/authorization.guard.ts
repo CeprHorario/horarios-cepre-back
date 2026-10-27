@@ -54,7 +54,16 @@ export class AuthorizationGuard implements CanActivate {
       context.getHandler(),
     );
     if (!metadata) throw new UnauthorizedException();
+    if (['auth.session', 'auth.logout'].includes(metadata.permission))
+      return true;
     if (metadata.adminOnly && role !== String(Role.ADMIN))
+      throw new UnauthorizedException();
+    // Historical DB grants must never restore a write removed from the code policy.
+    if (
+      !['GET', 'HEAD', 'OPTIONS'].includes(request.method) &&
+      role !== String(Role.ADMIN) &&
+      !metadata.roles?.includes(role as Role)
+    )
       throw new UnauthorizedException();
 
     try {

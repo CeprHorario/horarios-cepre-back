@@ -6,32 +6,47 @@ import { PrismaService } from '@database/prisma/prisma.service';
 import { RequestContext } from '@database/schema-manager/request-context';
 import { SchemaManagerService } from '@database/schema-manager/schema-manger.service';
 import { isUUID } from 'class-validator';
+import { sessionCookieToken } from '../session-cookie';
+import type { Request } from 'express';
+import { TokenRevocationService } from '../token-revocation.service';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   constructor(
-    configService: ConfigService,
+    private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
     private readonly context: RequestContext,
     private readonly schemas: SchemaManagerService,
+    private readonly revocations: TokenRevocationService,
   ) {
     super({
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      jwtFromRequest: ExtractJwt.fromExtractors([
+        ExtractJwt.fromAuthHeaderAsBearerToken(),
+        (req: Request) =>
+          sessionCookieToken(
+            req,
+            configService.get<string>('NODE_ENV') === 'production',
+          ),
+      ]),
       ignoreExpiration: false,
       secretOrKey: configService.getOrThrow<string>('JWT_SECRET'),
       algorithms: ['HS256'],
       issuer: 'cepr',
       audience: 'cepr-api',
+      passReqToCallback: true,
     });
   }
 
-  async validate(payload: {
-    id?: unknown;
-    role?: unknown;
-    email?: unknown;
-    schema?: unknown;
-    exp?: unknown;
-  }) {
+  async validate(
+    request: Request,
+    payload: {
+      id?: unknown;
+      role?: unknown;
+      email?: unknown;
+      schema?: unknown;
+      exp?: unknown;
+    },
+  ) {
     if (
       typeof payload.id !== 'string' ||
       !(isUUID(payload.id, '4') || isUUID(payload.id, '7')) ||
@@ -40,6 +55,11 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       payload.exp <= Date.now() / 1000
     )
       throw new UnauthorizedException();
+    const token =
+      ExtractJwt.fromAuthHeaderAsBearerToken()(request) ??
+      sessionCookieToken(request, this.configService.get<string>('NODE_ENV') === 'production');
+    if (!token) throw new UnauthorizedException();
+    await this.revocations.assertActive(token);
     const schema =
       payload.role === 'administrador'
         ? 'core_schema'
@@ -66,6 +86,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       role: user.role,
       firstName: user.userProfile?.firstName,
       lastName: user.userProfile?.lastName,
+      expiresAt: payload.exp,
     };
   }
 }

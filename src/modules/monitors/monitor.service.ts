@@ -1,3 +1,4 @@
+import { pagination } from '@modules/schedules/compatibility.sql';
 import {
   Injectable,
   NotFoundException,
@@ -20,9 +21,16 @@ import { MonitorWithoutSupervisorDto } from './dto/monitorWithoutSupervisor.dto'
 import { MonitorGetByIdDto } from './dto/monitor-get-by-id.dto';
 import { Prisma } from '../../generated/prisma/client';
 import { deactivateUsers } from '@modules/shared/deactivate-users';
+import {
+  assertMonitorAccess,
+  type ResourceActor,
+} from '@modules/shared/resource-access';
 
 @Injectable()
 export class MonitorService {
+  assertAccess(userId: string, actor: ResourceActor) {
+    return assertMonitorAccess(this.prisma.getClient(), userId, actor);
+  }
   constructor(private prisma: PrismaService) {}
 
   // ─────── CRUD ───────
@@ -52,6 +60,7 @@ export class MonitorService {
     page: number;
     limit: number;
   }> {
+    pagination(page, limit);
     const offset = (page - 1) * limit;
 
     const activeFilter: Prisma.MonitorWhereInput = {
@@ -167,8 +176,10 @@ export class MonitorService {
       ) {
         throw error;
       }
-      console.error('Error en findOne:', error); // Agregar un log para depuración
-      throw new Error('Ocurrió un error inesperado al buscar el monitor', { cause: error });
+      console.error('Error en findOne:'); // Agregar un log para depuración
+      throw new Error('Ocurrió un error inesperado al buscar el monitor', {
+        cause: error,
+      });
     }
   }
 
@@ -461,6 +472,7 @@ export class MonitorService {
     page: number;
     limit: number;
   }> {
+    pagination(page, limit);
     const offset = (page - 1) * limit;
 
     const where: Prisma.MonitorWhereInput = {
@@ -532,6 +544,7 @@ export class MonitorService {
     page: number;
     limit: number;
   }> {
+    pagination(page, limit);
     const offset = (page - 1) * limit;
 
     const [monitors, total] = await this.prisma.getClient().$transaction([
