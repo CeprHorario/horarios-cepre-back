@@ -13,12 +13,13 @@ import { SupervisorModule } from './supervisors/supervisor.module';
 import { MonitorModule } from './monitors/monitor.module';
 import { ClassModule } from './classes/class.module';
 import { ScheduleModule } from './schedules/schedules.module';
+import { ImportsModule } from './imports/imports.module';
 
 @Module({
   imports: [
     AreaModule, AreaCourseHourModule, CourseModule, SedeModule, ShiftModule,
     HourSessionModule, UsersModule, UserProfileModule, TeacherModule,
-    CoordinatorModule, SupervisorModule, MonitorModule, ClassModule, ScheduleModule,
+    CoordinatorModule, SupervisorModule, MonitorModule, ClassModule, ScheduleModule, ImportsModule,
   ],
 })
 export class ModulesModule {}

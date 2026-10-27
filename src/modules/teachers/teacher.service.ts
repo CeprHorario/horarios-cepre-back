@@ -19,6 +19,7 @@ import { ScheduleTeacherDto } from './dto/schedule-teacher.dto';
 import { TeacherFilteredDto } from '@modules/teachers/dto/teacherFiltered.dto';
 import { JobStatus } from '../../generated/prisma/client';
 import { RequestContext } from '@database/schema-manager/request-context';
+import { importLegacyTeachers } from './import-teachers';
 import { assertSchemaName } from '@database/schema-manager/schema-name';
 import { deactivateUsers } from '@modules/shared/deactivate-users';
 import { covers, overlaps, scheduleInterval } from '@modules/schedules/availability';
@@ -319,150 +320,7 @@ export class TeacherService {
   }
 
   async createManyTeachers(dtos: CreateTeacherDto[]) {
-    type UserWithRelations = Prisma.UserGetPayload<{
-      include: {
-        teacher: true;
-        userProfile: true;
-      };
-    }>;
-
-    const validDtos = dtos.map((dto) => ({
-      ...dto,
-      phonesAdditional: dto.phonesAdditional ?? [],
-      personalEmail: dto.personalEmail ?? null,
-      isCoordinator: dto.isCoordinator ?? false,
-    }));
-    const prisma = this.prisma.getClient();
-
-    const [existingUsers, existingProfiles] = await Promise.all([
-      prisma.user.findMany({
-        where: {
-          email: {
-            in: validDtos.map((dto) => dto.email),
-          },
-        },
-        select: { email: true },
-      }),
-      prisma.userProfile.findMany({
-        where: {
-          dni: {
-            in: validDtos.map((dto) => dto.dni),
-          },
-        },
-        select: { dni: true },
-      }),
-    ]);
-
-    const existingEmails = new Set(existingUsers.map((u) => u.email));
-    const existingDnis = new Set(existingProfiles.map((p) => p.dni));
-
-    const duplicated = validDtos.filter(
-      (dto) => existingEmails.has(dto.email) || existingDnis.has(dto.dni),
-    );
-    const toCreate = validDtos.filter(
-      (dto) => !existingEmails.has(dto.email) && !existingDnis.has(dto.dni),
-    );
-
-    if (toCreate.length === 0) {
-      return {
-        creados: [],
-        noCreados: duplicated.map((d) => ({
-          email: d.email,
-          dni: d.dni,
-          motivo: existingEmails.has(d.email)
-            ? 'email duplicado'
-            : 'dni duplicado',
-        })),
-      };
-    }
-
-    try {
-      const createData = toCreate.map((dto) => {
-        const {
-          jobStatus,
-          courseId,
-          isCoordinator,
-          email,
-          dni,
-          firstName,
-          lastName,
-          phone,
-          phonesAdditional,
-          personalEmail,
-        } = dto;
-
-        // Calculate maxHours based on rules
-        let maxHours: number;
-        if (isCoordinator) {
-          maxHours = jobStatus === 'FullTime' ? 12 : 16;
-        } else if (courseId === 10) {
-          maxHours = jobStatus === 'FullTime' ? 16 : 21;
-        } else {
-          maxHours = jobStatus === 'FullTime' ? 16 : 20;
-        }
-
-        return {
-          email,
-          role: Role.TEACHER,
-          userProfile: {
-            create: {
-              dni,
-              firstName,
-              lastName,
-              phone,
-              phonesAdditional: phonesAdditional ?? [],
-              personalEmail: personalEmail ?? null,
-            },
-          },
-          teacher: {
-            create: {
-              courseId,
-              maxHours,
-              scheduledHours: 0,
-              jobStatus,
-              isCoordinator: isCoordinator ?? false,
-            },
-          },
-        };
-      });
-
-      const chunkSize = 30;
-      const results: UserWithRelations[] = [];
-
-      for (let i = 0; i < createData.length; i += chunkSize) {
-        const chunk = createData.slice(i, i + chunkSize);
-        const chunkResults = await prisma.$transaction(
-          chunk.map((userData) =>
-            prisma.user.create({
-              data: userData,
-              include: {
-                teacher: true,
-                userProfile: true,
-              },
-            }),
-          ),
-        );
-
-        results.push(...chunkResults);
-      }
-
-      return {
-        creados: results.map((r) => ({
-          email: r.email,
-          dni: r.userProfile?.dni,
-        })),
-        noCreados: duplicated.map((d) => ({
-          email: d.email,
-          dni: d.dni,
-          motivo: existingEmails.has(d.email)
-            ? 'email duplicado'
-            : 'dni duplicado',
-        })),
-      };
-    } catch (error) {
-      console.error('Error al crear usuarios:', error);
-      throw new Error('Error creando profesores. No se creó ningún profesor.', { cause: error });
-    }
+    return importLegacyTeachers(this.prisma.getClient(), this.prisma.getSchemaName(), dtos);
   }
 
   /** Eliminación lógica en bloque: todos o ninguno */

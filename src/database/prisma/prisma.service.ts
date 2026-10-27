@@ -28,9 +28,14 @@ export class PrismaService implements OnModuleDestroy {
   }
 
   getClient(): PrismaClient {
+    return this.getClientForSchema(this.getSchemaName());
+  }
+
+  getSchemaName(): string {
     const schema = this.context.require().schema;
     if (!schema) throw new Error('No authorized request schema');
-    return this.getClientForSchema(schema);
+    assertSchemaName(schema);
+    return schema;
   }
 
   getClientForSchema(schema: string): PrismaClient {

@@ -14,6 +14,7 @@ import {
   Res,
   Req,
   ForbiddenException,
+  ParseArrayPipe,
 } from '@nestjs/common';
 import { Response } from 'express';
 import { TeacherService } from './teacher.service';
@@ -259,7 +260,7 @@ export class TeacherController {
     summary: 'Crear profesores desde un archivo JSON',
   })
   @ApiBody({ type: [CreateTeacherDto] })
-  async createTeachersFromJson(@Body() importTeacherDto: CreateTeacherDto[]) {
+  async createTeachersFromJson(@Body(new ParseArrayPipe({ items: CreateTeacherDto, whitelist: true, forbidNonWhitelisted: true })) importTeacherDto: CreateTeacherDto[]) {
     return this.teacherService.createManyTeachers(importTeacherDto);
   }
 
