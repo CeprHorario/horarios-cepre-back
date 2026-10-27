@@ -11,11 +11,15 @@ import { AdmissionsService } from './admissions.service';
 import { ApiOperation } from '@nestjs/swagger';
 import { Authorization } from '@modules/auth/decorators/authorization.decorator';
 import { ProcessAdmissionDto } from './dto/create-admission.dto';
+import { RequestContext } from '@database/schema-manager/request-context';
 //import { Unauthenticated } from '@modules/auth/decorators/unauthenticated.decorator';
 
 @Controller('admissions')
 export class AdmissionsController {
-  constructor(private readonly service: AdmissionsService) {}
+  constructor(
+    private readonly service: AdmissionsService,
+    private readonly context: RequestContext,
+  ) {}
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
@@ -71,7 +75,9 @@ export class AdmissionsController {
     description: 'Get the current admission process with its observations',
   })
   async getCurrent() {
-    return await this.service.getCurrentWithObservations();
+    return await this.service.getCurrentWithObservations(
+      this.context.require().schema,
+    );
   }
 
   @Post('current')

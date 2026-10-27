@@ -23,6 +23,27 @@ export class AdmissionsService {
   ) {}
 
   async create(body: ProcessAdmissionDto) {
+    if (
+      body.configuration &&
+      body.configuration.shifts.reduce(
+        (total, shift) =>
+          total +
+          shift.classesToAreas.reduce(
+            (sum, area) => sum + area.quantityClasses,
+            0,
+          ),
+        0,
+      ) > 2000
+    )
+      throw new BadRequestException('Máximo 2000 salones por proceso');
+    if (
+      body.configuration?.shifts.some(
+        (shift) =>
+          !shift.classesToAreas.some((area) => area.quantityClasses > 0),
+      )
+    ) {
+      throw new BadRequestException('Cada turno debe tener al menos un salón');
+    }
     if (body.started >= body.finished)
       throw new BadRequestException(
         'The start date must be less than the end date',
@@ -58,6 +79,8 @@ export class AdmissionsService {
             started: body.started,
             finished: body.finished,
             structureVersion: version,
+            sessionMinutes: body.configuration?.sessionMinutes ?? 40,
+            breakMinutes: body.configuration?.breakMinutes ?? 5,
           })
           .returning();
         return admission;
@@ -145,11 +168,13 @@ export class AdmissionsService {
   getCurrent() {
     return this.schemaManager.getCurrent();
   }
-  async getCurrentWithObservations() {
+  async getCurrentWithObservations(schema?: string) {
     return plainToInstance(
       AdmissionBaseDto,
       await this.drizzle.db.query.admissionProcesses.findFirst({
-        where: eq(admissionProcesses.isCurrent, true),
+        where: schema
+          ? eq(admissionProcesses.name, schema)
+          : eq(admissionProcesses.isCurrent, true),
         with: {
           observations: { columns: { description: true, createdAt: true } },
         },

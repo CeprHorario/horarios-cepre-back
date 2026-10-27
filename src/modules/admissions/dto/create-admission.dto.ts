@@ -8,6 +8,7 @@ import {
   ValidateNested,
   IsArray,
   ArrayNotEmpty,
+  ArrayMaxSize,
   IsIn,
   IsDate,
   IsOptional,
@@ -31,7 +32,8 @@ export class ClassToAreaDto {
   area: string;
 
   @IsInt()
-  @Min(1)
+  @Min(0)
+  @Max(500)
   @ApiProperty({ example: 10 })
   quantityClasses: number;
 }
@@ -56,12 +58,25 @@ export class ShiftDetailDto {
 
   @IsArray()
   @ArrayNotEmpty()
+  @ArrayMaxSize(4)
   @ValidateNested({ each: true })
   @Type(() => ClassToAreaDto)
   classesToAreas: ClassToAreaDto[];
 }
 
 export class ConfigurationDto {
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(180)
+  sessionMinutes?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(120)
+  breakMinutes?: number;
+
   @IsString()
   @Matches(/^@.{4,}\..+$/, {
     message: 'Invalid email domain, it should be in the format @example.com',
@@ -74,6 +89,7 @@ export class ConfigurationDto {
 
   @IsArray()
   @ArrayNotEmpty()
+  @ArrayMaxSize(12)
   @ValidateNested({ each: true })
   @Type(() => ShiftDetailDto)
   shifts: ShiftDetailDto[];

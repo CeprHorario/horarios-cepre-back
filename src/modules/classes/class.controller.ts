@@ -23,6 +23,7 @@ import {
 import { ScheduleForClass } from './dto/scheduleForClass.dto';
 import { TeacherResponseDto } from '@modules/monitors/dto/teacher-response.dto';
 import { CreateClassDataDto } from './dto/CreateClassData.dto';
+import { CreateClassesDto } from './dto/create-classes.dto';
 import { getCoordinatorCourseId } from '@modules/auth/utils/coordinator-role';
 import type { AuthenticatedRequest } from '@modules/auth/authenticated-request';
 
@@ -30,6 +31,17 @@ import type { AuthenticatedRequest } from '@modules/auth/authenticated-request';
 @ApiTags('Classes')
 export class ClassController {
   constructor(private readonly classService: ClassService) {}
+
+  @Post('bulk')
+  @HttpCode(HttpStatus.CREATED)
+  @Authorization({
+    adminOnly: true,
+    permission: 'class.createMany',
+    description: 'Crear varios salones con monitores y horarios base',
+  })
+  createMany(@Body() body: CreateClassesDto) {
+    return this.classService.createMany(body);
+  }
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
@@ -112,7 +124,9 @@ export class ClassController {
     summary: 'Obtener la clase del profito',
     description: 'Get all classes',
   })
-  getClassOfTeacher(@Req() req: AuthenticatedRequest): Promise<ClassForTeacherDto[]> {
+  getClassOfTeacher(
+    @Req() req: AuthenticatedRequest,
+  ): Promise<ClassForTeacherDto[]> {
     const userId = req.user?.userId; // Verifica que exista
 
     if (!userId) {

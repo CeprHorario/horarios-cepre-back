@@ -19,7 +19,7 @@ import * as fs from 'fs';
 /**
  * Validates the shift times to ensure that the end time is after the start time
  */
-export const validateShiftTimes = (shift: ShiftStr): Shift => {
+export const validateShiftTimes = (shift: ShiftStr, sessionMinutes = 40, breakMinutes = 5): Shift => {
   const id = numberShift(shift.name);
   const today = new Date().toISOString().split('T')[0];
   const startTime = new Date(`${today}T${shift.startTime}:00Z`);
@@ -32,10 +32,10 @@ export const validateShiftTimes = (shift: ShiftStr): Shift => {
   }
 
   const diffMinutes =
-    (endTime.getTime() - startTime.getTime() + 300000) / (1000 * 60);
-  if (diffMinutes % 45 !== 0) {
+    (endTime.getTime() - startTime.getTime()) / (1000 * 60) + breakMinutes;
+  if (sessionMinutes < 1 || breakMinutes < 0 || diffMinutes % (sessionMinutes + breakMinutes) !== 0) {
     throw new Error(
-      `Shift: invalid time difference of 45 minutes in ${shift.name}`,
+      `Turno ${shift.name}: el rango debe contener sesiones completas de ${sessionMinutes} minutos y descansos de ${breakMinutes} minutos, sin descanso final`,
     );
   }
 
@@ -50,10 +50,11 @@ export const validateShiftTimes = (shift: ShiftStr): Shift => {
 /**
  * Generates hour sessions based on the provided shift data.
  */
-export const generateHourSessions = (shift: Shift) => {
+export const generateHourSessions = (shift: Shift, sessionMinutes = 40, breakMinutes = 5) => {
   const hourSessionData: HourSessionData[] = [];
-  const sessionDuration = 40 * 60 * 1000; // 40 minutes in milliseconds
-  const breakDuration = 5 * 60 * 1000; // 5 minutes in milliseconds
+  if (!Number.isInteger(sessionMinutes) || sessionMinutes < 1 || !Number.isInteger(breakMinutes) || breakMinutes < 0) throw new Error('Duraciones inválidas');
+  const sessionDuration = sessionMinutes * 60 * 1000;
+  const breakDuration = breakMinutes * 60 * 1000;
 
   const today = new Date().toISOString().split('T')[0];
   let current = new Date(`${today}T${shift.startTime}Z`);
@@ -65,7 +66,9 @@ export const generateHourSessions = (shift: Shift) => {
 
   for (let i = 1; current < endTime; i++) {
     const sessionEnd = new Date(current.getTime() + sessionDuration);
+    if (sessionEnd > endTime) throw new Error('El turno termina antes de completar una sesión');
     hourSessionData.push({
+      durationMinutes: sessionMinutes,
       shiftId: shift.id,
       period: i,
       startTime: formatTime6(current), // only time with precision
@@ -85,12 +88,14 @@ export const getMapAndSorted = (
   shifts: Shift[],
   areas: Area[],
 ): Record<string, Record<string, Class[]>> => {
+  const shiftNames = new Map(shifts.map((shift) => [shift.id, shift.name]));
+  const areaNames = new Map(areas.map((area) => [area.id, area.name]));
   const result = classes.reduce<Record<string, Record<string, Class[]>>>(
     (acc, cls) => {
       const shiftName =
-        shifts.find((s) => s.id === cls.shiftId)?.name ?? 'Unknown Shift';
+        shiftNames.get(cls.shiftId) ?? 'Unknown Shift';
       const areaName =
-        areas.find((a) => a.id === cls.areaId)?.name ?? 'Unknown Area';
+        areaNames.get(cls.areaId) ?? 'Unknown Area';
 
       if (!acc[areaName]) acc[areaName] = {};
       if (!acc[areaName][shiftName]) acc[areaName][shiftName] = [];
@@ -224,6 +229,7 @@ export const generateScheduleData = (
   let currentAreaId: number | null = null;
 
   const scheduleData: ScheduleData[] = [];
+  const sessionIds = new Map(hourSessions.map((hour) => [`${hour.shiftId}|${hour.period}`, hour.id]));
   Object.values(classes).flatMap((classGroup) =>
     classGroup.flatMap((c) => {
       // Reiniciar el índice cuando cambia el areaId
@@ -235,9 +241,7 @@ export const generateScheduleData = (
       dataSchedules[index].flatMap((d) => {
         d.clases.map((cl) => {
           const hourSessionId =
-            hourSessions.find(
-              (h) => h.shiftId === c.shiftId && h.period === cl.bloque,
-            )?.id ?? 0;
+            sessionIds.get(`${c.shiftId}|${cl.bloque}`) ?? 0;
           scheduleData.push({
             courseId: courseMap.get(cl.curso) ?? 0,
             hourSessionId,

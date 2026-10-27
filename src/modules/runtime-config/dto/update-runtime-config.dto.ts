@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsBoolean,
   IsInt,
@@ -16,6 +16,12 @@ export class MaintenanceConfigDto {
   @IsBoolean()
   enabled: boolean;
 
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
+  @ValidateIf((object: MaintenanceConfigDto, value: unknown) =>
+    object.enabled || value !== '',
+  )
   @IsString()
   @IsNotEmpty()
   @MaxLength(255)

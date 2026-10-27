@@ -2,16 +2,13 @@ import { ApiProperty } from '@nestjs/swagger';
 import {
   IsArray,
   IsEmail,
-  IsIn,
-  IsNumber,
+  IsInt,
+  Min,
   IsOptional,
   IsString,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-
-const validAreas: number[] = [1, 2, 3, 4];
-const validShifts: number[] = [1, 2, 3, 4];
 
 /** Datos del monitor del salón; sin ellos se usa el correo automático */
 export class CreateClassMonitorDto {
@@ -53,14 +50,14 @@ export class CreateClassMonitorDto {
 }
 
 export class CreateClassDataDto {
-  @IsNumber()
-  @IsIn(validAreas)
-  @ApiProperty({ example: validAreas[0] })
+  @IsInt()
+  @Min(1)
+  @ApiProperty({ example: 1 })
   area_id: number;
 
-  @IsNumber()
-  @IsIn(validShifts)
-  @ApiProperty({ example: validShifts[0] })
+  @IsInt()
+  @Min(1)
+  @ApiProperty({ example: 1 })
   shift_id: number;
 
   @ApiProperty({ type: CreateClassMonitorDto, required: false })

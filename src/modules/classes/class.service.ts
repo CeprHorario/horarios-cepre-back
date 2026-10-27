@@ -17,17 +17,9 @@ import { UserProfileForTeacherDto } from '@modules/user-profile/dto/user-profile
 import { ScheduleForClass } from './dto/scheduleForClass.dto';
 import { TeacherResponseDto } from '@modules/monitors/dto/teacher-response.dto';
 import { CreateClassDataDto } from './dto/CreateClassData.dto';
-import { Role } from '@modules/auth/decorators/authorization.decorator';
-import { parsedScheduleJson } from '@database/prisma/data/utils';
+import { CreateClassesDto } from './dto/create-classes.dto';
+import { createClassrooms } from './create-classrooms';
 import { ScheduleService } from '@modules/schedules/schedules.service';
-
-import rawScheduleBio from '@database/prisma/data/schedules/bio.json';
-import rawScheduleIng from '@database/prisma/data/schedules/ing.json';
-import rawScheduleSoc from '@database/prisma/data/schedules/soc.json';
-import rawScheduleExtra from '@database/prisma/data/schedules/extra.json';
-
-import { Weekday } from '../../generated/prisma/client';
-
 @Injectable()
 export class ClassService {
   constructor(
@@ -37,140 +29,29 @@ export class ClassService {
 
   // ─────── CRUD ───────
   async create(body: CreateClassDataDto): Promise<ClassBaseDto> {
-    const area = await this.prisma.getClient().area.findUnique({
-      where: { id: body.area_id },
-    });
-    if (!area) {
-      throw new NotFoundException('Área no encontrada');
-    }
+    const result = await createClassrooms(
+      this.prisma,
+      body.area_id,
+      body.shift_id,
+      1,
+      body.monitor,
+    );
+    return this.mapToClassDto(result.classes[0]);
+  }
 
-    const shift = await this.prisma.getClient().shift.findUnique({
-      where: { id: body.shift_id },
-    });
-    if (!shift) {
-      throw new NotFoundException('Turno no encontrado');
-    }
-
-    const countClasses = await this.prisma.getClient().class.count({
-      where: {
-        areaId: body.area_id,
-        shiftId: body.shift_id,
-      },
-    });
-
-    const number = countClasses + 1 + 100 * body.shift_id;
-
-    // Mismo formato que los salones generados por proceso: "B-301 Biomédicas"
-    const className = `${area.name[0]}-${number} ${area.name}`;
-
-    // Validar si la clase ya existe en la base de datos
-    const existingClass = await this.prisma.getClient().class.findFirst({
-      where: { name: className },
-    });
-    if (existingClass) {
-      throw new BadRequestException(
-        `La clase ${className} ya existe en la base de datos`,
-      );
-    }
-
-    const dataSchedules =
-      area.name === 'Biomédicas'
-        ? parsedScheduleJson(rawScheduleBio as any)
-        : area.name === 'Ingenierías'
-          ? parsedScheduleJson(rawScheduleIng as any)
-          : area.name === 'Sociales'
-            ? parsedScheduleJson(rawScheduleSoc as any)
-            : area.name === 'Extraordinario'
-              ? parsedScheduleJson(rawScheduleExtra as any)
-              : (() => {
-                  throw new BadRequestException('Area no válida');
-                })();
-
-    const monitorData = body.monitor;
-    const userEmail =
-      monitorData?.email?.trim().toLowerCase() ||
-      `${number}${area.name[0].toLowerCase()}@cepr.unsa.pe`;
-    // El perfil exige nombres; sin ellos el monitor queda solo con su correo
-    const monitorProfile =
-      monitorData?.firstName && monitorData?.lastName
-        ? {
-            create: {
-              dni: monitorData.dni || null,
-              firstName: monitorData.firstName.trim(),
-              lastName: monitorData.lastName.trim(),
-              phone: monitorData.phone || null,
-              phonesAdditional: monitorData.phonesAdditional || [],
-              personalEmail: monitorData.personalEmail || null,
-            },
-          }
-        : undefined;
-    const classResult = await this.prisma
-      .getClient()
-      .$transaction(async (px) => {
-        // Crear la clase y el monitor asociado
-        const newClass = await px.class.create({
-          data: {
-            name: className,
-            area: { connect: { id: area.id } },
-            shift: { connect: { id: shift.id } },
-            sede: { connect: { id: 1 } },
-            monitor: {
-              create: {
-                user: {
-                  create: {
-                    email: userEmail,
-                    role: Role.MONITOR,
-                    userProfile: monitorProfile,
-                  },
-                },
-              },
-            },
-          },
-        });
-
-        // Obtener los cursos de la base de datos
-        const courses = await px.course.findMany({
-          select: { id: true, name: true },
-        });
-        const courseMap: Record<string, number> = {};
-        courses.forEach((course) => {
-          courseMap[course.name] = course.id;
-        });
-
-        // Obtener los bloques de horas del turno
-        const hourSessions = await px.hourSession.findMany({
-          where: { shiftId: shift.id },
-          select: { id: true, period: true },
-        });
-        const hourSessionMap: Record<string, number> = {};
-        hourSessions.forEach((session) => {
-          hourSessionMap[session.period] = session.id;
-        });
-
-        // Crear los horarios para la clase
-        const index = ((number % 100) - 1) % dataSchedules.length;
-        const schedules = dataSchedules[index].flatMap((schedule) => {
-          return schedule.clases.map((c) => {
-            const courseId = courseMap[c.curso];
-            const hourSessionId = hourSessionMap[c.bloque];
-
-            return {
-              weekday: Weekday[schedule.dia as keyof typeof Weekday],
-              courseId: courseId,
-              hourSessionId: hourSessionId,
-              classId: newClass.id,
-            };
-          });
-        });
-
-        await px.schedule.createMany({
-          data: schedules,
-        });
-
-        return this.mapToClassDto(newClass);
-      });
-
-    return classResult;
+  async createMany(body: CreateClassesDto) {
+    const result = await createClassrooms(
+      this.prisma,
+      body.area_id,
+      body.shift_id,
+      body.quantity,
+    );
+    return {
+      created: result.classes.length,
+      monitorsCreated: result.classes.length,
+      scheduleBlocks: result.scheduleBlocks,
+      classes: result.classes.map((room) => this.mapToClassDto(room)),
+    };
   }
 
   async findAll(courseId?: number): Promise<ClassBaseDto[]> {
@@ -200,44 +81,44 @@ export class ClassService {
     });
 
     const classesWithStatus = classes.map((clas) => {
-        // Para cada clase, calculamos el número esperado de horarios
-        const totalPeriods = clas.shift?.hourSessions?.length || 0;
-        const expectedSchedulesCount = totalPeriods * WEEKDAYS_COUNT;
+      // Para cada clase, calculamos el número esperado de horarios
+      const totalPeriods = clas.shift?.hourSessions?.length || 0;
+      const expectedSchedulesCount = totalPeriods * WEEKDAYS_COUNT;
 
-        // Verificamos que existan todos los registros de horarios esperados
-        const totalSchedules = clas.schedules?.length || 0;
+      // Verificamos que existan todos los registros de horarios esperados
+      const totalSchedules = clas.schedules?.length || 0;
 
-        // Contamos los horarios asignados con profesor
-        const schedulesWithTeacherCount =
-          clas.schedules?.filter((s) => s.teacherId !== null)?.length || 0;
+      // Contamos los horarios asignados con profesor
+      const schedulesWithTeacherCount =
+        clas.schedules?.filter((s) => s.teacherId !== null)?.length || 0;
 
-        // Determinamos el estado:
-        // - Si hay menos registros que los esperados: FALTAN_REGISTROS
-        // - Si hay suficientes registros pero faltan profesores: FALTAN_DOCENTES
-        // - Si todos los horarios tienen profesor asignado: COMPLETO
-        let status = 'FALTAN_DOCENTES';
-        if (totalSchedules < expectedSchedulesCount) {
-          status = 'FALTAN_REGISTROS';
-        } else if (
-          schedulesWithTeacherCount === expectedSchedulesCount &&
-          expectedSchedulesCount > 0
-        ) {
-          status = 'COMPLETO';
-        }
+      // Determinamos el estado:
+      // - Si hay menos registros que los esperados: FALTAN_REGISTROS
+      // - Si hay suficientes registros pero faltan profesores: FALTAN_DOCENTES
+      // - Si todos los horarios tienen profesor asignado: COMPLETO
+      let status = 'FALTAN_DOCENTES';
+      if (totalSchedules < expectedSchedulesCount) {
+        status = 'FALTAN_REGISTROS';
+      } else if (
+        schedulesWithTeacherCount === expectedSchedulesCount &&
+        expectedSchedulesCount > 0
+      ) {
+        status = 'COMPLETO';
+      }
 
-        // Creamos un nuevo objeto sin incluir schedules ni hourSessions
-        const classWithoutSchedules = {
-          ...clas,
-          status,
-          schedules: undefined,
-          shift: {
-            ...clas.shift,
-            hourSessions: undefined,
-          },
-        };
+      // Creamos un nuevo objeto sin incluir schedules ni hourSessions
+      const classWithoutSchedules = {
+        ...clas,
+        status,
+        schedules: undefined,
+        shift: {
+          ...clas.shift,
+          hourSessions: undefined,
+        },
+      };
 
-        return classWithoutSchedules;
-      });
+      return classWithoutSchedules;
+    });
 
     return classesWithStatus.map((clas) => this.mapToClassDto(clas));
   }

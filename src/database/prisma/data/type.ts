@@ -78,6 +78,7 @@ export interface AreaCourse {
 }
 
 export interface HourSessionData {
+  durationMinutes?: number;
   id?: number;
   shiftId: number;
   period: number;

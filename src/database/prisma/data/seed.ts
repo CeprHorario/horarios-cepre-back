@@ -40,6 +40,8 @@ export const initialDataSchema = async (
   const { areas, shifts, sedes, hourSessions, courses } = await createBasicData(
     db,
     config.shifts,
+    config.sessionMinutes ?? 40,
+    config.breakMinutes ?? 5,
   );
   // 2: Insert monitors and classes into the database
   const { classes } = await createDataMonitors(
@@ -77,6 +79,8 @@ export const initialDataSchema = async (
 const createBasicData = async (
   pool: PoolClient,
   shiftsBody: ShiftDetailDto[],
+  sessionMinutes = 40,
+  breakMinutes = 5,
 ) => {
   // Destructure the data from the JSON files
   const { areas, sedes } = rawData as DataInitial;
@@ -87,7 +91,7 @@ const createBasicData = async (
   const areasBeingCreated = new Set<string>();
   shiftsBody.forEach((shift) => {
     shift.classesToAreas.forEach((classArea) => {
-      areasBeingCreated.add(classArea.area);
+      if (classArea.quantityClasses > 0) areasBeingCreated.add(classArea.area);
     });
   });
 
@@ -115,9 +119,9 @@ const createBasicData = async (
   const coursesWithIds = assignNumericIds(filteredCourses);
 
   // Validate and assign IDs to shifts and generate hour sessions
-  const shiftsWithIds = shiftsBody.map((shift) => validateShiftTimes(shift));
+  const shiftsWithIds = shiftsBody.map((shift) => validateShiftTimes(shift, sessionMinutes, breakMinutes));
   const hoursSessionsWithIds = assignNumericIds(
-    shiftsWithIds.flatMap((shift) => generateHourSessions(shift)),
+    shiftsWithIds.flatMap((shift) => generateHourSessions(shift, sessionMinutes, breakMinutes)),
   );
 
   // Assign hours to areas and courses
@@ -174,27 +178,20 @@ export const createDataMonitors = async (
   pool: PoolClient,
   data: DataMonitor[],
 ) => {
-  const classes: Class[] = [];
-  for (const item of data) {
-    const user = await pool.query<{ id: string }>(
-      'INSERT INTO users (email, role) VALUES ($1, $2) RETURNING id',
-      [item.user.email, item.user.role],
-    );
-    const monitor = await pool.query<{ id: string }>(
-      'INSERT INTO monitors (user_id) VALUES ($1) RETURNING id',
-      [user.rows[0].id],
-    );
-    const c = item.classes;
-    const result = await pool.query<{ id: string }>(
-      'INSERT INTO classes (name, capacity, monitor_id, shift_id, area_id, id_sede) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
-      [c.name, c.capacity, monitor.rows[0].id, c.shiftId, c.areaId, c.idSede],
-    );
-    classes.push({
-      ...c,
-      id: result.rows[0].id,
-      monitorId: monitor.rows[0].id,
-    });
-  }
+  if (!data.length) return { classes: [] as Class[] };
+  const result = await pool.query<{ id: string; name: string; monitor_id: string }>(`
+    WITH input AS MATERIALIZED (
+      SELECT uuidv7() AS user_id,uuidv7() AS monitor_id,r.*
+      FROM jsonb_to_recordset($1::jsonb) r(email text,role text,name text,capacity integer,shift_id smallint,area_id smallint,id_sede smallint)
+    ), inserted_users AS (
+      INSERT INTO users(id,email,role) SELECT user_id,email,role FROM input RETURNING id
+    ), inserted_monitors AS (
+      INSERT INTO monitors(id,user_id) SELECT i.monitor_id,i.user_id FROM input i JOIN inserted_users u ON u.id=i.user_id RETURNING id
+    ) INSERT INTO classes(name,capacity,monitor_id,shift_id,area_id,id_sede)
+      SELECT i.name,i.capacity,i.monitor_id,i.shift_id,i.area_id,i.id_sede FROM input i JOIN inserted_monitors m ON m.id=i.monitor_id
+      RETURNING id,name,monitor_id`, [JSON.stringify(data.map((item) => ({ email: item.user.email, role: item.user.role, name: item.classes.name, capacity: item.classes.capacity, shift_id: item.classes.shiftId, area_id: item.classes.areaId, id_sede: item.classes.idSede })))]);
+  const byName = new Map(result.rows.map((row) => [row.name, row]));
+  const classes: Class[] = data.map((item) => ({ ...item.classes, id: byName.get(item.classes.name)!.id, monitorId: byName.get(item.classes.name)!.monitor_id }));
   return { classes };
 };
 
@@ -217,6 +214,7 @@ export const createSchedules = async (
   const areas: string[] = [];
   shifts.map((s) => {
     s.classesToAreas.map((c) => {
+      if (c.quantityClasses === 0) return;
       /*   'Biomédicas': {
           'Turno 1': [
             [Object], [Object],
