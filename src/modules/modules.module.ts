@@ -14,9 +14,12 @@ import { MonitorModule } from './monitors/monitor.module';
 import { ClassModule } from './classes/class.module';
 import { ScheduleModule } from './schedules/schedules.module';
 import { ImportsModule } from './imports/imports.module';
+import { ClassSessionRecordsModule } from './class-session-records/class-session-records.module';
+import { SessionFilesModule } from './session-files/session-files.module';
 
 @Module({
   imports: [
+    ClassSessionRecordsModule, SessionFilesModule,
     AreaModule, AreaCourseHourModule, CourseModule, SedeModule, ShiftModule,
     HourSessionModule, UsersModule, UserProfileModule, TeacherModule,
     CoordinatorModule, SupervisorModule, MonitorModule, ClassModule, ScheduleModule, ImportsModule,

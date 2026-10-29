@@ -54,6 +54,10 @@ export class AuthorizationGuard implements CanActivate {
       context.getHandler(),
     );
     if (!metadata) throw new UnauthorizedException();
+    if (
+      (metadata.permission.startsWith('class-session-records.') || metadata.permission.startsWith('class-session-files.')) &&
+      ![Role.ADMIN,Role.MONITOR,Role.SUPERVISOR].includes(role as Role)
+    ) throw new UnauthorizedException('Rol sin acceso operativo a partes');
     if (['auth.session', 'auth.logout'].includes(metadata.permission))
       return true;
     if (metadata.adminOnly && role !== String(Role.ADMIN))

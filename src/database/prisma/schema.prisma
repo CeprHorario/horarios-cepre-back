@@ -1,9 +1,9 @@
 generator client {
-  provider        = "prisma-client"
-  output = "../../generated/prisma"
-  moduleFormat = "cjs"
+  provider            = "prisma-client"
+  output              = "../../generated/prisma"
+  moduleFormat        = "cjs"
   importFileExtension = ""
-  previewFeatures = ["relationJoins"]
+  previewFeatures     = ["relationJoins"]
 }
 
 datasource db {
@@ -11,19 +11,21 @@ datasource db {
 }
 
 model User {
-  id          String       @id @default(dbgenerated("uuidv7()")) @db.Uuid
-  email       String       @unique @db.VarChar(48)
-  password    String?      @db.VarChar(128)
-  isActive    Boolean      @default(true) @map("is_active")
-  createdAt   DateTime     @default(now()) @map("created_at")
-  updatedAt   DateTime     @default(now()) @updatedAt @map("updated_at")
-  lastLogin   DateTime?    @map("last_login")
-  googleId    String?      @unique @map("google_id") @db.VarChar(64)
-  role        String       @db.VarChar(48)
-  monitor     Monitor?
-  supervisor  Supervisor?
-  teacher     Teacher?
-  userProfile UserProfile?
+  id              String               @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  email           String               @unique @db.VarChar(48)
+  password        String?              @db.VarChar(128)
+  isActive        Boolean              @default(true) @map("is_active")
+  createdAt       DateTime             @default(now()) @map("created_at")
+  updatedAt       DateTime             @default(now()) @updatedAt @map("updated_at")
+  lastLogin       DateTime?            @map("last_login")
+  googleId        String?              @unique @map("google_id") @db.VarChar(64)
+  role            String               @db.VarChar(48)
+  monitor         Monitor?
+  supervisor      Supervisor?
+  teacher         Teacher?
+  userProfile     UserProfile?
+  sessionAccounts ClassSessionRecord[]
+  sessionGrants   SessionEditGrant[]
 
   @@index([role])
   @@map("users")
@@ -48,69 +50,78 @@ model UserProfile {
 }
 
 model Teacher {
-  id             String     @id @default(dbgenerated("uuidv7()")) @db.Uuid
-  userId         String     @unique @map("user_id") @db.Uuid
-  courseId       Int        @map("course_id") @db.SmallInt
-  maxHours       Int?       @map("max_hours") @db.SmallInt
-  scheduledHours Int        @default(0) @map("scheduled_hours") @db.SmallInt
-  createdAt      DateTime   @default(now()) @map("created_at")
-  updatedAt      DateTime   @default(now()) @updatedAt @map("updated_at")
-  isCoordinator  Boolean    @default(false) @map("is_coordinator")
-  jobStatus      JobStatus  @map("job_status")
-  schedules      Schedule[]
-  availabilities TeacherAvailability[]
-  courses        Course     @relation(fields: [courseId], references: [id])
-  user           User       @relation(fields: [userId], references: [id])
+  id                String                @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  userId            String                @unique @map("user_id") @db.Uuid
+  courseId          Int                   @map("course_id") @db.SmallInt
+  maxHours          Int?                  @map("max_hours") @db.SmallInt
+  scheduledHours    Int                   @default(0) @map("scheduled_hours") @db.SmallInt
+  createdAt         DateTime              @default(now()) @map("created_at")
+  updatedAt         DateTime              @default(now()) @updatedAt @map("updated_at")
+  isCoordinator     Boolean               @default(false) @map("is_coordinator")
+  jobStatus         JobStatus             @map("job_status")
+  schedules         Schedule[]
+  availabilities    TeacherAvailability[]
+  courses           Course                @relation(fields: [courseId], references: [id])
+  user              User                  @relation(fields: [userId], references: [id])
+  titularSessions   ClassSessionRecord[]  @relation("TitularTeacher")
+  effectiveSessions ClassSessionRecord[]  @relation("EffectiveTeacher")
+  sessionCoverages  SessionCoverage[]
 
   @@index([courseId])
   @@map("teachers")
 }
 
 model TeacherAvailability {
-  id          String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
-  teacherId   String   @map("teacher_id") @db.Uuid
+  id          String  @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  teacherId   String  @map("teacher_id") @db.Uuid
   weekday     Weekday
-  startMinute Int      @map("start_minute") @db.SmallInt
-  endMinute   Int      @map("end_minute") @db.SmallInt
-  teacher     Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  startMinute Int     @map("start_minute") @db.SmallInt
+  endMinute   Int     @map("end_minute") @db.SmallInt
+  teacher     Teacher @relation(fields: [teacherId], references: [id], onDelete: Cascade)
 
   @@unique([teacherId, weekday, startMinute, endMinute])
   @@map("teacher_availabilities")
 }
 
 model Supervisor {
-  id        String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
-  userId    String    @unique @map("user_id") @db.Uuid
-  shiftId   Int?      @map("shift_id") @db.SmallInt
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
-  monitors  Monitor[]
-  users     User      @relation(fields: [userId], references: [id])
-  shift     Shift?    @relation(fields: [shiftId], references: [id])
+  id             String               @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  userId         String               @unique @map("user_id") @db.Uuid
+  shiftId        Int?                 @map("shift_id") @db.SmallInt
+  createdAt      DateTime             @default(now()) @map("created_at")
+  updatedAt      DateTime             @default(now()) @updatedAt @map("updated_at")
+  monitors       Monitor[]
+  users          User                 @relation(fields: [userId], references: [id])
+  shift          Shift?               @relation(fields: [shiftId], references: [id])
+  sessions       ClassSessionRecord[]
+  sessionReviews SessionReview[]
 
   @@map("supervisors")
 }
 
 model Monitor {
-  id           String      @id @default(dbgenerated("uuidv7()")) @db.Uuid
-  userId       String      @unique @map("user_id") @db.Uuid
-  supervisorId String?     @map("supervisor_id") @db.Uuid
-  createdAt    DateTime    @default(now()) @map("created_at")
-  updatedAt    DateTime    @default(now()) @updatedAt @map("updated_at")
-  classes      Class?
-  supervisors  Supervisor? @relation(fields: [supervisorId], references: [id], onDelete: Restrict)
-  user         User        @relation(fields: [userId], references: [id])
+  id                String               @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  userId            String               @unique @map("user_id") @db.Uuid
+  supervisorId      String?              @map("supervisor_id") @db.Uuid
+  createdAt         DateTime             @default(now()) @map("created_at")
+  updatedAt         DateTime             @default(now()) @updatedAt @map("updated_at")
+  classes           Class?
+  supervisors       Supervisor?          @relation(fields: [supervisorId], references: [id], onDelete: Restrict)
+  user              User                 @relation(fields: [userId], references: [id])
+  titularSessions   ClassSessionRecord[] @relation("TitularMonitor")
+  effectiveSessions ClassSessionRecord[] @relation("EffectiveMonitor")
+  sessionCoverages  SessionCoverage[]
 
   @@index([supervisorId])
   @@map("monitors")
 }
 
 model Area {
-  id              Int              @id @default(autoincrement()) @db.SmallInt
-  name            String           @unique @db.VarChar(48)
-  description     String?          @db.VarChar(255)
+  id              Int                  @id @default(autoincrement()) @db.SmallInt
+  name            String               @unique @db.VarChar(48)
+  description     String?              @db.VarChar(255)
   areaCourseHours AreaCourseHour[]
   classes         Class[]
+  sessionRecords  ClassSessionRecord[]
 
   @@map("areas")
 }
@@ -130,13 +141,14 @@ model AreaCourseHour {
 }
 
 model Course {
-  id              Int              @id @default(autoincrement()) @db.SmallInt
-  name            String           @unique @db.VarChar(48)
-  color           String?          @db.VarChar(7)
-  description     String?          @db.VarChar(255)
+  id              Int                  @id @default(autoincrement()) @db.SmallInt
+  name            String               @unique @db.VarChar(48)
+  color           String?              @db.VarChar(7)
+  description     String?              @db.VarChar(255)
   schedules       Schedule[]
   areaCourseHours AreaCourseHour[]
   teachers        Teacher[]
+  sessionRecords  ClassSessionRecord[]
 
   @@map("courses")
 }
@@ -152,33 +164,35 @@ model Sede {
 }
 
 model Shift {
-  id           Int           @id @default(autoincrement()) @db.SmallInt
-  name         String        @db.VarChar(48)
-  startTime    DateTime?     @map("start_time") @db.Time(6)
-  endTime      DateTime?     @map("end_time") @db.Time(6)
-  classes      Class[]
-  hourSessions HourSession[]
-  supervisors  Supervisor[]
+  id             Int                  @id @default(autoincrement()) @db.SmallInt
+  name           String               @db.VarChar(48)
+  startTime      DateTime?            @map("start_time") @db.Time(6)
+  endTime        DateTime?            @map("end_time") @db.Time(6)
+  classes        Class[]
+  hourSessions   HourSession[]
+  supervisors    Supervisor[]
+  sessionRecords ClassSessionRecord[]
 
   @@index([name])
   @@map("shifts")
 }
 
 model Class {
-  id           String     @id @default(dbgenerated("uuidv7()")) @db.Uuid
-  name         String     @db.VarChar(48)
-  idSede       Int        @map("id_sede") @db.SmallInt
-  areaId       Int        @map("area_id") @db.SmallInt
-  shiftId      Int        @map("shift_id") @db.SmallInt
-  monitorId    String?    @unique @map("monitor_id") @db.Uuid
-  capacity     Int        @default(100) @db.SmallInt
-  urlMeet      String?    @map("url_meet") @db.VarChar(48)
-  urlClassroom String?    @map("url_classroom") @db.VarChar(64)
-  area         Area       @relation(fields: [areaId], references: [id])
-  sede         Sede       @relation(fields: [idSede], references: [id])
-  monitor      Monitor?   @relation(fields: [monitorId], references: [id])
-  shift        Shift      @relation(fields: [shiftId], references: [id])
-  schedules    Schedule[]
+  id             String               @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  name           String               @db.VarChar(48)
+  idSede         Int                  @map("id_sede") @db.SmallInt
+  areaId         Int                  @map("area_id") @db.SmallInt
+  shiftId        Int                  @map("shift_id") @db.SmallInt
+  monitorId      String?              @unique @map("monitor_id") @db.Uuid
+  capacity       Int                  @default(100) @db.SmallInt
+  urlMeet        String?              @map("url_meet") @db.VarChar(48)
+  urlClassroom   String?              @map("url_classroom") @db.VarChar(64)
+  area           Area                 @relation(fields: [areaId], references: [id])
+  sede           Sede                 @relation(fields: [idSede], references: [id])
+  monitor        Monitor?             @relation(fields: [monitorId], references: [id])
+  shift          Shift                @relation(fields: [shiftId], references: [id])
+  schedules      Schedule[]
+  sessionRecords ClassSessionRecord[]
 
   @@index([idSede])
   @@index([areaId])
@@ -188,14 +202,15 @@ model Class {
 }
 
 model HourSession {
-  id              Int        @id @default(autoincrement()) @db.SmallInt
-  shiftId         Int        @map("shift_id") @db.SmallInt
-  period          Int        @db.SmallInt
-  startTime       DateTime   @map("start_time") @db.Time(6)
-  endTime         DateTime   @map("end_time") @db.Time(6)
-  durationMinutes Int        @default(40) @map("duration_minutes") @db.SmallInt
-  shift           Shift      @relation(fields: [shiftId], references: [id])
+  id              Int                  @id @default(autoincrement()) @db.SmallInt
+  shiftId         Int                  @map("shift_id") @db.SmallInt
+  period          Int                  @db.SmallInt
+  startTime       DateTime             @map("start_time") @db.Time(6)
+  endTime         DateTime             @map("end_time") @db.Time(6)
+  durationMinutes Int                  @default(40) @map("duration_minutes") @db.SmallInt
+  shift           Shift                @relation(fields: [shiftId], references: [id])
   schedules       Schedule[]
+  sessionRecords  ClassSessionRecord[]
 
   @@unique([shiftId, period])
   @@index([shiftId])
@@ -204,18 +219,20 @@ model HourSession {
 }
 
 model Schedule {
-  id            Int         @id @default(autoincrement())
-  classId       String      @map("class_id") @db.Uuid
-  courseId      Int         @map("course_id") @db.SmallInt
-  hourSessionId Int         @map("hour_session_id") @db.SmallInt
-  teacherId     String?     @map("teacher_id") @db.Uuid
-  weekday       Weekday
-  clas          Class       @relation(fields: [classId], references: [id])
-  course        Course      @relation(fields: [courseId], references: [id])
-  hourSession   HourSession @relation(fields: [hourSessionId], references: [id])
-  teacher       Teacher?    @relation(fields: [teacherId], references: [id])
+  id             Int                  @id @default(autoincrement())
+  classId        String               @map("class_id") @db.Uuid
+  courseId       Int                  @map("course_id") @db.SmallInt
+  hourSessionId  Int                  @map("hour_session_id") @db.SmallInt
+  teacherId      String?              @map("teacher_id") @db.Uuid
+  weekday        Weekday
+  clas           Class                @relation(fields: [classId], references: [id])
+  course         Course               @relation(fields: [courseId], references: [id])
+  hourSession    HourSession          @relation(fields: [hourSessionId], references: [id])
+  teacher        Teacher?             @relation(fields: [teacherId], references: [id])
+  sessionRecords ClassSessionRecord[]
 
   @@unique([courseId, hourSessionId, teacherId, weekday])
+  @@unique([classId, weekday, hourSessionId])
   @@index([classId])
   @@index([courseId])
   @@index([hourSessionId])
@@ -239,4 +256,201 @@ enum Weekday {
   Viernes   @map("FRIDAY")
   Sabado    @map("SATURDAY")
   Domingo   @map("SUNDAY")
+}
+
+model ClassSessionRecord {
+  id                  Int                  @id @default(autoincrement())
+  date                DateTime             @db.Date
+  classId             String               @map("class_id") @db.Uuid
+  hourSessionId       Int                  @map("hour_session_id") @db.SmallInt
+  shiftId             Int                  @map("shift_id") @db.SmallInt
+  areaId              Int                  @map("area_id") @db.SmallInt
+  courseId            Int                  @map("course_id") @db.SmallInt
+  scheduleId          Int?                 @map("schedule_id")
+  origin              String               @default("REGULAR") @db.VarChar(16)
+  originalRecordId    Int?                 @map("original_record_id")
+  scheduledStart      DateTime             @map("scheduled_start") @db.Timestamptz(3)
+  scheduledEnd        DateTime             @map("scheduled_end") @db.Timestamptz(3)
+  shiftEnd            DateTime             @map("shift_end") @db.Timestamptz(3)
+  editDeadline        DateTime             @map("edit_deadline") @db.Timestamptz(3)
+  period              Int
+  pedagogicalMinutes  Int                  @map("pedagogical_minutes")
+  titularTeacherId    String?              @map("titular_teacher_id") @db.Uuid
+  effectiveTeacherId  String?              @map("effective_teacher_id") @db.Uuid
+  titularMonitorId    String?              @map("titular_monitor_id") @db.Uuid
+  effectiveMonitorId  String?              @map("effective_monitor_id") @db.Uuid
+  monitorAccountId    String?              @map("monitor_account_id") @db.Uuid
+  supervisorId        String?              @map("supervisor_id") @db.Uuid
+  snapshot            Json
+  effectiveSnapshot   Json                 @default("{}") @map("effective_snapshot")
+  actualStart         DateTime?            @map("actual_start") @db.Timestamptz(3)
+  actualEnd           DateTime?            @map("actual_end") @db.Timestamptz(3)
+  teachingStatus      String               @default("UNCONFIRMED") @map("teaching_status") @db.VarChar(24)
+  titularOutcome      String               @default("UNKNOWN") @map("titular_outcome") @db.VarChar(24)
+  incidents           String?              @db.Text
+  initialFileId       String?              @map("initial_file_id") @db.Uuid
+  finalFileId         String?              @map("final_file_id") @db.Uuid
+  initialAssociatedAt DateTime?            @map("initial_associated_at") @db.Timestamptz(3)
+  finalAssociatedAt   DateTime?            @map("final_associated_at") @db.Timestamptz(3)
+  initialAssociatedBy Json?                @map("initial_associated_by")
+  finalAssociatedBy   Json?                @map("final_associated_by")
+  timingPolicy        Json                 @map("timing_policy")
+  version             Int                  @default(1)
+  createdAt           DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime             @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt           DateTime?            @map("deleted_at") @db.Timestamptz(3)
+  deletedBy           Json?                @map("deleted_by")
+  deletionReason      String?              @map("deletion_reason")
+  clas                Class                @relation(fields: [classId], references: [id], onDelete: Restrict)
+  hourSession         HourSession          @relation(fields: [hourSessionId], references: [id], onDelete: Restrict)
+  shift               Shift                @relation(fields: [shiftId], references: [id], onDelete: Restrict)
+  area                Area                 @relation(fields: [areaId], references: [id], onDelete: Restrict)
+  course              Course               @relation(fields: [courseId], references: [id], onDelete: Restrict)
+  schedule            Schedule?            @relation(fields: [scheduleId], references: [id], onDelete: Restrict)
+  titularTeacher      Teacher?             @relation("TitularTeacher", fields: [titularTeacherId], references: [id], onDelete: Restrict)
+  effectiveTeacher    Teacher?             @relation("EffectiveTeacher", fields: [effectiveTeacherId], references: [id], onDelete: Restrict)
+  titularMonitor      Monitor?             @relation("TitularMonitor", fields: [titularMonitorId], references: [id], onDelete: Restrict)
+  effectiveMonitor    Monitor?             @relation("EffectiveMonitor", fields: [effectiveMonitorId], references: [id], onDelete: Restrict)
+  monitorAccount      User?                @relation(fields: [monitorAccountId], references: [id], onDelete: Restrict)
+  supervisor          Supervisor?          @relation(fields: [supervisorId], references: [id], onDelete: Restrict)
+  originalRecord      ClassSessionRecord?  @relation("Recovery", fields: [originalRecordId], references: [id], onDelete: Restrict)
+  recoveries          ClassSessionRecord[] @relation("Recovery")
+  initialFile         File?                @relation("InitialCapture", fields: [initialFileId], references: [id], onDelete: Restrict)
+  finalFile           File?                @relation("FinalCapture", fields: [finalFileId], references: [id], onDelete: Restrict)
+  files               File[]               @relation("RecordFiles")
+  events              SessionAuditEvent[]
+  coverages           SessionCoverage[]
+  reviews             SessionReview[]
+  grants              SessionEditGrant[]
+  alerts              SessionAlert[]
+
+  @@unique([date, classId, hourSessionId])
+  @@index([titularMonitorId, date])
+  @@index([effectiveTeacherId, date])
+  @@map("class_session_records")
+}
+
+model File {
+  id             String               @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  recordId       Int?                 @map("record_id")
+  bucket         String
+  objectName     String               @unique @map("object_name")
+  generation     String?
+  originalName   String               @map("original_name")
+  contentType    String               @map("content_type")
+  size           Int
+  checksum       String?
+  uploadedBy     Json                 @map("uploaded_by")
+  uploadedAt     DateTime             @default(now()) @map("uploaded_at") @db.Timestamptz(3)
+  status         String               @default("PENDING") @db.VarChar(16)
+  deletedAt      DateTime?            @map("deleted_at") @db.Timestamptz(3)
+  deletedBy      Json?                @map("deleted_by")
+  deletionReason String?              @map("deletion_reason")
+  record         ClassSessionRecord?  @relation("RecordFiles", fields: [recordId], references: [id], onDelete: Restrict)
+  initialRecords ClassSessionRecord[] @relation("InitialCapture")
+  finalRecords   ClassSessionRecord[] @relation("FinalCapture")
+
+  @@map("files")
+}
+
+model SessionCoverage {
+  id             Int                @id @default(autoincrement())
+  recordId       Int                @map("record_id")
+  kind           String             @db.VarChar(16)
+  teacherId      String?            @map("teacher_id") @db.Uuid
+  monitorId      String?            @map("monitor_id") @db.Uuid
+  mode           String             @db.VarChar(16)
+  status         String             @db.VarChar(16)
+  personSnapshot Json               @map("person_snapshot")
+  operationId    String             @map("operation_id") @db.Uuid
+  requestedBy    Json               @map("requested_by")
+  requestedAt    DateTime           @default(now()) @map("requested_at") @db.Timestamptz(3)
+  resolvedBy     Json?              @map("resolved_by")
+  resolvedAt     DateTime?          @map("resolved_at") @db.Timestamptz(3)
+  reason         String
+  record         ClassSessionRecord @relation(fields: [recordId], references: [id], onDelete: Restrict)
+  teacher        Teacher?           @relation(fields: [teacherId], references: [id], onDelete: Restrict)
+  monitor        Monitor?           @relation(fields: [monitorId], references: [id], onDelete: Restrict)
+
+  @@map("session_coverages")
+}
+
+model SessionAuditEvent {
+  id        Int                 @id @default(autoincrement())
+  recordId  Int?                @map("record_id")
+  action    String
+  actor     Json
+  before    Json?
+  after     Json?
+  reason    String?
+  createdAt DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  record    ClassSessionRecord? @relation(fields: [recordId], references: [id], onDelete: Restrict)
+
+  @@index([recordId, id])
+  @@map("session_audit_events")
+}
+
+model SessionReview {
+  id            Int                @id @default(autoincrement())
+  recordId      Int                @map("record_id")
+  recordVersion Int                @map("record_version")
+  supervisorId  String             @map("supervisor_id") @db.Uuid
+  result        String             @db.VarChar(16)
+  comments      String?
+  files         Json
+  actor         Json
+  createdAt     DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  record        ClassSessionRecord @relation(fields: [recordId], references: [id], onDelete: Restrict)
+  supervisor    Supervisor         @relation(fields: [supervisorId], references: [id], onDelete: Restrict)
+
+  @@unique([recordId, recordVersion])
+  @@map("session_reviews")
+}
+
+model SessionEditGrant {
+  id        Int                @id @default(autoincrement())
+  recordId  Int                @map("record_id")
+  accountId String             @map("account_id") @db.Uuid
+  expiresAt DateTime           @map("expires_at") @db.Timestamptz(3)
+  reason    String
+  grantedBy Json               @map("granted_by")
+  createdAt DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  revokedAt DateTime?          @map("revoked_at") @db.Timestamptz(3)
+  revokedBy Json?              @map("revoked_by")
+  record    ClassSessionRecord @relation(fields: [recordId], references: [id], onDelete: Restrict)
+  account   User               @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
+  @@index([recordId, accountId, expiresAt])
+  @@map("session_edit_grants")
+}
+
+model SessionAlert {
+  id             Int                @id @default(autoincrement())
+  recordId       Int                @map("record_id")
+  type           String             @db.VarChar(32)
+  supervisorId   String?            @map("supervisor_id") @db.Uuid
+  createdAt      DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  acknowledgedAt DateTime?          @map("acknowledged_at") @db.Timestamptz(3)
+  acknowledgedBy Json?              @map("acknowledged_by")
+  record         ClassSessionRecord @relation(fields: [recordId], references: [id], onDelete: Restrict)
+
+  @@unique([recordId, type])
+  @@index([supervisorId, acknowledgedAt, id])
+  @@map("session_alerts")
+}
+
+model SessionOperationalConfig {
+  id                       Int       @id @default(1)
+  enabled                  Boolean   @default(false)
+  startsOn                 DateTime? @map("starts_on") @db.Date
+  endsOn                   DateTime? @map("ends_on") @db.Date
+  latenessToleranceMinutes Int?      @map("lateness_tolerance_minutes")
+  replacementWaitMinutes   Int?      @map("replacement_wait_minutes")
+  alertThresholdMinutes    Int?      @map("alert_threshold_minutes")
+  continuityGapMinutes     Int?      @map("continuity_gap_minutes")
+  version                  Int       @default(1)
+  updatedBy                Json?     @map("updated_by")
+  updatedAt                DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("session_operational_config")
 }

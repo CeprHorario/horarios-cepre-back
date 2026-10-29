@@ -2,6 +2,7 @@ import {
   Injectable, NestInterceptor, ExecutionContext, CallHandler,
   NotFoundException, ConflictException, BadRequestException,
   InternalServerErrorException, HttpException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { Observable, catchError } from 'rxjs';
 import { Prisma } from '../../../generated/prisma/client';
@@ -31,6 +32,7 @@ export class PrismaExceptionInterceptor implements NestInterceptor {
   intercept(_context: ExecutionContext, next: CallHandler): Observable<unknown> {
     return next.handle().pipe(catchError(async (error: unknown) => {
       if (error instanceof HttpException) throw error;
+      if(error instanceof Error && error.message.includes('SESSION_EDIT_CLOSED')) throw new ForbiddenException('Plazo de edición cerrado');
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         const modelName = typeof error.meta?.modelName === 'string' ? error.meta.modelName : 'Record';
         const adapterError = error.meta?.driverAdapterError as {

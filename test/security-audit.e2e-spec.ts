@@ -10,6 +10,7 @@ import { PATH_METADATA, METHOD_METADATA } from '@nestjs/common/constants';
 import request from 'supertest';
 import { Pool } from 'pg';
 import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { AppModule } from '../src/app.module';
 import { configureApp } from '../src/app.setup';
 import { applyStructure } from '../src/database/prisma/structure';
@@ -29,6 +30,7 @@ const suite = process.env.SECURITY_AUDIT_DATABASE_URL
 suite('Security audit diagnostics (temporary schema only)', () => {
   const schema = `security_test_${process.pid}_${Date.now()}`;
   const observations: { check: string; status: number; result: string }[] = [];
+  const outputDir=process.env.SECURITY_AUDIT_OUTPUT_DIR ?? 'docs/security';
   const revokedHashes: string[] = [];
   let app: INestApplication;
   let pool: Pool;
@@ -67,7 +69,7 @@ suite('Security audit diagnostics (temporary schema only)', () => {
     const url = process.env.SECURITY_AUDIT_DATABASE_URL!;
     if (
       new URL(url).hostname !== 'db' ||
-      new URL(url).pathname !== '/cepre_local'
+      !(new URL(url).pathname === '/cepre_local' || /^\/cepr_records_test_[a-f0-9]{32}$/.test(new URL(url).pathname))
     )
       throw new Error('Audit is restricted to the local Compose database');
     pool = new Pool({ connectionString: url });
@@ -249,7 +251,7 @@ suite('Security audit diagnostics (temporary schema only)', () => {
       }
     }
     writeFileSync(
-      'docs/security/routes-remediation.json',
+      join(outputDir,'routes-remediation.json'),
       JSON.stringify(routes, null, 2),
     );
     routeInventory = routes;
@@ -266,7 +268,7 @@ suite('Security audit diagnostics (temporary schema only)', () => {
       await pool.end();
     }
     writeFileSync(
-      'docs/security/runtime-remediation.json',
+      join(outputDir,'runtime-remediation.json'),
       JSON.stringify(
         {
           fixture:

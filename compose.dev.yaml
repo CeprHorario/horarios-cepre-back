@@ -14,11 +14,15 @@ services:
       NODE_ENV: development
       PORT: '8080'
       DATABASE_URL: postgresql://${POSTGRES_USER:-cepr}:${POSTGRES_PASSWORD:-cepr_dev}@db:5432/${POSTGRES_DB:-cepr}
+      STORAGE_EMULATOR_HOST: http://gcs:4443
+      GCS_BUCKET: ${GCS_BUCKET:-cepr-records-local}
     ports:
       - '127.0.0.1:${PORT:-8080}:8080'
     volumes:
       - .:/app
     depends_on:
+      gcs:
+        condition: service_started
       db:
         condition: service_healthy
   db:
@@ -38,3 +42,6 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+  gcs:
+    image: fsouza/fake-gcs-server:1.52.3
+    command: ['-scheme', 'http', '-port', '4443', '-public-host', 'gcs:4443']

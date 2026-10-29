@@ -367,7 +367,7 @@ databaseSuite('PostgreSQL 18: provisioning and routing', () => {
     const first = await sync.syncAuthorization();
     expect(
       first.data.filter((route) => route.permission === 'schedule.delete'),
-    ).toHaveLength(3);
+    ).toHaveLength(4); // Three probe routes plus the real DELETE /schedules/:id.
     const snapshot = async () =>
       Promise.all(
         ['roles', 'permissions', 'roles_permissions'].map(
