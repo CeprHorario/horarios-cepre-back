@@ -52,7 +52,13 @@ export function configureApp(app: INestApplication): void {
   app.enableCors({
     origin: [new URL(frontend).origin],
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Requested-With',
+      'X-Class-Session-Context',
+      'X-Class-Session-Account',
+    ],
     credentials: true,
   });
   app.setGlobalPrefix('api');

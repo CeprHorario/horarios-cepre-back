@@ -244,6 +244,96 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
     await fixture.close();
   });
 
+  it('expone cuenta, proceso validado y reloj sin caché; admin usa runtime y no su JWT core', async () => {
+    for (const role of ['monitor', 'supervisor', 'admin']) {
+      const response = await api('get', '/context', role).expect(200);
+      expect(response.headers['cache-control']).toBe('private, no-store');
+      const context = body<{
+        accountId: string;
+        process: string;
+        serverNow: string;
+      }>(response);
+      expect(Object.keys(context).sort()).toEqual([
+        'accountId',
+        'process',
+        'serverNow',
+      ]);
+      expect(context.accountId).toBe(actor(role).userId);
+      expect(context.process).toBe(fixture.schema);
+      expect(Math.abs(+new Date(context.serverNow) - Date.now())).toBeLessThan(
+        5000,
+      );
+    }
+    routing = { adminSchema: fixture.otherSchema, userSchema: fixture.schema };
+    expect(
+      body<{ process: string }>(
+        await api('get', '/context', 'admin').expect(200),
+      ).process,
+    ).toBe(fixture.otherSchema);
+    expect(
+      body<{ process: string }>(await api('get', '/context').expect(200))
+        .process,
+    ).toBe(fixture.schema);
+    for (const role of ['teacher', 'coordinator'])
+      await api('get', '/context', role).expect(401);
+    await request(app.getHttpServer() as Server)
+      .get('/class-session-records/context')
+      .expect(401);
+    await api('get', `/context?process=${fixture.otherSchema}`).expect(400);
+    await api('get', '/context')
+      .set('x-schema', fixture.otherSchema)
+      .expect(400);
+    routing.userSchema = fixture.otherSchema;
+    await api('get', '/context').expect(401);
+    routing.adminSchema = 'public';
+    await api('get', '/context', 'admin').expect(403);
+  });
+  it('no entrega contexto a una cuenta desactivada', async () => {
+    await db().user.update({
+      where: { id: actor('otherMonitor').userId },
+      data: { isActive: false },
+    });
+    try {
+      await api('get', '/context', 'otherMonitor').expect(401);
+    } finally {
+      await db().user.update({
+        where: { id: actor('otherMonitor').userId },
+        data: { isActive: true },
+      });
+    }
+  });
+  it('trata X-Class-Session-Context como precondición opcional y exceptúa recuperar contexto', async () => {
+    const r = await fresh();
+    for (const role of ['monitor', 'supervisor', 'admin']) {
+      await api('get', `/${r.id}`, role).expect(200);
+      await api('get', `/${r.id}`, role)
+        .set('X-Class-Session-Context', fixture.schema)
+        .expect(200);
+      const mismatch = await api('get', `/${r.id}`, role)
+        .set('X-Class-Session-Context', fixture.otherSchema)
+        .expect(409);
+      expect(body<{ code: string }>(mismatch).code).toBe(
+        'CLASS_SESSION_CONTEXT_CHANGED',
+      );
+      expect(
+        body<{ process: string }>(
+          await api('get', '/context', role)
+            .set('X-Class-Session-Context', fixture.otherSchema)
+            .expect(200),
+        ).process,
+      ).toBe(fixture.schema);
+    }
+    await api('get', `/${r.id}`, 'admin')
+      .set('X-Class-Session-Context', 'core_schema')
+      .expect(409);
+    await api('get', `/${r.id}`, 'admin')
+      .set('X-Class-Session-Context', '')
+      .expect(409);
+    await api('get', `/${r.id}`, 'admin')
+      .set('X-Class-Session-Context', fixture.schema)
+      .set('x-schema', fixture.otherSchema)
+      .expect(400);
+  });
   it('usa JWT real, contexto HTTP y cuenta monitor; rechaza salón ajeno e identidad ausente', async () => {
     const r = await fresh();
     await api('get', `/${r.id}`).expect(200);
@@ -255,6 +345,87 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
       .get(`/class-session-records/${r.id}`)
       .auth(token('monitor', { schema: undefined }), { type: 'bearer' })
       .expect(401);
+  });
+  it('bloquea cuenta esperada distinta antes de consultas/escrituras aunque coincidan rol y proceso', async () => {
+    const r = await fresh();
+    const secondAdmin = await fixture.client(fixture.coreSchema).user.create({
+      data: { email: 'second-admin@test.invalid', role: 'administrador' },
+    });
+    const credential = token('admin', {
+      userId: secondAdmin.id,
+      email: secondAdmin.email,
+    });
+    const asSecond = (method: 'get' | 'post', path: string) =>
+      request(app.getHttpServer() as Server)
+        [method](`/class-session-records${path}`)
+        .auth(credential, { type: 'bearer' });
+    const operationalContext = jest.spyOn(records, 'context');
+    for (const path of [
+      `/${r.id}`,
+      `/${r.id}/history`,
+      `/${r.id}/people?kind=TEACHER`,
+      '/configuration',
+    ]) {
+      const blocked = await asSecond('get', path)
+        .set('X-Class-Session-Context', fixture.schema)
+        .set('X-Class-Session-Account', actor('admin').userId)
+        .expect(409);
+      expect(body<{ code: string }>(blocked).code).toBe(
+        'CLASS_SESSION_CONTEXT_CHANGED',
+      );
+    }
+    await asSecond('post', `/${r.id}/corrections`)
+      .set('X-Class-Session-Context', fixture.schema)
+      .set('X-Class-Session-Account', actor('admin').userId)
+      .send({
+        expectedVersion: 1,
+        incidents: 'Intención del administrador previo',
+        reason: 'Debe rechazarse por cambio de cuenta',
+      })
+      .expect(409);
+    await api('patch', `/${r.id}`)
+      .set('X-Class-Session-Account', actor('admin').userId)
+      .send({ expectedVersion: 1, incidents: 'Intención de otra cuenta' })
+      .expect(409);
+    expect(operationalContext).not.toHaveBeenCalled();
+    operationalContext.mockRestore();
+    expect(
+      (await db().classSessionRecord.findUniqueOrThrow({ where: { id: r.id } }))
+        .version,
+    ).toBe(1);
+    expect(
+      await db().sessionAuditEvent.count({ where: { recordId: r.id } }),
+    ).toBe(0);
+    const recovered = body<{ accountId: string; process: string }>(
+      await asSecond('get', '/context')
+        .set('X-Class-Session-Account', actor('admin').userId)
+        .expect(200),
+    );
+    expect(recovered).toMatchObject({
+      accountId: secondAdmin.id,
+      process: fixture.schema,
+    });
+    await asSecond('get', `/${r.id}`).expect(200);
+    await asSecond('post', `/${r.id}/corrections`)
+      .set('X-Class-Session-Context', fixture.schema)
+      .set('X-Class-Session-Account', secondAdmin.id)
+      .send({
+        expectedVersion: 1,
+        incidents: 'Cuenta nueva confirmada',
+        reason: 'Intención explícita de la cuenta actual',
+      })
+      .expect(201);
+    const audit = await db().sessionAuditEvent.findFirstOrThrow({
+      where: { recordId: r.id },
+    });
+    expect(audit.actor).toEqual(
+      expect.objectContaining({ id: secondAdmin.id }),
+    );
+    for (const role of ['monitor', 'supervisor', 'admin'])
+      await api('get', `/${r.id}`, role)
+        .set('X-Class-Session-Account', actor(role).userId)
+        .expect(200);
+    await api('get', `/${r.id}`).set('X-Class-Session-Account', '').expect(409);
   });
   it('supervisa monitores de turnos distintos y rechaza supervisor ajeno', async () => {
     const r = await fresh();
@@ -272,6 +443,132 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
     await api('get', `/${r2.id}`, 'supervisor').expect(200);
     await api('get', `/${r.id}`, 'otherSupervisor').expect(404);
   });
+  it('ofrece solo identidad operativa de personas activas y docentes del curso del parte', async () => {
+    const r = await fresh();
+    await db().userProfile.create({
+      data: {
+        userId: teacherUsers[0],
+        firstName: 'Ana Catalogo',
+        lastName: 'Prueba',
+        dni: '12345678',
+        phone: '999999999',
+        phonesAdditional: ['888888888'],
+        personalEmail: 'privado@test.invalid',
+      },
+    });
+    await db().user.create({
+      data: {
+        email: 'inactive-teacher@test.invalid',
+        role: 'profesor',
+        isActive: false,
+        teacher: { create: { courseId: 1, jobStatus: 'PartTime' } },
+      },
+    });
+    const response = body<{
+      data: { id: string; name: string; email: string }[];
+      total: number;
+    }>(await api('get', `/${r.id}/people?kind=TEACHER`).expect(200));
+    expect(response.total).toBe(2);
+    expect(response.data.map((p) => p.id).sort()).toEqual(
+      teacherIds.slice(0, 2).sort(),
+    );
+    for (const person of response.data)
+      expect(Object.keys(person).sort()).toEqual(['email', 'id', 'name']);
+    expect(
+      body<unknown>(
+        await api(
+          'get',
+          `/${r.id}/people?kind=TEACHER&search=cATALOGO&limit=1`,
+        ).expect(200),
+      ),
+    ).toEqual({
+      data: [
+        {
+          id: teacherIds[0],
+          name: 'Ana Catalogo Prueba',
+          email: 'replacement0@test.invalid',
+        },
+      ],
+      total: 1,
+      page: 1,
+      limit: 1,
+    });
+    expect(
+      body<{ data: unknown[]; total: number }>(
+        await api(
+          'get',
+          `/${r.id}/people?kind=TEACHER&search=CATALOGO&limit=1&page=2`,
+        ).expect(200),
+      ),
+    ).toMatchObject({ data: [], total: 1 });
+    await db().user.create({
+      data: {
+        email: 'inactive-monitor@test.invalid',
+        role: 'monitor',
+        isActive: false,
+        monitor: { create: {} },
+      },
+    });
+    const monitors = body<{ data: { id: string }[]; total: number }>(
+      await api('get', `/${r.id}/people?kind=MONITOR`).expect(200),
+    );
+    expect(monitors.total).toBe(2);
+    expect(monitors.data.map((p) => p.id).sort()).toEqual(
+      [monitorId, otherMonitorId].sort(),
+    );
+  });
+  it('limita el catálogo al recurso autorizado sin depender de permisos generales de personas', async () => {
+    const r = await fresh();
+    jest
+      .spyOn(app.get(PermissionsService), 'checkPermission')
+      .mockResolvedValue(false);
+    for (const role of ['monitor', 'supervisor', 'admin'])
+      await api('get', `/${r.id}/people?kind=TEACHER`, role).expect(200);
+    for (const role of ['otherMonitor', 'otherSupervisor'])
+      await api('get', `/${r.id}/people?kind=TEACHER`, role).expect(404);
+    for (const role of ['teacher', 'coordinator'])
+      await api('get', `/${r.id}/people?kind=TEACHER`, role).expect(401);
+    await request(app.getHttpServer() as Server)
+      .get(`/class-session-records/${r.id}/people?kind=TEACHER`)
+      .expect(401);
+    await api('get', `/${r.id}/people?kind=MONITOR`)
+      .set('x-schema', fixture.otherSchema)
+      .expect(400);
+    routing = {
+      adminSchema: fixture.otherSchema,
+      userSchema: fixture.otherSchema,
+    };
+    await api('get', `/${r.id}/people?kind=TEACHER`).expect(401);
+    await api('get', `/${r.id}/people?kind=TEACHER`, 'admin').expect(404);
+  });
+  it('valida tipo, búsqueda y paginación del catálogo; consultarlo no reabre ni modifica un parte', async () => {
+    const r = await fresh();
+    for (const query of [
+      '',
+      'kind=OTHER',
+      'kind=TEACHER&limit=101',
+      'kind=TEACHER&page=0',
+      `kind=TEACHER&search=${'x'.repeat(101)}`,
+      'kind=TEACHER&courseId=2',
+      `kind=TEACHER&schema=${fixture.otherSchema}`,
+    ])
+      await api('get', `/${r.id}/people?${query}`).expect(400);
+    await fixture.closeRecord(r.id);
+    await api('get', `/${r.id}/people?kind=MONITOR`).expect(200);
+    expect(
+      (await db().classSessionRecord.findUniqueOrThrow({ where: { id: r.id } }))
+        .version,
+    ).toBe(r.version);
+    await patch(r, { incidents: 'Sigue cerrado' }).expect(403);
+    await api('post', `/${r.id}/cancel`, 'admin')
+      .send({
+        expectedVersion: r.version,
+        reason: 'Anular después de consulta',
+      })
+      .expect(201);
+    await api('get', `/${r.id}/people?kind=MONITOR`).expect(404);
+    await api('get', `/${r.id}/people?kind=MONITOR`, 'admin').expect(200);
+  });
   it('bloquea profesor/coordinador con todos los permisos globales, también historial y reportes', async () => {
     const r = await fresh();
     for (const name of ['teacher', 'coordinator'])
@@ -287,8 +584,11 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
       .expect(400);
     await patch(r, { incidents: 'x' }, 'supervisor').expect(401);
   });
-  it('aísla schemas con cuentas e IDs enteros coincidentes y guarda actor admin externo sin FK', async () => {
+  it('impide lectura/escritura con contexto admin obsoleto e IDs coincidentes; conserva clientes sin header', async () => {
     const r = await fresh();
+    const originalContext = body<{ process: string }>(
+      await api('get', '/context', 'admin').expect(200),
+    );
     const other = fixture.client(fixture.otherSchema);
     await other.$executeRaw`INSERT INTO areas(id,name) VALUES(1,'Area')`;
     await other.$executeRaw`INSERT INTO courses(id,name) VALUES(1,'Course')`;
@@ -314,6 +614,56 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
       adminSchema: fixture.otherSchema,
       userSchema: fixture.otherSchema,
     };
+    const operationalContext = jest.spyOn(records, 'context');
+    const date = r.date.toISOString().slice(0, 10);
+    for (const path of [
+      `/${r.id}`,
+      `/${r.id}/history`,
+      `/${r.id}/people?kind=TEACHER`,
+      `?from=${date}&to=${date}`,
+      `/agenda?date=${date}`,
+      '/alerts',
+      `/reports/detail?from=${date}&to=${date}`,
+      `/reports/summary?from=${date}&to=${date}`,
+      '/configuration',
+    ])
+      await api('get', path, 'admin')
+        .set('X-Class-Session-Context', originalContext.process)
+        .expect(409);
+    await api('post', `/${r.id}/corrections`, 'admin')
+      .set('X-Class-Session-Context', originalContext.process)
+      .send({
+        expectedVersion: 1,
+        incidents: 'No debe cruzar de proceso',
+        reason: 'Petición basada en contexto antiguo',
+      })
+      .expect(409);
+    expect(operationalContext).not.toHaveBeenCalled();
+    operationalContext.mockRestore();
+    expect(
+      (
+        await other.classSessionRecord.findUniqueOrThrow({
+          where: { id: r.id },
+        })
+      ).version,
+    ).toBe(1);
+    expect(
+      await other.sessionAuditEvent.count({ where: { recordId: r.id } }),
+    ).toBe(0);
+    expect(
+      (await db().classSessionRecord.findUniqueOrThrow({ where: { id: r.id } }))
+        .version,
+    ).toBe(1);
+    expect(
+      body<{ process: string }>(
+        await api('get', '/context', 'admin')
+          .set('X-Class-Session-Context', originalContext.process)
+          .expect(200),
+      ).process,
+    ).toBe(fixture.otherSchema);
+    await api('get', `/${r.id}`, 'admin')
+      .set('X-Class-Session-Context', fixture.otherSchema)
+      .expect(200);
     await api('get', `/${r.id}`).expect(401);
     const corrected = body<ClassSessionRecord>(
       await api('post', `/${r.id}/corrections`, 'admin')
@@ -950,6 +1300,9 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
       expect.objectContaining({
         authorized_teacher_id: null,
         requested_teacher_id: teacherIds[1],
+        scheduled_minutes: expect.any(String) as unknown,
+        actual_minutes: null,
+        actual_clock_hours: null,
       }),
     );
     const totals = body<Record<string, number>>(

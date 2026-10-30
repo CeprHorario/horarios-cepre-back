@@ -22,7 +22,11 @@ import {
   SessionPrincipal,
   SessionTx,
 } from './session.types';
-import { SessionQueryDto, UpdateSessionDto } from './session.dto';
+import {
+  SessionPeopleQueryDto,
+  SessionQueryDto,
+  UpdateSessionDto,
+} from './session.dto';
 
 @Injectable()
 export class ClassSessionRecordsService {
@@ -376,6 +380,77 @@ export class ClassSessionRecordsService {
       orderBy: { id: 'desc' },
       skip: (page - 1) * 50,
       take: 50,
+    });
+  }
+
+  async people(
+    principal: SessionPrincipal,
+    id: number,
+    query: SessionPeopleQueryDto,
+  ) {
+    const { client, actor } = await this.context(principal);
+    return this.transaction(client, actor.schema, async (tx) => {
+      const record = await this.authorizeRecord(tx, actor, id, false, true);
+      const search = query.search?.trim();
+      const user: Prisma.UserWhereInput = {
+        isActive: true,
+        ...(search
+          ? {
+              OR: [
+                { email: { contains: search, mode: 'insensitive' } },
+                {
+                  userProfile: {
+                    firstName: { contains: search, mode: 'insensitive' },
+                  },
+                },
+                {
+                  userProfile: {
+                    lastName: { contains: search, mode: 'insensitive' },
+                  },
+                },
+              ],
+            }
+          : {}),
+      };
+      const options = {
+        skip: (query.page - 1) * query.limit,
+        take: query.limit,
+        orderBy: { id: 'asc' } as const,
+        select: {
+          id: true,
+          user: {
+            select: {
+              email: true,
+              userProfile: { select: { firstName: true, lastName: true } },
+            },
+          },
+        },
+      } as const;
+      const [data, total] =
+        query.kind === 'TEACHER'
+          ? await Promise.all([
+              tx.teacher.findMany({
+                ...options,
+                where: { courseId: record.courseId, user },
+              }),
+              tx.teacher.count({ where: { courseId: record.courseId, user } }),
+            ])
+          : await Promise.all([
+              tx.monitor.findMany({ ...options, where: { user } }),
+              tx.monitor.count({ where: { user } }),
+            ]);
+      return {
+        data: data.map(({ id, user }) => ({
+          id,
+          name: [user.userProfile?.firstName, user.userProfile?.lastName]
+            .filter(Boolean)
+            .join(' '),
+          email: user.email,
+        })),
+        total,
+        page: query.page,
+        limit: query.limit,
+      };
     });
   }
 

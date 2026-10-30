@@ -1,14 +1,17 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   DefaultValuePipe,
   Get,
+  Header,
   Param,
   ParseIntPipe,
   Patch,
   Post,
   Query,
   Req,
+  UseGuards,
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
@@ -30,16 +33,19 @@ import {
   RecoveryDto,
   ResolveCoverageDto,
   ReviewDto,
+  SessionPeopleQueryDto,
   SessionQueryDto,
   UpdateSessionDto,
 } from './session.dto';
 import { SessionPrincipal } from './session.types';
+import { ClassSessionContextGuard } from './class-session-context.guard';
 
 type AuthRequest = { user: SessionPrincipal };
 const readers = [Role.MONITOR, Role.SUPERVISOR];
 @Controller('class-session-records')
 @ApiTags('Partes operativos')
 @ApiBearerAuth()
+@UseGuards(ClassSessionContextGuard)
 @UsePipes(
   new ValidationPipe({
     transform: true,
@@ -54,6 +60,28 @@ export class ClassSessionRecordsController {
     private readonly followup: SessionFollowupService,
     private readonly reports: SessionReportsService,
   ) {}
+  @Get('context')
+  @Authorization({
+    roles: readers,
+    permission: 'class-session-records.context',
+  })
+  @Header('Cache-Control', 'private, no-store')
+  @ApiOperation({
+    summary: 'Cuenta, proceso operativo validado y reloj del servidor',
+  })
+  async context(
+    @Req() req: AuthRequest,
+    @Query() query: Record<string, unknown>,
+  ) {
+    if (Object.keys(query).length)
+      throw new BadRequestException('El contexto no admite parámetros');
+    const { client, actor } = await this.records.context(req.user);
+    return {
+      accountId: actor.id,
+      process: actor.schema,
+      serverNow: (await this.records.now(client)).toISOString(),
+    };
+  }
   @Get('agenda')
   @Authorization({ roles: readers, permission: 'class-session-records.agenda' })
   @ApiOperation({
@@ -171,6 +199,19 @@ export class ClassSessionRecordsController {
   })
   summary(@Req() req: AuthRequest, @Query() query: SessionQueryDto) {
     return this.reports.report(req.user, query, true);
+  }
+  @Get(':id/people')
+  @Authorization({ roles: readers, permission: 'class-session-records.people' })
+  @ApiOperation({
+    summary:
+      'Personas activas para un parte autorizado; no garantiza disponibilidad',
+  })
+  people(
+    @Req() req: AuthRequest,
+    @Param('id', ParseIntPipe) id: number,
+    @Query() query: SessionPeopleQueryDto,
+  ) {
+    return this.records.people(req.user, id, query);
   }
   @Get(':id/history')
   @Authorization({

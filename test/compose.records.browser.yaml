@@ -1,0 +1,20 @@
+services:
+  backend:
+    command:
+      - node
+      - test/records-browser.cjs
+    environment:
+      RECORDS_BROWSER_HARNESS: serve
+    ports:
+      - '127.0.0.1:3000:3000'
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:3000/__test/fixtures').then(r=>{if(!r.ok)process.exitCode=1}).catch(()=>process.exitCode=1)
+      interval: 2s
+      timeout: 5s
+      start_period: 30s
+      retries: 30
+    stop_grace_period: 60s

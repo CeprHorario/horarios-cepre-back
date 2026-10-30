@@ -171,7 +171,11 @@ suite('Session files (PostgreSQL + fake GCS)', () => {
   beforeEach(async () => {
     currentRecord = await fixture.record();
   });
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+    routing.adminSchema = fixture.schema;
+    routing.userSchema = fixture.schema;
+  });
   afterAll(async () => {
     await app?.close();
     // Retain emulator objects, just as the API does. The test uses a unique bucket each run.
@@ -225,6 +229,55 @@ suite('Session files (PostgreSQL + fake GCS)', () => {
     );
   });
 
+  it('rechaza cambio de cuenta dentro del proceso antes de consultar, subir o asociar archivos', async () => {
+    const uploaded = body(await upload().expect(201));
+    const before = await fixture
+      .client()
+      .sessionAuditEvent.count({ where: { recordId: currentRecord.id } });
+    const oldAccount = fixture.principals.monitor.userId;
+    const read = jest.spyOn(service, 'content');
+    const write = jest.spyOn(service, 'upload');
+    const attach = jest.spyOn(service, 'associate');
+    const blocked = await content(uploaded.id, 'admin')
+      .set('X-Class-Session-Context', fixture.schema)
+      .set('X-Class-Session-Account', oldAccount)
+      .expect(409);
+    expect(body(blocked).code).toBe('CLASS_SESSION_CONTEXT_CHANGED');
+    await upload('admin')
+      .set('X-Class-Session-Account', oldAccount)
+      .expect(409);
+    await associate(uploaded.id, 1, 'initial', 'admin')
+      .set('X-Class-Session-Account', oldAccount)
+      .expect(409);
+    expect(read).not.toHaveBeenCalled();
+    expect(write).not.toHaveBeenCalled();
+    expect(attach).not.toHaveBeenCalled();
+    expect(
+      await fixture
+        .client()
+        .file.count({ where: { recordId: currentRecord.id } }),
+    ).toBe(1);
+    expect(
+      await fixture
+        .client()
+        .sessionAuditEvent.count({ where: { recordId: currentRecord.id } }),
+    ).toBe(before);
+    expect(
+      (
+        await fixture
+          .client()
+          .classSessionRecord.findUniqueOrThrow({
+            where: { id: currentRecord.id },
+          })
+      ).version,
+    ).toBe(1);
+    await content(uploaded.id, 'admin')
+      .set('X-Class-Session-Account', fixture.principals.admin.userId)
+      .expect(200);
+    await associate(uploaded.id, 1, 'initial', 'admin')
+      .set('X-Class-Session-Account', fixture.principals.admin.userId)
+      .expect(201);
+  });
   it('rejects anonymous, other monitor, other supervisor, teacher and coordinator despite global permissions', async () => {
     const uploaded = body(await upload().expect(201));
     await request(server())
@@ -260,7 +313,7 @@ suite('Session files (PostgreSQL + fake GCS)', () => {
     await associate(file.id, 1).expect(404);
   });
 
-  it('rejects schema-origin mismatch even with matching local account, record and file IDs', async () => {
+  it('rejects JWT/process mismatch and stale admin context before files with matching IDs are read or changed', async () => {
     const uploaded = body(await upload().expect(201));
     const other = fixture.client(fixture.otherSchema);
     // Rows with coincident IDs exist in the other process, but the authenticated origin is not the runtime process.
@@ -306,6 +359,63 @@ suite('Session files (PostgreSQL + fake GCS)', () => {
       'monitor',
       token('monitor', { schema: fixture.otherSchema }),
     ).expect(401);
+    routing.adminSchema = fixture.otherSchema;
+    const read = jest.spyOn(service, 'content');
+    const write = jest.spyOn(service, 'upload');
+    const attach = jest.spyOn(service, 'associate');
+    await content(fileId, 'admin')
+      .set('X-Class-Session-Context', fixture.schema)
+      .expect(409);
+    await upload('admin')
+      .set('X-Class-Session-Context', fixture.schema)
+      .expect(409);
+    await associate(fileId, 1, 'initial', 'admin')
+      .set('X-Class-Session-Context', fixture.schema)
+      .expect(409);
+    await request(server())
+      .post(
+        `/class-session-files/records/${currentRecord.id}/corrections/upload`,
+      )
+      .auth(token('admin'), { type: 'bearer' })
+      .set('X-Class-Session-Context', fixture.schema)
+      .field('reason', 'No debe escribir en otro proceso')
+      .attach('file', pngFixture(), {
+        filename: 'obsoleta.png',
+        contentType: 'image/png',
+      })
+      .expect(409);
+    await request(server())
+      .post(
+        `/class-session-files/records/${currentRecord.id}/corrections/captures/final`,
+      )
+      .auth(token('admin'), { type: 'bearer' })
+      .set('X-Class-Session-Context', fixture.schema)
+      .send({
+        expectedVersion: 1,
+        fileId,
+        reason: 'No debe asociar en otro proceso',
+      })
+      .expect(409);
+    expect(read).not.toHaveBeenCalled();
+    expect(write).not.toHaveBeenCalled();
+    expect(attach).not.toHaveBeenCalled();
+    expect(await other.file.count()).toBe(1);
+    expect(await other.sessionAuditEvent.count()).toBe(0);
+    expect(
+      (
+        await other.classSessionRecord.findUniqueOrThrow({
+          where: { id: currentRecord.id },
+        })
+      ).version,
+    ).toBe(1);
+    await content(fileId, 'admin')
+      .set('X-Class-Session-Context', fixture.otherSchema)
+      .expect(200);
+    await content(fileId, 'admin').expect(200);
+    routing.adminSchema = fixture.schema;
+    await content(fileId, 'admin')
+      .set('X-Class-Session-Context', fixture.otherSchema)
+      .expect(409);
   });
   it('permite corregir capturas cerradas solo por ruta administrativa motivada y conserva evidencia/plazo', async () => {
     const first = body(await upload().expect(201));

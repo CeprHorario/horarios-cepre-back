@@ -119,6 +119,27 @@ export class RecoveryDto extends DateDto {
   @ApiProperty() @IsInt() @Min(1) hourSessionId: number;
   @ApiProperty() @IsString() @MinLength(3) @MaxLength(2000) reason: string;
 }
+export class SessionPeopleQueryDto {
+  @ApiProperty({ enum: ['TEACHER', 'MONITOR'] })
+  @IsIn(['TEACHER', 'MONITOR'])
+  kind: string;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  search?: string;
+  @ApiPropertyOptional({ default: 1 })
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page = 1;
+  @ApiPropertyOptional({ default: 25, maximum: 100 })
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit = 25;
+}
 export class CoverageTargetDto extends VersionDto {
   @ApiProperty() @IsInt() @Min(1) recordId: number;
 }

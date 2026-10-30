@@ -9,6 +9,7 @@ import {
   Req,
   StreamableFile,
   UploadedFile,
+  UseGuards,
   UseInterceptors,
   UsePipes,
   ValidationPipe,
@@ -34,10 +35,12 @@ import {
 } from '@nestjs/swagger';
 import { SessionFilesService } from './session-files.service';
 import { MAX_SESSION_FILE_SIZE } from './session-file.validation';
+import { ClassSessionContextGuard } from '../class-session-records/class-session-context.guard';
 
 @Controller('class-session-files')
 @ApiTags('Evidencias de partes')
 @ApiBearerAuth()
+@UseGuards(ClassSessionContextGuard)
 @UsePipes(
   new ValidationPipe({
     transform: true,

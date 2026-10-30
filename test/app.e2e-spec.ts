@@ -42,18 +42,21 @@ describe('Configuración HTTP', () => {
     expect(document.components.securitySchemes).toHaveProperty('bearer');
   });
 
-  it('mantiene el origen CORS y la cabecera Authorization', async () => {
+  it('mantiene origen CORS y permite Authorization y precondiciones de partes', async () => {
     await request(app.getHttpServer())
       .options('/api/health')
       .set('Origin', 'http://localhost:5173')
       .set('Access-Control-Request-Method', 'GET')
-      .set('Access-Control-Request-Headers', 'Authorization')
+      .set(
+        'Access-Control-Request-Headers',
+        'Authorization,X-Class-Session-Context,X-Class-Session-Account',
+      )
       .expect(204)
       .expect('Access-Control-Allow-Origin', 'http://localhost:5173')
       .expect('Access-Control-Allow-Credentials', 'true')
       .expect(
         'Access-Control-Allow-Headers',
-        'Content-Type,Authorization,X-Requested-With',
+        'Content-Type,Authorization,X-Requested-With,X-Class-Session-Context,X-Class-Session-Account',
       );
   });
 
