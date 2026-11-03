@@ -70,6 +70,18 @@ import { AreaController } from '../../src/modules/areas/area.controller';
 import { AreaService } from '../../src/modules/areas/area.service';
 import { ShiftController } from '../../src/modules/shifts/shift.controller';
 import { ShiftService } from '../../src/modules/shifts/shift.service';
+import { SupervisorController } from '../../src/modules/supervisors/supervisor.controller';
+import { SupervisorService } from '../../src/modules/supervisors/supervisor.service';
+import { CoordinatorController } from '../../src/modules/coordinators/coordinator.controller';
+import { CoordinatorService } from '../../src/modules/coordinators/coordinator.service';
+import { CourseController } from '../../src/modules/courses/course.controller';
+import { CourseService } from '../../src/modules/courses/course.service';
+import { AdmissionsController } from '../../src/modules/admissions/admissions.controller';
+import { AdmissionsService } from '../../src/modules/admissions/admissions.service';
+import { ScheduleController } from '../../src/modules/schedules/schedules.controller';
+import { SedeController } from '../../src/modules/sedes/sede.controller';
+import { SedeService } from '../../src/modules/sedes/sede.service';
+import { OperationsReportsController } from '../../src/modules/operations/operations-reports.controller';
 
 const frontend =
   process.env.RECORDS_BROWSER_FRONTEND_ORIGIN ?? 'http://127.0.0.1:5174';
@@ -222,6 +234,13 @@ export async function createRecordsBrowserHarness() {
         TeacherController,
         AreaController,
         ShiftController,
+        SupervisorController,
+        CoordinatorController,
+        CourseController,
+        AdmissionsController,
+        ScheduleController,
+        SedeController,
+        OperationsReportsController,
       ],
       providers: [
         AuthService,
@@ -251,6 +270,11 @@ export async function createRecordsBrowserHarness() {
         TeacherService,
         AreaService,
         ShiftService,
+        SupervisorService,
+        CoordinatorService,
+        CourseService,
+        AdmissionsService,
+        SedeService,
         { provide: JwtService, useValue: jwt },
         { provide: PrismaService, useValue: fixture.apiPrisma },
         { provide: RequestContext, useValue: fixture.context },
@@ -258,7 +282,10 @@ export async function createRecordsBrowserHarness() {
         { provide: SchemaManagerService, useValue: schemas },
         {
           provide: RuntimeConfigService,
-          useValue: { getCurrent: () => Promise.resolve(runtime) },
+          useValue: {
+            getCurrent: () => Promise.resolve(runtime),
+            getHistory: () => Promise.resolve([runtime]),
+          },
         },
         {
           provide: PermissionsService,
@@ -445,6 +472,7 @@ export async function createRecordsBrowserHarness() {
       });
       await db.class.create({ data: {
         id: ids.emptyClass, name: `Aula sin partes ${label.toUpperCase()}`, idSede: 1, areaId: 1, shiftId: 1,
+        monitorId: ids.otherMonitor,
       } });
       const replacement = await db.user.create({
         data: {
@@ -466,12 +494,14 @@ export async function createRecordsBrowserHarness() {
             userId: fixture.principals.teacher.userId,
             courseId: 1,
             jobStatus: 'PartTime',
+            maxHours: 20,
           },
           {
             id: ids.replacementTeacher,
             userId: replacement.id,
             courseId: 1,
             jobStatus: 'PartTime',
+            maxHours: 20,
           },
         ],
       });
@@ -622,6 +652,9 @@ export async function createRecordsBrowserHarness() {
             );
         });
       }
+      for (const [classId, teacherId] of [[fixture.classId, ids.teacher], [ids.emptyClass, ids.replacementTeacher]])
+        for (const hourSessionId of [1, 2, 3])
+          await db.$executeRaw`INSERT INTO schedules(class_id,course_id,hour_session_id,teacher_id,weekday) VALUES (${classId}::uuid,1,${hourSessionId},${teacherId}::uuid,'MONDAY')`;
       const historicalDate = new Date(`${date}T12:00:00Z`);
       historicalDate.setUTCDate(historicalDate.getUTCDate() - 7);
       entry.historical.date = historicalDate.toISOString().slice(0, 10);
@@ -654,6 +687,7 @@ export async function createRecordsBrowserHarness() {
       processes,
       ids,
       classId: fixture.classId,
+      supervisorId: fixture.supervisorId,
       accounts: Object.fromEntries(
         Object.entries(fixture.principals).map(([role, p]) => [
           role,
