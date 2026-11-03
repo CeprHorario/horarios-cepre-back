@@ -27,6 +27,7 @@ import {
   SessionQueryDto,
   UpdateSessionDto,
 } from './session.dto';
+import { syncPartObservations } from './part-observations';
 
 @Injectable()
 export class ClassSessionRecordsService {
@@ -153,6 +154,14 @@ export class ClassSessionRecordsService {
     return row.now;
   }
 
+  editStartsAt(
+    record: Pick<ClassSessionRecord, 'scheduledStart' | 'period' | 'editOpensAt'>,
+  ): Date {
+    return new Date(
+      record.editOpensAt ?? (+record.scheduledStart - (record.period === 1 ? 5 * 60_000 : 0)),
+    );
+  }
+
   async assertWritable(
     tx: SessionTx,
     actor: SessionActor,
@@ -161,21 +170,14 @@ export class ClassSessionRecordsService {
     await tx.$queryRaw`SELECT set_config('cepr.session_account',${actor.id},true)`;
     const now = await this.now(tx);
     if (record.deletedAt) throw new ForbiddenException('Parte anulado');
-    if (now < record.scheduledStart)
-      throw new ForbiddenException('El bloque todavía no comienza');
-    if (now < record.editDeadline) return;
-    const grant = await tx.sessionEditGrant.findFirst({
-      where: {
-        recordId: record.id,
-        accountId: actor.id,
-        revokedAt: null,
-        expiresAt: { gt: now },
-      },
-    });
-    if (!grant)
+    if (now < this.editStartsAt(record))
       throw new ForbiddenException(
-        'Plazo cerrado; requiere habilitación o corrección administrativa motivada',
+        'La edición del bloque todavía no está habilitada',
       );
+    if (now < record.editDeadline) return;
+    throw new ForbiddenException(
+      'Plazo cerrado: solo administración puede corregir el parte con un motivo',
+    );
   }
 
   async lock(tx: SessionTx, id: number) {
@@ -374,6 +376,7 @@ export class ClassSessionRecordsService {
 
   async history(principal: SessionPrincipal, id: number, page = 1) {
     const { client, actor } = await this.context(principal);
+    this.admin(actor);
     await this.authorizeRecord(client, actor, id, false, true);
     return client.sessionAuditEvent.findMany({
       where: { recordId: id },
@@ -501,37 +504,137 @@ export class ClassSessionRecordsService {
     dto: UpdateSessionDto,
     administrative = false,
   ) {
+    let observationWarning: string | undefined;
     return this.mutate(
       principal,
       id,
       dto.expectedVersion,
       administrative ? 'ADMIN_CORRECTION' : 'UPDATE',
       dto.reason,
-      async (tx, record) => {
+      async (tx, record, actor) => {
+        if (
+          actor.role !== Role.ADMIN &&
+          (dto.effectiveTeacherId !== undefined ||
+            dto.effectiveMonitorId !== undefined)
+        )
+          throw new ForbiddenException(
+            'Solo administración puede cambiar el docente o monitor del parte',
+          );
         const data: Prisma.ClassSessionRecordUncheckedUpdateInput = {};
+        const state =
+          dto.classState === undefined ? record.classState : dto.classState;
+        if (
+          actor.role === Role.MONITOR &&
+          dto.classState !== undefined &&
+          (dto.classState === 'RE' || record.classState === 'RE') &&
+          dto.classState !== record.classState
+        )
+          throw new ForbiddenException(
+            'El reemplazo de emergencia se registra desde supervisión',
+          );
+        if (dto.classState !== undefined) data.classState = dto.classState;
         if (dto.teachingStatus !== undefined)
           data.teachingStatus = dto.teachingStatus;
         if (dto.titularOutcome !== undefined)
           data.titularOutcome = dto.titularOutcome;
-        if (dto.incidents !== undefined) data.incidents = dto.incidents;
+        if (dto.incidents !== undefined && actor.role === Role.ADMIN) data.incidents = dto.incidents;
+        if(dto.structuredObservations !== undefined) {
+          if(new Set(dto.structuredObservations.map(o=>o.id)).size!==dto.structuredObservations.length) throw new BadRequestException('Observaciones duplicadas');
+          for(const o of dto.structuredObservations) if(o.target==='STUDENT' && (!o.firstName?.trim() || !o.lastName?.trim())) throw new BadRequestException('Indica nombres y apellidos del alumno');
+          if(dto.structuredObservations.some(o=>o.description.trim().length<3))throw new BadRequestException('La descripción debe contener al menos tres caracteres');
+          data.structuredObservations=json(dto.structuredObservations.map(o=>({id:o.id,target:o.target,description:o.description.trim(),...(o.target==='STUDENT'?{firstName:o.firstName!.trim(),lastName:o.lastName!.trim()}: {})})));
+          data.incidents=dto.structuredObservations.map(o=>`[${o.target}] ${o.target==='STUDENT' ? o.firstName+' '+o.lastName+': ' : ''}${o.description.trim()}`).join('\n');
+        } else if(dto.incidents !== undefined && actor.role!==Role.ADMIN) throw new BadRequestException('Clasifica la observación como docente, alumno o aula');
         for (const field of ['actualStart', 'actualEnd'] as const)
           if (dto[field] !== undefined)
             data[field] = dto[field] ? new Date(dto[field]) : null;
+        if (state) {
+          const started =
+            dto.actualStart === undefined
+              ? record.actualStart
+              : dto.actualStart;
+          data.teachingStatus =
+            state === 'SD' ? 'NOT_TAUGHT' : started ? 'TAUGHT' : 'UNCONFIRMED';
+          data.titularOutcome =
+            state === 'SD'
+              ? 'ABSENT'
+              : state === 'RN'
+                ? 'PLANNED_REPLACEMENT'
+                : started
+                  ? state === 'RE'
+                    ? 'ABSENT'
+                    : 'PRESENT'
+                  : 'UNKNOWN';
+          if (state === 'SD') {
+            data.actualStart = null;
+            data.actualEnd = null;
+          }
+          if (state === 'RN' || state === 'RE') {
+            const authorized = await tx.sessionCoverage.findFirst({
+              where: {
+                recordId: id,
+                kind: 'TEACHER',
+                mode: state === 'RE' ? 'EMERGENCY' : 'PLANNED',
+                status: 'AUTHORIZED',
+              },
+            });
+            if (!authorized)
+              throw new BadRequestException(
+                state === 'RE'
+                  ? 'Supervisión debe registrar el reemplazo de emergencia'
+                  : 'Administración debe registrar el reemplazo normal',
+              );
+          }
+        } else if (dto.classState === null) {
+          data.teachingStatus = 'UNCONFIRMED';
+          data.titularOutcome = 'UNKNOWN';
+        }
         const effectiveSnapshot = {
           ...(record.effectiveSnapshot as Prisma.JsonObject),
         };
+        const effectiveIds: Partial<
+          Pick<UpdateSessionDto, 'effectiveTeacherId' | 'effectiveMonitorId'>
+        > = actor.role === Role.ADMIN ? dto : {};
+        if (actor.role === Role.MONITOR) {
+          if (!record.effectiveMonitorId)
+            effectiveIds.effectiveMonitorId = (await tx.monitor.findUnique({where:{userId:actor.id}}))?.id ?? null;
+          const status =
+            data.teachingStatus ?? dto.teachingStatus ?? record.teachingStatus;
+          const hasStart =
+            dto.actualStart === undefined
+              ? record.actualStart
+              : dto.actualStart;
+          if (
+            !record.effectiveTeacherId &&
+            hasStart &&
+            (status === 'TAUGHT' || status === 'INTERRUPTED')
+          ) {
+            const authorized = await tx.sessionCoverage.findFirst({
+              where: { recordId: id, kind: 'TEACHER', status: 'AUTHORIZED' },
+              orderBy: { id: 'desc' },
+            });
+            effectiveIds.effectiveTeacherId =
+              authorized?.teacherId ??
+              ((data.titularOutcome ??
+                dto.titularOutcome ??
+                record.titularOutcome) === 'ABSENT'
+                ? null
+                : record.titularTeacherId);
+          }
+          if (state === 'SD') effectiveIds.effectiveTeacherId = null;
+        }
         for (const [field, kind, titular] of [
           ['effectiveTeacherId', 'TEACHER', record.titularTeacherId],
           ['effectiveMonitorId', 'MONITOR', record.titularMonitorId],
         ] as const) {
-          const personId = dto[field];
+          const personId = effectiveIds[field];
           if (personId === undefined) continue;
           if (personId && personId !== titular) {
             const coverage = await tx.sessionCoverage.findFirst({
               where: {
                 recordId: id,
                 kind,
-                status: { in: ['AUTHORIZED', 'PENDING'] },
+                status: 'AUTHORIZED',
                 ...(kind === 'TEACHER'
                   ? { teacherId: personId }
                   : { monitorId: personId }),
@@ -549,17 +652,21 @@ export class ClassSessionRecordsService {
         }
         data.effectiveSnapshot = json(effectiveSnapshot);
         const start =
-          dto.actualStart === undefined
-            ? record.actualStart
-            : dto.actualStart
-              ? new Date(dto.actualStart)
-              : null;
+          state === 'SD'
+            ? null
+            : dto.actualStart === undefined
+              ? record.actualStart
+              : dto.actualStart
+                ? new Date(dto.actualStart)
+                : null;
         const end =
-          dto.actualEnd === undefined
-            ? record.actualEnd
-            : dto.actualEnd
-              ? new Date(dto.actualEnd)
-              : null;
+          state === 'SD'
+            ? null
+            : dto.actualEnd === undefined
+              ? record.actualEnd
+              : dto.actualEnd
+                ? new Date(dto.actualEnd)
+                : null;
         if (start && end && end < start)
           throw new BadRequestException('Intervalo real inválido');
         const now = await this.now(tx);
@@ -567,9 +674,18 @@ export class ClassSessionRecordsService {
           throw new BadRequestException(
             'No se pueden confirmar hechos futuros',
           );
+        observationWarning = await syncPartObservations(
+          tx,
+          actor,
+          record,
+          dto.structuredObservations === undefined ? undefined : dto.structuredObservations.filter(o=>o.target==='TEACHER').map(o=>o.description.trim()).join('\n'),
+          now,
+        );
         return data;
       },
       administrative,
+    ).then((record) =>
+      observationWarning ? { ...record, observationWarning } : record,
     );
   }
 }

@@ -33,6 +33,8 @@ import { SessionReportsService } from '../src/modules/class-session-records/sess
 import { SessionPrincipal } from '../src/modules/class-session-records/session.types';
 import { SessionFilesFixture } from './helpers/session-files-fixtures';
 import { initialDataSchema } from '../src/database/prisma/data/seed';
+import { IncidencesController } from '../src/modules/incidences/incidences.controller';
+import { IncidencesService } from '../src/modules/incidences/incidences.service';
 
 const suite = process.env.TEST_DATABASE_URL ? describe : describe.skip;
 suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
@@ -104,6 +106,7 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
     api('patch', `/${r.id}`, name).send({
       expectedVersion: r.version,
       ...data,
+      ...(typeof data.incidents==='string'?{incidents:undefined,structuredObservations:[{id:randomUUID(),target:'CLASSROOM',description:data.incidents.length<3?'Nota '+data.incidents:data.incidents}]}:{}),
     });
 
   beforeAll(async () => {
@@ -189,9 +192,10 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
         ]),
     };
     const module = await Test.createTestingModule({
-      controllers: [ClassSessionRecordsController],
+      controllers: [ClassSessionRecordsController, IncidencesController],
       providers: [
         ClassSessionRecordsService,
+        IncidencesService,
         SessionJournalService,
         SessionFollowupService,
         SessionReportsService,
@@ -602,7 +606,7 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
         titularTeacherId: null,
         titularMonitorId: null,
         supervisorId: null,
-        snapshot: {},
+        snapshot: {}, structuredObservations: [],
         effectiveSnapshot: {},
         timingPolicy: {},
         initialAssociatedBy: Prisma.DbNull,
@@ -724,7 +728,7 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
       run(() =>
         records.update(actor(), r.id, {
           expectedVersion: 1,
-          incidents: 'No persistir',
+          structuredObservations:[{id:randomUUID(),target:'CLASSROOM',description:'No persistir'}],
         }),
       ),
     ).rejects.toThrow('audit unavailable');
@@ -746,13 +750,59 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
         .incidents,
     ).toBeNull();
   });
-  it('cierra al límite exacto y después; concede, vence y revoca habilitaciones sin mover plazo', async () => {
+  it('habilita solo el primer bloque cinco minutos antes, también en PostgreSQL', async () => {
+    const prepare = async (period: number, minutes: number) => {
+      const r = await fresh(),
+        now = Date.now();
+      return db().classSessionRecord.update({
+        where: { id: r.id },
+        data: {
+          period,
+          scheduledStart: new Date(now + minutes * 60000),
+          scheduledEnd: new Date(now + (minutes + 40) * 60000),
+          shiftEnd: new Date(now + 4 * 3600000),
+          editDeadline: new Date(now + 5.5 * 3600000),
+        },
+      });
+    };
+    const first = await prepare(1, 5),
+      later = await prepare(2, 5),
+      tooEarly = await prepare(1, 6);
+    await patch(first, {
+      incidents: 'Preparación previa del primer bloque',
+    }).expect(200);
+    await patch(later, { incidents: 'No anticipar bloques siguientes' }).expect(
+      403,
+    );
+    await patch(tooEarly, { incidents: 'Demasiado temprano' }).expect(403);
+    await db().$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT set_config('cepr.session_account',${actor().userId},true)`;
+      await tx.classSessionRecord.update({
+        where: { id: first.id },
+        data: { incidents: 'Preparación dentro del plazo' },
+      });
+    });
+    await expect(
+      db().$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT set_config('cepr.session_account',${actor().userId},true)`;
+        await tx.classSessionRecord.update({
+          where: { id: later.id },
+          data: { incidents: 'No autorizado' },
+        });
+      }),
+    ).rejects.toThrow('SESSION_EDIT_CLOSED');
+    expect(
+      (
+        await db().classSessionRecord.findUniqueOrThrow({
+          where: { id: first.id },
+        })
+      ).editDeadline,
+    ).toEqual(first.editDeadline);
+  });
+  it('cierra al límite exacto y no admite habilitaciones después del plazo', async () => {
     const r = await fresh();
     await patch(r, { incidents: 'Antes' }).expect(200);
     await fixture.closeRecord(r.id);
-    await api('patch', `/${r.id}`)
-      .send({ expectedVersion: 2, incidents: 'Después' })
-      .expect(403);
     const closed = await db().classSessionRecord.findUniqueOrThrow({
       where: { id: r.id },
     });
@@ -773,48 +823,46 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
       ),
     ).rejects.toThrow('Plazo cerrado');
     jest.restoreAllMocks();
-    const grant = body<{ id: number }>(
-      await api('post', `/${r.id}/grants`, 'admin')
-        .send({
-          expectedVersion: 2,
-          accountId: actor().userId,
-          expiresAt: new Date(Date.now() + 60000).toISOString(),
-          reason: 'Completar evidencia',
-        })
-        .expect(201),
-    );
-    await api('patch', `/${r.id}`)
-      .send({ expectedVersion: 2, incidents: 'Habilitado' })
-      .expect(200);
-    await api('post', `/grants/${grant.id}/revoke`, 'admin')
-      .send({ expectedVersion: 3, reason: 'Revocación solicitada' })
-      .expect(201);
-    await api('patch', `/${r.id}`)
-      .send({ expectedVersion: 3, incidents: 'Revocado' })
-      .expect(403);
+    await api('post', `/${r.id}/grants`, 'admin')
+      .send({
+        expectedVersion: 2,
+        accountId: actor().userId,
+        expiresAt: new Date(Date.now() + 60000).toISOString(),
+        reason: 'No ampliar cierre',
+      })
+      .expect(400);
     await db().sessionEditGrant.create({
       data: {
         recordId: r.id,
         accountId: actor().userId,
-        createdAt: new Date(Date.now() - 120000),
-        expiresAt: new Date(Date.now() - 60000),
-        reason: 'Ya vencida',
+        expiresAt: new Date(Date.now() + 60000),
+        reason: 'Permiso histórico',
         grantedBy: {},
       },
     });
-    await api('patch', `/${r.id}`).send({ expectedVersion: 3 }).expect(403);
+    await api('patch', `/${r.id}`)
+      .send({ expectedVersion: 2, incidents: 'Fuera de plazo' })
+      .expect(403);
+    await expect(
+      db().$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT set_config('cepr.session_account',${actor().userId},true)`;
+        await tx.classSessionRecord.update({
+          where: { id: r.id },
+          data: { incidents: 'Permiso antiguo' },
+        });
+      }),
+    ).rejects.toThrow('SESSION_EDIT_CLOSED');
+    await api('post', `/${r.id}/corrections`, 'admin')
+      .send({
+        expectedVersion: 2,
+        incidents: 'Corrección con motivo',
+        reason: 'Revisión administrativa posterior',
+      })
+      .expect(201);
     expect(
       (await db().classSessionRecord.findUniqueOrThrow({ where: { id: r.id } }))
         .editDeadline,
     ).toEqual(closed.editDeadline);
-    await api('post', `/${r.id}/grants`, 'admin')
-      .send({
-        expectedVersion: 3,
-        accountId: actor('teacher').userId,
-        expiresAt: new Date(Date.now() + 60000).toISOString(),
-        reason: 'No permitido',
-      })
-      .expect(400);
   });
   it('el trigger PostgreSQL rechaza escritura que cruza el cierre, aunque la validación previa haya pasado', async () => {
     const r = await fresh();
@@ -877,6 +925,8 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
     await patch(current, {
       effectiveTeacherId: teacherIds[1],
       effectiveMonitorId: monitorId,
+    }).expect(403);
+    await patch(current, {
       titularOutcome: 'ABSENT',
       teachingStatus: 'TAUGHT',
       actualStart: r.scheduledStart.toISOString(),
@@ -886,6 +936,8 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
       where: { id: r.id },
     });
     expect(after.titularOutcome).toBe('ABSENT');
+    expect(after.effectiveTeacherId).toBe(teacherIds[1]);
+    expect(after.effectiveMonitorId).toBe(monitorId);
     expect(after.titularTeacherId).toBe(teacherIds[0]);
     expect(
       (await db().teacher.findUniqueOrThrow({ where: { id: teacherIds[0] } }))
@@ -901,44 +953,12 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
       })
       .expect(409);
   });
-  it('solicitud de emergencia pendiente y resolución no reescriben trabajo ocurrido', async () => {
-    const r = await fresh();
-    const result = body<{ data: { id: number; status: string }[] }>(
-      await api('post', '/replacements')
-        .send({
-          targets: [{ recordId: r.id, expectedVersion: 1 }],
-          kind: 'TEACHER',
-          personId: teacherIds[1],
-          mode: 'EMERGENCY',
-          reason: 'Emergencia declarada',
-        })
-        .expect(201),
-    );
-    expect(result.data[0].status).toBe('PENDING');
-    await api('patch', `/${r.id}`)
-      .send({
-        expectedVersion: 2,
-        effectiveTeacherId: teacherIds[1],
-        titularOutcome: 'ABSENT',
-      })
-      .expect(200);
-    await api('post', `/replacements/${result.data[0].id}/resolve`, 'admin')
-      .send({ expectedVersion: 3, status: 'REJECTED', reason: 'No autorizada' })
-      .expect(201);
-    const current = await db().classSessionRecord.findUniqueOrThrow({
-      where: { id: r.id },
-    });
-    expect(current.effectiveTeacherId).toBe(teacherIds[1]);
-    expect(current.titularOutcome).toBe('ABSENT');
-    await api('post', '/replacements')
-      .send({
-        targets: [{ recordId: r.id, expectedVersion: 4 }],
-        kind: 'MONITOR',
-        personId: otherMonitorId,
-        mode: 'PLANNED',
-        reason: 'Monitor no autoriza',
-      })
-      .expect(400);
+  it('las rutas antiguas no permiten al monitor ni al supervisor saltarse la aprobación de reemplazos',async()=>{
+    const r=await fresh();const dto={targets:[{recordId:r.id,expectedVersion:1}],kind:'TEACHER',personId:teacherIds[1],mode:'EMERGENCY',reason:'Solicitud debe usar el flujo documentado'};
+    await api('post','/replacements').send(dto).expect(401);
+    await api('post','/replacements','supervisor').send(dto).expect(403);
+    expect(await db().sessionCoverage.count({where:{recordId:r.id}})).toBe(0);
+    expect((await db().classSessionRecord.findUniqueOrThrow({where:{id:r.id}})).version).toBe(1);
   });
   it('serializa coberturas concurrentes sin duplicación activa ni conflictos entre aulas', async () => {
     const r = await fresh();
@@ -1005,7 +1025,7 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
         data: {
           ...r,
           id: undefined,
-          snapshot: {},
+          snapshot: {}, structuredObservations: [],
           timingPolicy: {},
           effectiveSnapshot: {},
           initialAssociatedBy: Prisma.DbNull,
@@ -1022,7 +1042,7 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
       db().classSessionRecord.delete({ where: { id: r.id } }),
     ).rejects.toThrow('retained');
   });
-  it('jornada idempotente antes de ejecución, no reconstruye pasado; alerta persistente sin intervención monitor', async () => {
+  it('completa la jornada actual aunque haya iniciado, sin confirmar ejecución ni reconstruir otros días', async () => {
     const now = new Date();
     const future = new Date(+now + 3600000);
     if (limaDate(future) !== limaDate(now)) future.setTime(+now + 60000);
@@ -1055,6 +1075,23 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
         weekday,
       },
     });
+    const pastHour = await db().hourSession.create({
+      data: {
+        shiftId: 1,
+        period: 11,
+        startTime: new Date('1970-01-01T00:00:00Z'),
+        endTime: new Date('1970-01-01T00:01:00Z'),
+      },
+    });
+    await db().schedule.create({
+      data: {
+        classId: fixture.classId,
+        hourSessionId: pastHour.id,
+        courseId: 1,
+        teacherId: teacherIds[0],
+        weekday,
+      },
+    });
     await db().sessionOperationalConfig.update({
       where: { id: 1 },
       data: {
@@ -1066,11 +1103,55 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
         continuityGapMinutes: 10,
       },
     });
+    const todaysSchedules = await db().schedule.findMany({
+      where: { weekday },
+      select: { classId: true, hourSessionId: true },
+    });
+    const before = await db().classSessionRecord.findMany({
+      where: { date: new Date(limaDate()) },
+      select: { classId: true, hourSessionId: true },
+    });
+    const expected = todaysSchedules.filter(
+      (s) =>
+        !before.some(
+          (r) => r.classId === s.classId && r.hourSessionId === s.hourSessionId,
+        ),
+    ).length;
     const results = await Promise.all([
       journal.materialize(db(), fixture.schema, limaDate()),
       journal.materialize(db(), fixture.schema, limaDate()),
     ]);
-    expect(results.reduce((a, b) => a + b.created, 0)).toBe(1);
+    expect(results.reduce((a, b) => a + b.created, 0)).toBe(expected);
+    const pastRecord = await db().classSessionRecord.findUniqueOrThrow({
+      where: {
+        date_classId_hourSessionId: {
+          date: new Date(limaDate()),
+          classId: fixture.classId,
+          hourSessionId: pastHour.id,
+        },
+      },
+    });
+    expect(pastRecord).toMatchObject({
+      teachingStatus: 'UNCONFIRMED',
+      titularOutcome: 'UNKNOWN',
+      actualStart: null,
+      actualEnd: null,
+    });
+    const originalSnapshot = pastRecord.snapshot;
+    await db().schedule.updateMany({
+      where: { classId: fixture.classId, hourSessionId: pastHour.id },
+      data: { teacherId: null },
+    });
+    expect(await journal.materialize(db(), fixture.schema, limaDate())).toEqual(
+      { created: 0 },
+    );
+    expect(
+      (
+        await db().classSessionRecord.findUniqueOrThrow({
+          where: { id: pastRecord.id },
+        })
+      ).snapshot,
+    ).toEqual(originalSnapshot);
     const r = await db().classSessionRecord.findUniqueOrThrow({
       where: {
         date_classId_hourSessionId: {
@@ -1174,7 +1255,7 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
           actualStart: i === 4 ? null : new Date(+s + 8 * 60000),
           actualEnd: i === 4 ? null : new Date(+s + 40 * 60000),
           teachingStatus: i === 4 ? 'UNCONFIRMED' : 'TAUGHT',
-          snapshot: {},
+          snapshot: {}, structuredObservations: [],
           timingPolicy: {
             version: 1,
             latenessToleranceMinutes: 5,
@@ -1675,7 +1756,7 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
       });
       const personId = kind === 'TEACHER' ? teacherIds[1] : otherMonitorId;
       const response = body<{ data: { id: number }[] }>(
-        await api('post', '/replacements')
+        await api('post', '/replacements', 'admin')
           .send({
             targets: [{ recordId: r.id, expectedVersion: 1 }],
             kind,
@@ -1685,20 +1766,21 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
           })
           .expect(201),
       );
-      await patch(
-        { ...r, version: 2 },
-        {
+      await api('post', `/${r.id}/corrections`, 'admin')
+        .send({
+          expectedVersion: 2,
+          reason: 'Registrar ejecución verificada por administración',
           [kind === 'TEACHER' ? 'effectiveTeacherId' : 'effectiveMonitorId']:
             personId,
           actualStart: r.scheduledStart.toISOString(),
           actualEnd: r.scheduledEnd.toISOString(),
           teachingStatus: 'TAUGHT',
-        },
-      ).expect(200);
+        })
+        .expect(201);
       await api('post', `/replacements/${response.data[0].id}/resolve`, 'admin')
         .send({
           expectedVersion: 3,
-          status: 'REJECTED',
+          status: 'REVOKED',
           reason: 'No autorizado pero ocurrido',
         })
         .expect(201);
@@ -1712,5 +1794,210 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
         })
         .expect(409);
     }
+  });
+
+  const incidenceApi = (
+    method: 'get' | 'post' | 'patch',
+    path = '',
+    name = 'admin',
+  ) =>
+    request(app.getHttpServer() as Server)
+      [method](`/incidences${path}`)
+      .auth(token(name), { type: 'bearer' });
+  const profile = (userId: string, dni: string, client = db()) =>
+    client.userProfile.upsert({
+      where: { userId },
+      create: {
+        userId,
+        dni,
+        firstName: 'Persona',
+        lastName: 'Prueba',
+        phonesAdditional: [],
+      },
+      update: { dni },
+    });
+  it('observaciones clasificadas separan alumno/aula del DNI docente y respetan cierre y alcance',async()=>{
+    const r=await fresh();await profile(teacherUsers[0],'91000001');
+    const dto={operationId:randomUUID(),subjectAccountId:teacherUsers[0],subjectRole:'profesor',recordId:r.id,title:'No usar ruta genérica',description:'Observación del bloque',occurredAt:new Date(+r.scheduledStart+1000).toISOString()};
+    await incidenceApi('post','','monitor').send(dto).expect(403);
+    const before=await db().$queryRaw<{total:number}[]>`SELECT count(*)::int total FROM public.person_incidences WHERE subject_dni='91000001'`;
+    const notes=[{id:randomUUID(),target:'STUDENT',firstName:'Alumno',lastName:'Prueba',description:'Observación de alumno'},{id:randomUUID(),target:'CLASSROOM',description:'Observación del aula'}];
+    await patch(r,{structuredObservations:notes}).expect(200);
+    expect(await db().$queryRaw`SELECT count(*)::int total FROM public.person_incidences WHERE subject_dni='91000001'`).toEqual(before);
+    const current=await db().classSessionRecord.findUniqueOrThrow({where:{id:r.id}});
+    expect(current.structuredObservations).toEqual(notes);
+    const teacherNotes=[{id:randomUUID(),target:'TEACHER',description:'Observación del docente de la hora'}];
+    await patch(current,{structuredObservations:teacherNotes}).expect(200);
+    expect((await db().$queryRaw<{total:number}[]>`SELECT count(*)::int total FROM public.person_incidences WHERE subject_dni='91000001'`)[0].total).toBe(before[0].total+1);
+    await patch(current,{structuredObservations:teacherNotes},'otherMonitor').expect(404);
+    await incidenceApi('get','?dni=91000001','monitor').expect(403);
+    await incidenceApi('get','','teacher').expect(401);
+    await fixture.closeRecord(r.id);
+    const closed=await db().classSessionRecord.findUniqueOrThrow({where:{id:r.id}});
+    await patch(closed,{structuredObservations:notes}).expect(403);
+  });
+  it('incidencias: supervisor solo consulta sus monitores, nunca incidencias propias', async () => {
+    await profile(actor().userId, '91000002');
+    await profile(actor('supervisor').userId, '91000003');
+    const dto = {
+      operationId: randomUUID(),
+      subjectAccountId: actor().userId,
+      subjectRole: 'monitor',
+      title: 'Reporte supervisor',
+      description: 'Incidencia con seguimiento',
+      occurredAt: new Date(Date.now() - 60000).toISOString(),
+    };
+    const monitorReport = body<{ id: string }>(
+      await incidenceApi('post', '', 'supervisor').send(dto).expect(201),
+    );
+    await incidenceApi('post', '', 'otherSupervisor')
+      .send({ ...dto, operationId: randomUUID() })
+      .expect(404);
+    await incidenceApi('post', '', 'supervisor')
+      .send({
+        ...dto,
+        operationId: randomUUID(),
+        subjectRole: 'supervisor',
+        subjectAccountId: actor('supervisor').userId,
+      })
+      .expect(403);
+    const report = body<{ id: string }>(
+      await incidenceApi('post')
+        .send({
+          ...dto,
+          operationId: randomUUID(),
+          subjectRole: 'supervisor',
+          subjectAccountId: actor('supervisor').userId,
+        })
+        .expect(201),
+    );
+    const received = body<{ data: { id: string }[] }>(
+      await incidenceApi('get', '', 'supervisor').expect(200),
+    );
+    expect(received.data.some((x) => x.id === report.id)).toBe(false);
+    expect(received.data.some((x) => x.id === monitorReport.id)).toBe(true);
+    const other = body<{ data: { id: string }[] }>(
+      await incidenceApi('get', '', 'otherSupervisor').expect(200),
+    );
+    expect(other.data.some((x) => x.id === monitorReport.id)).toBe(false);
+    await incidenceApi('get', '?mine=true', 'supervisor').expect(400);
+    await incidenceApi('get', '?dni=91000003', 'supervisor').expect(403);
+    await incidenceApi('get', '', 'monitor').expect(403);
+    await incidenceApi('get', '?mine=true', 'monitor').expect(400);
+    await incidenceApi('get', `/${report.id}/history`, 'supervisor').expect(
+      401,
+    );
+    await incidenceApi('get', `/${monitorReport.id}/history`, 'monitor').expect(
+      401,
+    );
+    const monitorReceived = body<{ id: string }>(
+      await incidenceApi('post')
+        .send({ ...dto, operationId: randomUUID() })
+        .expect(201),
+    );
+    const ownMonitors = body<{ data: { id: string }[] }>(
+      await incidenceApi('get', '', 'supervisor').expect(200),
+    );
+    expect(ownMonitors.data.some((x) => x.id === monitorReceived.id)).toBe(
+      true,
+    );
+    await incidenceApi('get', '?dni=91000002', 'monitor').expect(403);
+    await incidenceApi('patch', `/${report.id}`, 'supervisor')
+      .send({ expectedVersion: 1, status: 'RESOLVED', reason: 'Sin permiso' })
+      .expect(401);
+  });
+  it('incidencias: historial por DNI entre procesos, resolución auditada y protección SQL', async () => {
+    const dni = '91000004',
+      first = teacherUsers[1];
+    await profile(first, dni);
+    const dto = {
+      operationId: randomUUID(),
+      subjectAccountId: first,
+      subjectRole: 'profesor',
+      title: 'Historial común',
+      description: 'Conservar texto original',
+      occurredAt: new Date(Date.now() - 60000).toISOString(),
+    };
+    const firstRow = body<{ id: string }>(
+      await incidenceApi('post').send(dto).expect(201),
+    );
+    const other = fixture.client(fixture.otherSchema),
+      second = randomUUID();
+    await other.user.create({
+      data: {
+        id: second,
+        email: `${second.slice(0, 12)}@test.invalid`,
+        role: 'profesor',
+      },
+    });
+    await profile(second, dni, other);
+    routing.adminSchema = fixture.otherSchema;
+    await incidenceApi('post')
+      .send({ ...dto, operationId: randomUUID(), subjectAccountId: second })
+      .expect(201);
+    const rows = body<{ data: { process_schema: string }[]; total: number }>(
+      await incidenceApi('get', `?dni=${dni}`).expect(200),
+    );
+    expect(rows.total).toBe(2);
+    expect(new Set(rows.data.map((x) => x.process_schema)).size).toBe(2);
+    expect(
+      body<unknown[]>(
+        await incidenceApi('post', '/dni-summary')
+          .send({ dnis: [dni, '99999999'] })
+          .expect(201),
+      ),
+    ).toEqual([{ dni, total: 2, pending: 2 }]);
+    await incidenceApi('post', '/dni-summary', 'monitor')
+      .send({ dnis: [dni] })
+      .expect(401);
+    await incidenceApi('post', '/dni-summary')
+      .send({ dnis: ["' OR 1=1"] })
+      .expect(400);
+    await incidenceApi('post', '/dni-summary')
+      .send({ dnis: [dni, dni] })
+      .expect(400);
+    await incidenceApi('post', '/dni-summary')
+      .send({
+        dnis: Array.from({ length: 501 }, (_, i) => String(90000000 + i)),
+      })
+      .expect(400);
+    await incidenceApi('patch', `/${firstRow.id}`)
+      .send({
+        expectedVersion: 1,
+        status: 'RESOLVED',
+        reason: 'Verificado con evidencia',
+      })
+      .expect(200);
+    await incidenceApi('patch', `/${firstRow.id}`)
+      .send({ expectedVersion: 1, status: 'OPEN', reason: 'Versión antigua' })
+      .expect(409);
+    expect(
+      body<unknown[]>(
+        await incidenceApi('post', '/dni-summary')
+          .send({ dnis: [dni] })
+          .expect(201),
+      ),
+    ).toEqual([{ dni, total: 2, pending: 1 }]);
+    expect(
+      body<unknown[]>(
+        await incidenceApi('get', `/${firstRow.id}/history`).expect(200),
+      ),
+    ).toHaveLength(2);
+    await expect(
+      fixture.pg.query(
+        'UPDATE public.person_incidences SET description=$1 WHERE id=$2',
+        ['Modificar', firstRow.id],
+      ),
+    ).rejects.toThrow('INCIDENCE_HISTORY_IMMUTABLE');
+    await expect(
+      fixture.pg.query(
+        'DELETE FROM public.person_incidence_events WHERE incidence_id=$1',
+        [firstRow.id],
+      ),
+    ).rejects.toThrow('INCIDENCE_HISTORY_IMMUTABLE');
+    const warnings = body<{ total: number }>(
+      await incidenceApi('get', '/warnings').expect(200),
+    );
+    expect(warnings.total).toBeGreaterThan(0);
   });
 });

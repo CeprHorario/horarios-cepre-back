@@ -117,6 +117,7 @@ export class MonitorService {
       plainToInstance(MonitorGetSummaryDto, {
         id: monitor.id,
         firstName: monitor.user?.userProfile?.firstName || '',
+        dni: monitor.user?.userProfile?.dni ?? null,
         lastName: monitor.user?.userProfile?.lastName || '',
         personalEmail: monitor.user?.userProfile?.personalEmail || '',
         email: monitor.user?.email || '',

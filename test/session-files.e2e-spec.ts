@@ -336,7 +336,7 @@ suite('Session files (PostgreSQL + fake GCS)', () => {
       data: {
         ...source,
         supervisorId: null,
-        snapshot: {},
+        snapshot: {}, structuredObservations: [],
         effectiveSnapshot: {},
         timingPolicy: {},
         initialAssociatedBy: undefined,

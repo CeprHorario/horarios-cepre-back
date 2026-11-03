@@ -1,3 +1,4 @@
+import { PartObservationDto } from '../operations/operations.dto';
 import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
@@ -35,6 +36,17 @@ export class ReasonDto extends VersionDto {
   declare reason: string;
 }
 export class UpdateSessionDto extends VersionDto {
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(20)
+  @ValidateNested({ each: true })
+  @Type(() => PartObservationDto)
+  structuredObservations?: PartObservationDto[];
+
+  @ApiPropertyOptional({ nullable: true, enum: ['N', 'T', 'SD', 'RN', 'RE'] })
+  @IsOptional()
+  @IsIn(['N', 'T', 'SD', 'RN', 'RE'])
+  classState?: string | null;
   @ApiPropertyOptional({ nullable: true })
   @IsOptional()
   @IsDateString()

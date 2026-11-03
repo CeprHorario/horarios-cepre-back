@@ -4,6 +4,8 @@ const { mkdirSync, mkdtempSync } = require('node:fs');
 const { Pool } = require('pg');
 
 async function main() {
+  const focus=process.argv.slice(2);
+  if(focus.some(path=>!/^test\/[a-z0-9-]+\.e2e-spec\.ts$/.test(path))) throw new Error('Ruta de prueba inválida');
   const base = new URL(process.env.DATABASE_URL);
   if (
     process.env.NODE_ENV !== 'test' ||
@@ -43,7 +45,7 @@ async function main() {
         'test',
         '--',
         '--runInBand',
-        '--testPathIgnorePatterns=test/database.e2e-spec.ts',
+        ...(focus.length?['--runTestsByPath',...focus]:['--testPathIgnorePatterns=test/database.e2e-spec.ts']),
       ],
     ]) {
       const result = spawnSync('npm', args, { env, stdio: 'inherit' });

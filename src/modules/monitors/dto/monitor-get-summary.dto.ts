@@ -3,6 +3,12 @@ import { Expose } from 'class-transformer';
 
 export class MonitorGetSummaryDto {
   @ApiProperty({
+    nullable: true,
+    description: 'DNI de la persona asociada al salón',
+  })
+  @Expose()
+  dni: string | null;
+  @ApiProperty({
     description: 'ID único del monitor',
     example: '550e8400-e29b-41d4-a716-446655440000',
   })

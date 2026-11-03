@@ -16,10 +16,12 @@ import { ScheduleModule } from './schedules/schedules.module';
 import { ImportsModule } from './imports/imports.module';
 import { ClassSessionRecordsModule } from './class-session-records/class-session-records.module';
 import { SessionFilesModule } from './session-files/session-files.module';
+import { IncidencesModule } from './incidences/incidences.module';
+import { OperationsModule } from './operations/operations.module';
 
 @Module({
   imports: [
-    ClassSessionRecordsModule, SessionFilesModule,
+    ClassSessionRecordsModule, SessionFilesModule, IncidencesModule, OperationsModule,
     AreaModule, AreaCourseHourModule, CourseModule, SedeModule, ShiftModule,
     HourSessionModule, UsersModule, UserProfileModule, TeacherModule,
     CoordinatorModule, SupervisorModule, MonitorModule, ClassModule, ScheduleModule, ImportsModule,

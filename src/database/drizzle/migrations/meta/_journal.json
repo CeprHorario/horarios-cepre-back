@@ -22,6 +22,20 @@
       "when": 1793079870769,
       "tag": "0002_pale_the_renegades",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793420792701,
+      "tag": "0003_person_incidences",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793657401577,
+      "tag": "0004_operations_notifications",
+      "breakpoints": true
     }
   ]
 }

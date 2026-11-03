@@ -85,7 +85,7 @@ export class ClassSessionRecordsController {
   @Get('agenda')
   @Authorization({ roles: readers, permission: 'class-session-records.agenda' })
   @ApiOperation({
-    summary: 'Agenda fechada; materializa solo bloques futuros de hoy',
+    summary: 'Agenda fechada; completa todos los bloques programados de hoy',
   })
   agenda(@Req() req: AuthRequest, @Query() query: DateDto) {
     return this.journal.agenda(req.user, query.date);
@@ -111,12 +111,12 @@ export class ClassSessionRecordsController {
   }
   @Post('replacements')
   @Authorization({
-    roles: [Role.MONITOR],
+    roles: [Role.SUPERVISOR],
     permission: 'class-session-records.replacements',
   })
   @ApiOperation({
     summary:
-      'Cobertura individual/masiva por bloques; monitor solicita emergencia, administración autoriza',
+      'Cobertura individual/masiva por bloques; supervisión registra emergencia, administración registra reemplazo normal',
   })
   cover(@Req() req: AuthRequest, @Body() dto: CoverageDto) {
     return this.journal.cover(req.user, dto);
@@ -217,6 +217,7 @@ export class ClassSessionRecordsController {
   @Authorization({
     roles: readers,
     permission: 'class-session-records.history',
+    adminOnly: true,
   })
   history(
     @Req() req: AuthRequest,

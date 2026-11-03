@@ -11,8 +11,94 @@ import {
   boolean,
   check,
   date,
+  uuid,
+  text,
+  jsonb,
+  index,
 } from 'drizzle-orm/pg-core';
 import { relations, sql } from 'drizzle-orm';
+
+export const operationNotifications = pgTable('operation_notifications', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  recipientId: uuid('recipient_id').notNull(),
+  recipientOrigin: varchar('recipient_origin', {length:48}).notNull(),
+  processSchema: varchar('process_schema', {length:48}).notNull(),
+  kind: varchar('kind', {length:32}).notNull(),
+  title: varchar('title', {length:160}).notNull(),
+  message: text('message').notNull(),
+  requestId: uuid('request_id'),
+  dedupeKey: varchar('dedupe_key', {length:180}).notNull(),
+  resolvedAt: timestamp('resolved_at', {withTimezone:true}),
+  createdAt: timestamp('created_at', {withTimezone:true}).notNull().defaultNow(),
+}, t=>[uniqueIndex('operation_notification_dedupe').on(t.recipientId,t.recipientOrigin,t.dedupeKey),index('operation_notifications_recipient').on(t.recipientId,t.recipientOrigin,t.processSchema,t.createdAt)]);
+
+export const personIncidences = pgTable(
+  'person_incidences',
+  {
+    id: uuid('id').primaryKey(),
+    subjectDni: varchar('subject_dni', { length: 8 }).notNull(),
+    subjectRole: varchar('subject_role', { length: 16 }).notNull(),
+    subjectAccountId: uuid('subject_account_id').notNull(),
+    subjectName: varchar('subject_name', { length: 260 }).notNull(),
+    processSchema: varchar('process_schema', { length: 48 }).notNull(),
+    recordId: integer('record_id'),
+    classId: uuid('class_id'),
+    title: varchar('title', { length: 120 }).notNull(),
+    description: text('description').notNull(),
+    occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull(),
+    actor: jsonb('actor').notNull(),
+    actorId: uuid('actor_id').notNull(),
+    actorOrigin: varchar('actor_origin', { length: 48 }).notNull(),
+    status: varchar('status', { length: 16 }).notNull().default('OPEN'),
+    version: integer('version').notNull().default(1),
+    seenAt: timestamp('seen_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index('person_incidences_dni_created_idx').on(
+      table.subjectDni,
+      table.createdAt,
+    ),
+    index('person_incidences_status_created_idx').on(
+      table.status,
+      table.createdAt,
+    ),
+    check('person_incidence_dni', sql`${table.subjectDni} ~ '^[0-9]{8}$'`),
+    check(
+      'person_incidence_role',
+      sql`${table.subjectRole} IN ('profesor','monitor','supervisor','administrador','coordinador')`,
+    ),
+    check(
+      'person_incidence_status',
+      sql`${table.status} IN ('OPEN','RESOLVED')`,
+    ),
+    check('person_incidence_version', sql`${table.version} > 0`),
+  ],
+);
+
+export const personIncidenceEvents = pgTable(
+  'person_incidence_events',
+  {
+    id: serial('id').primaryKey(),
+    incidenceId: uuid('incidence_id')
+      .notNull()
+      .references(() => personIncidences.id, { onDelete: 'restrict' }),
+    action: varchar('action', { length: 32 }).notNull(),
+    actor: jsonb('actor').notNull(),
+    reason: text('reason'),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index('person_incidence_events_incidence_idx').on(
+      table.incidenceId,
+      table.id,
+    ),
+  ],
+);
 
 export const revokedTokens = pgTable(
   'revoked_tokens',

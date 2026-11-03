@@ -1,3 +1,4 @@
+import { applyApprovedReplacements } from '../operations/apply-approved-replacements';
 import {
   BadRequestException,
   ConflictException,
@@ -90,17 +91,28 @@ export class SessionJournalService {
             hourSession: true,
           },
         });
+        const lastBlocks = await tx.hourSession.groupBy({
+          by: ['shiftId'],
+          where: {
+            shiftId: { in: [...new Set(schedules.map((s) => s.clas.shiftId))] },
+          },
+          _max: { endTime: true },
+        });
+        const shiftEnds = new Map(
+          lastBlocks.map((h) => [h.shiftId, h._max.endTime]),
+        );
         let created = 0;
         for (const s of schedules) {
           const start = academicInstant(date, s.hourSession.startTime);
-          // Never invent a past expected block after startup/configuration/schedule changes.
-          if (start < (await this.records.now(tx))) continue;
+          // Complete today's scheduled journal even when enabled after classes started.
+          // Execution remains unconfirmed; existing records keep their original snapshots.
           const end = academicInstant(date, s.hourSession.endTime);
-          if (!s.clas.shift.endTime)
+          const lastBlockEnd = shiftEnds.get(s.clas.shiftId);
+          if (!s.clas.shift.endTime || !lastBlockEnd)
             throw new BadRequestException(
               'Configure fin del turno antes de materializar',
             );
-          const shiftEnd = academicInstant(date, s.clas.shift.endTime);
+          const shiftEnd = academicInstant(date, lastBlockEnd);
           const data: Prisma.ClassSessionRecordCreateManyInput = {
             date: day,
             classId: s.classId,
@@ -112,7 +124,8 @@ export class SessionJournalService {
             scheduledStart: start,
             scheduledEnd: end,
             shiftEnd,
-            editDeadline: new Date(+shiftEnd + 90 * 60000),
+            editOpensAt: new Date(+start - (s.hourSession.period === 1 ? config.earlyEditMinutes * 60000 : 0)),
+            editDeadline: new Date(+shiftEnd + config.editGraceMinutes * 60000),
             period: s.hourSession.period,
             pedagogicalMinutes: s.hourSession.durationMinutes,
             titularTeacherId: s.teacherId,
@@ -182,6 +195,7 @@ export class SessionJournalService {
             created++;
           }
         }
+        await applyApprovedReplacements(tx);
         return { created };
       },
       30000,
@@ -219,9 +233,17 @@ export class SessionJournalService {
       });
       if (hour.shiftId !== clas.shiftId || !clas.shift.endTime)
         throw new BadRequestException('Bloque/turno incompatible');
+      const lastBlock = await tx.hourSession.aggregate({
+        where: { shiftId: clas.shiftId },
+        _max: { endTime: true },
+      });
+      const policy = await tx.sessionOperationalConfig.findUniqueOrThrow({where:{id:1}});
       const start = academicInstant(dto.date, hour.startTime),
         end = academicInstant(dto.date, hour.endTime),
-        shiftEnd = academicInstant(dto.date, clas.shift.endTime);
+        shiftEnd = academicInstant(
+          dto.date,
+          lastBlock._max.endTime ?? clas.shift.endTime,
+        );
       if (start <= (await this.records.now(tx)))
         throw new BadRequestException(
           'La recuperación debe programarse antes de su inicio',
@@ -239,7 +261,8 @@ export class SessionJournalService {
           scheduledStart: start,
           scheduledEnd: end,
           shiftEnd,
-          editDeadline: new Date(+shiftEnd + 90 * 60000),
+          editOpensAt: new Date(+start-(hour.period===1?policy.earlyEditMinutes*60000:0)),
+          editDeadline: new Date(+shiftEnd + policy.editGraceMinutes * 60000),
           period: hour.period,
           pedagogicalMinutes: hour.durationMinutes,
           titularTeacherId: original.titularTeacherId,
@@ -301,9 +324,14 @@ export class SessionJournalService {
   async cover(principal: SessionPrincipal, dto: CoverageDto) {
     this.records.reason(dto.reason);
     const { client, actor } = await this.records.context(principal);
-    if (actor.role !== Role.MONITOR) this.records.admin(actor);
-    if (actor.role === Role.MONITOR && dto.mode !== 'EMERGENCY')
-      throw new BadRequestException('Monitor solo solicita emergencias');
+    this.records.admin(actor);
+    if (
+      actor.role === Role.SUPERVISOR &&
+      (dto.mode !== 'EMERGENCY' || dto.kind !== 'TEACHER')
+    )
+      throw new BadRequestException(
+        'Supervisión solo registra reemplazos de emergencia de docentes',
+      );
     if (new Set(dto.targets.map((t) => t.recordId)).size !== dto.targets.length)
       throw new BadRequestException('Bloques repetidos');
     return this.records.transaction(
@@ -323,7 +351,7 @@ export class SessionJournalService {
             tx,
             actor,
             target.recordId,
-            actor.role === Role.MONITOR,
+            false,
           );
           this.records.version(r, target.expectedVersion);
           const person = await this.records.person(
@@ -363,7 +391,7 @@ export class SessionJournalService {
             r.date,
           );
           const now = await this.records.now(tx);
-          if (actor.role === Role.MONITOR)
+          if (actor.role === Role.SUPERVISOR)
             await this.records.assertWritable(tx, actor, r);
           const coverage = await tx.sessionCoverage.create({
             data: {
@@ -372,20 +400,23 @@ export class SessionJournalService {
               teacherId: dto.kind === 'TEACHER' ? person.id : null,
               monitorId: dto.kind === 'MONITOR' ? person.id : null,
               mode: dto.mode,
-              status: actor.role === Role.ADMIN ? 'AUTHORIZED' : 'PENDING',
+              status: 'AUTHORIZED',
               personSnapshot: json(person),
               operationId,
               requestedBy: json(actor),
               reason: dto.reason,
-              ...(actor.role === Role.ADMIN
-                ? { resolvedBy: json(actor), resolvedAt: now }
-                : {}),
+              resolvedBy: json(actor), resolvedAt: now,
             },
           });
           // Coverage never overwrites execution, outcomes, Schedule or scheduledHours.
           await tx.classSessionRecord.update({
             where: { id: r.id, version: r.version },
-            data: { version: { increment: 1 } },
+            data: {
+              version: { increment: 1 },
+              ...(dto.kind === 'TEACHER'
+                ? { classState: dto.mode === 'EMERGENCY' ? 'RE' : 'RN' }
+                : {}),
+            },
           });
           await this.records.audit(
             tx,
@@ -505,6 +536,10 @@ export class SessionJournalService {
       await this.records.lock(tx, id);
       const r = await this.records.authorizeRecord(tx, actor, id);
       this.records.version(r, dto.expectedVersion);
+      if (new Date(dto.expiresAt) > r.editDeadline)
+        throw new BadRequestException(
+          'No se permite extender la edición del monitor después del cierre del turno más 90 minutos',
+        );
       const account = await tx.user.findUnique({
         where: { id: dto.accountId },
       });

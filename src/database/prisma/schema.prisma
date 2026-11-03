@@ -286,6 +286,9 @@ model ClassSessionRecord {
   actualStart         DateTime?            @map("actual_start") @db.Timestamptz(3)
   actualEnd           DateTime?            @map("actual_end") @db.Timestamptz(3)
   teachingStatus      String               @default("UNCONFIRMED") @map("teaching_status") @db.VarChar(24)
+  classState          String?              @map("class_state") @db.VarChar(2)
+  editOpensAt         DateTime?            @map("edit_opens_at") @db.Timestamptz(3)
+  structuredObservations Json              @default("[]") @map("structured_observations")
   titularOutcome      String               @default("UNKNOWN") @map("titular_outcome") @db.VarChar(24)
   incidents           String?              @db.Text
   initialFileId       String?              @map("initial_file_id") @db.Uuid
@@ -440,6 +443,8 @@ model SessionAlert {
 }
 
 model SessionOperationalConfig {
+  earlyEditMinutes         Int       @default(5) @map("early_edit_minutes")
+  editGraceMinutes         Int       @default(90) @map("edit_grace_minutes")
   id                       Int       @id @default(1)
   enabled                  Boolean   @default(false)
   startsOn                 DateTime? @map("starts_on") @db.Date
