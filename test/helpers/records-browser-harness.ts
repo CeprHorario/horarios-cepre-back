@@ -11,6 +11,9 @@ import { Test } from '@nestjs/testing';
 import { Storage } from '@google-cloud/storage';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import type { Request, Response, NextFunction } from 'express';
+import { Pool } from 'pg';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { configureApp } from '../../src/app.setup';
 import { PrismaService } from '../../src/database/prisma/prisma.service';
 import { PrismaExceptionInterceptor } from '../../src/database/prisma/interceptors/exception.interceptor';
@@ -48,6 +51,14 @@ import { SessionFilesController } from '../../src/modules/session-files/session-
 import { SessionFilesService } from '../../src/modules/session-files/session-files.service';
 import { SessionObjectStorage } from '../../src/modules/session-files/session-object-storage.service';
 import { SessionFilesFixture, uploadFixture } from './session-files-fixtures';
+import { OperationsController } from '../../src/modules/operations/operations.controller';
+import { OperationsService } from '../../src/modules/operations/operations.service';
+import { OperationsContext } from '../../src/modules/operations/operations-context.service';
+import { RequestDocuments } from '../../src/modules/operations/request-document.service';
+import { AvailabilityWorkbook } from '../../src/modules/operations/availability-workbook.service';
+import { AvailabilityWorkbookController } from '../../src/modules/operations/availability-workbook.controller';
+import { IncidencesController } from '../../src/modules/incidences/incidences.controller';
+import { IncidencesService } from '../../src/modules/incidences/incidences.service';
 
 const frontend =
   process.env.RECORDS_BROWSER_FRONTEND_ORIGIN ?? 'http://127.0.0.1:5174';
@@ -86,6 +97,13 @@ export async function createRecordsBrowserHarness() {
   const fixture = new SessionFilesFixture();
   let closeApp: (() => Promise<void>) | undefined;
   try {
+    // Solo tras las barreras anteriores: preparar el catálogo público de ESTA BD de pruebas.
+    const pool = new Pool({ connectionString: process.env.TEST_DATABASE_URL });
+    try {
+      await migrate(drizzle(pool), { migrationsFolder: 'src/database/drizzle/migrations' });
+    } finally {
+      await pool.end();
+    }
     await fixture.initialize();
     const secret = randomBytes(48).toString('base64url');
     const jwt = new JwtService({ secret });
@@ -95,15 +113,18 @@ export async function createRecordsBrowserHarness() {
       otherMonitor: randomUUID(),
       teacher: randomUUID(),
       replacementTeacher: randomUUID(),
+      emptyClass: randomUUID(),
     };
     const processes = {
       a: {
         process: fixture.schema,
         records: {} as Record<(typeof scenarioNames)[number], number>,
+        historical: { date: '', firstId: 0, blocks: 105 },
       },
       b: {
         process: fixture.otherSchema,
         records: {} as Record<(typeof scenarioNames)[number], number>,
+        historical: { date: '', firstId: 0, blocks: 105 },
       },
     };
     const runtime: RuntimeConfig = {
@@ -180,6 +201,9 @@ export async function createRecordsBrowserHarness() {
         SessionFilesController,
         ClassController,
         HourSessionController,
+        OperationsController,
+        AvailabilityWorkbookController,
+        IncidencesController,
       ],
       providers: [
         AuthService,
@@ -198,6 +222,11 @@ export async function createRecordsBrowserHarness() {
         ClassService,
         HourSessionService,
         ScheduleService,
+        OperationsService,
+        OperationsContext,
+        RequestDocuments,
+        AvailabilityWorkbook,
+        IncidencesService,
         { provide: JwtService, useValue: jwt },
         { provide: PrismaService, useValue: fixture.apiPrisma },
         { provide: RequestContext, useValue: fixture.context },
@@ -314,6 +343,10 @@ export async function createRecordsBrowserHarness() {
 
     for (const [label, entry] of Object.entries(processes)) {
       const db = fixture.client(entry.process);
+      await fixture.pg.query(
+        "INSERT INTO public.admission_processes(name,year,is_current,started,finished,structure_version) VALUES($1,2026,false,CURRENT_DATE-1,CURRENT_DATE+90,'test')",
+        [entry.process],
+      );
       if (label === 'b') {
         for (const [name, p] of Object.entries(fixture.principals))
           if (name !== 'admin')
@@ -361,6 +394,7 @@ export async function createRecordsBrowserHarness() {
               userId: p.userId,
               firstName: name,
               lastName: `Prueba ${label.toUpperCase()}`,
+              dni: ({ teacher: '91000001', monitor: '92000001', otherMonitor: '92000002', supervisor: '93000001', otherSupervisor: '93000002' } as Record<string, string>)[name],
               phonesAdditional: [],
             },
           });
@@ -385,6 +419,9 @@ export async function createRecordsBrowserHarness() {
           name: `Aula ficticia ${label.toUpperCase()}`,
         },
       });
+      await db.class.create({ data: {
+        id: ids.emptyClass, name: `Aula sin partes ${label.toUpperCase()}`, idSede: 1, areaId: 1, shiftId: 1,
+      } });
       const replacement = await db.user.create({
         data: {
           email: 'reemplazante@browser.invalid',
@@ -504,7 +541,7 @@ export async function createRecordsBrowserHarness() {
         await inProcess(entry.process, async () => {
           if (name === 'evidence') {
             let updated = await records.update(
-              fixture.principals.monitor,
+              fixture.principals.admin,
               record.id,
               {
                 expectedVersion: record.version,
@@ -514,7 +551,9 @@ export async function createRecordsBrowserHarness() {
                 titularOutcome: 'PRESENT',
                 effectiveTeacherId: ids.teacher,
                 effectiveMonitorId: ids.monitor,
+                reason: 'Preparación administrativa de evidencia ficticia',
               },
+              true,
             );
             for (const slot of ['initial', 'final']) {
               const file = await files.upload(
@@ -536,24 +575,54 @@ export async function createRecordsBrowserHarness() {
               confirmed: true,
             });
           }
-          if (name === 'pendingReplacement' || name === 'authorizedReplacement')
+          if (name === 'pendingReplacement')
+            await db.sessionCoverage.create({ data: {
+              recordId: record.id, kind: 'TEACHER', teacherId: ids.replacementTeacher,
+              mode: 'EMERGENCY', status: 'PENDING', operationId: randomUUID(),
+              personSnapshot: { id: ids.replacementTeacher, name: 'Reemplazante ficticio', email: replacement.email },
+              requestedBy: { id: fixture.principals.monitor.userId, email: fixture.principals.monitor.email, role: 'monitor', origin: entry.process, schema: entry.process },
+              reason: 'Antecedente pendiente ficticio; no habilita solicitudes retiradas',
+            } });
+          if (name === 'authorizedReplacement')
             await journal.cover(
-              fixture.principals[
-                name === 'pendingReplacement' ? 'monitor' : 'admin'
-              ],
+              fixture.principals.admin,
               {
                 targets: [
                   { recordId: record.id, expectedVersion: record.version },
                 ],
                 kind: 'TEACHER',
                 personId: ids.replacementTeacher,
-                mode: name === 'pendingReplacement' ? 'EMERGENCY' : 'PLANNED',
+                mode: 'PLANNED',
                 reason: 'Cobertura ficticia de prueba',
               },
             );
         });
       }
+      const historicalDate = new Date(`${date}T12:00:00Z`);
+      historicalDate.setUTCDate(historicalDate.getUTCDate() - 7);
+      entry.historical.date = historicalDate.toISOString().slice(0, 10);
+      await db.hourSession.createMany({ data: Array.from({ length: 105 }, (_, index) => ({
+        id: 1000 + index, shiftId: 1, period: 1000 + index,
+        startTime: new Date('1970-01-01T08:00Z'), endTime: new Date('1970-01-01T08:40Z'),
+      })) });
+      await db.classSessionRecord.createMany({ data: Array.from({ length: 105 }, (_, index) => ({
+        date: new Date(entry.historical.date), classId: fixture.classId, hourSessionId: 1000 + index,
+        shiftId: 1, areaId: 1, courseId: 1, period: index + 1, pedagogicalMinutes: 40,
+        scheduledStart: new Date(`${entry.historical.date}T08:00:00-05:00`),
+        scheduledEnd: new Date(`${entry.historical.date}T08:40:00-05:00`),
+        shiftEnd: new Date(`${entry.historical.date}T08:40:00-05:00`),
+        editDeadline: new Date(`${entry.historical.date}T10:10:00-05:00`),
+        titularTeacherId: ids.teacher, titularMonitorId: ids.monitor,
+        monitorAccountId: fixture.principals.monitor.userId, supervisorId: fixture.supervisorId,
+        snapshot: { className: `Aula ficticia ${label.toUpperCase()}`, shift: 'Turno histórico', course: 'Curso histórico' },
+        timingPolicy: {},
+      })) });
+      entry.historical.firstId = (await db.classSessionRecord.findFirstOrThrow({ where: { date: new Date(entry.historical.date) }, orderBy: { id: 'asc' } })).id;
       await module.get(SessionFollowupService).generate(entry.process);
+      for (const [name, principal] of Object.entries(fixture.principals)) {
+        if (name === 'coordinator') continue;
+        await db.$executeRaw`INSERT INTO public.operation_notifications(recipient_id,recipient_origin,process_schema,kind,title,message,dedupe_key) VALUES(${principal.userId}::uuid,${name === 'admin' ? 'core_schema' : entry.process},${entry.process},'TEST',${`Aviso sintético ${name} ${label.toUpperCase()}`},'Aviso aislado de prueba, no representa una decisión',${`browser:${entry.process}:${name}`})`;
+      }
     }
     const manifest = {
       origin: 'http://127.0.0.1:3000',
@@ -696,6 +765,10 @@ export async function createRecordsBrowserHarness() {
       manifest,
       close: async () => {
         await closeApp?.();
+        for (const { process } of Object.values(processes)) {
+          await fixture.pg.query('DELETE FROM public.operation_notifications WHERE process_schema=$1', [process]);
+          await fixture.pg.query('DELETE FROM public.admission_processes WHERE name=$1', [process]);
+        }
         await fixture.close();
       },
     };

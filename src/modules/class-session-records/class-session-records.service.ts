@@ -257,7 +257,7 @@ export class ClassSessionRecordsService {
       throw new BadRequestException('Se requiere un motivo');
   }
 
-  range(query: SessionQueryDto) {
+  range(query: Pick<SessionQueryDto, 'from' | 'to'>) {
     const from = new Date(query.from),
       to = new Date(query.to);
     if (
@@ -286,6 +286,28 @@ export class ClassSessionRecordsService {
       shiftId: query.shiftId,
       courseId: query.courseId,
     };
+  }
+
+  async journals(principal: SessionPrincipal, query: Pick<SessionQueryDto, 'from' | 'to' | 'page' | 'limit'>) {
+    const { client, actor } = await this.context(principal);
+    if (actor.role !== Role.MONITOR) throw new ForbiddenException('Listado de jornadas exclusivo del monitor');
+    const range = this.range(query);
+    const [result] = await this.transaction(client, actor.schema, tx => tx.$queryRaw<{ data: unknown[]; total: number }[]>`
+      WITH journals AS (
+        SELECT date::text AS date, class_id AS "classId", shift_id AS "shiftId",
+          min(snapshot->>'className') AS "className", min(snapshot->>'shift') AS shift,
+          min(scheduled_start) AS "scheduledStart", max(scheduled_end) AS "scheduledEnd", count(*)::int AS blocks
+        FROM class_session_records
+        WHERE monitor_account_id=${actor.id}::uuid AND deleted_at IS NULL
+          AND date BETWEEN ${range.gte}::date AND ${range.lte}::date
+        GROUP BY date, class_id, shift_id
+      )
+      SELECT (SELECT count(*)::int FROM journals) AS total,
+        COALESCE((SELECT json_agg(page) FROM (
+          SELECT * FROM journals ORDER BY date DESC, "classId", "shiftId"
+          OFFSET ${(query.page - 1) * query.limit} LIMIT ${query.limit}
+        ) page), '[]'::json) AS data`);
+    return { ...result, page: query.page, limit: query.limit };
   }
 
   async list(principal: SessionPrincipal, query: SessionQueryDto) {

@@ -1,4 +1,4 @@
-# Harness local para navegador — partes
+# Harness local para navegador — partes y operaciones
 
 **Solo pruebas locales**, separado de desarrollo y de la aplicación productiva. No iniciar frontend desde este harness.
 
@@ -24,7 +24,7 @@ docker compose -f backend/compose.records.yaml -f backend/test/compose.records.b
 
 ## Qué se ejecuta realmente
 
-Reutiliza `SessionFilesFixture` y la composición de `class-session-records.e2e-spec.ts`: Nest y controladores/servicios reales de auth, estado runtime, partes, archivos, aulas y bloques; JWT firmado, guards de autenticación/autorización, `RequestContext`, interceptores de esquema/errores, configuración HTTP/CORS/CSRF real, PrismaPg/PostgreSQL 18 y GCS emulado.
+Reutiliza `SessionFilesFixture` y la composición de `class-session-records.e2e-spec.ts`: Nest y controladores/servicios reales de auth, estado runtime, partes, archivos, aulas, bloques, solicitudes/notificaciones, disponibilidad Excel e incidencias; JWT firmado, guards de autenticación/autorización, `RequestContext`, interceptores de esquema/errores, configuración HTTP/CORS/CSRF real, PrismaPg/PostgreSQL 18 y GCS emulado. No compone todos los catálogos/pantallas de la aplicación; las pruebas de estados con respuestas inyectadas se identifican por separado.
 
 No importa `AuthModule` completo, ya que instalaría estrategias OAuth y clientes externos innecesarios. En su lugar registra `AuthController`, `AuthService` y los proveedores reales necesarios. Solo runtime/registro de esquemas y almacén de revocación se sustituyen por fixtures locales; permisos generales devuelven false, conservando el acceso explícito por rol. La revocación se conserva por hash en memoria para probar logout. OAuth está bloqueado con 404 y no hay estrategia ni credenciales reales de Google. Los controles no pertenecen a ningún módulo productivo.
 
@@ -41,7 +41,7 @@ El proceso escucha `0.0.0.0:3000` **dentro del contenedor** para permitir el map
 
 ## Datos ficticios
 
-Cada arranque crea dos procesos académicos aleatorios `a`/`b` y un esquema core aleatorio de fixture, sin tocar `public`, `core_schema` real ni procesos existentes. Los mismos IDs de cuenta/persona/aula/parte pueden existir en ambos procesos intencionadamente para verificar aislamiento de caché. Administración reside en el core del fixture y su JWT declara `core_schema`; el proceso operativo procede del runtime, como en producción.
+Cada arranque crea dos procesos académicos aleatorios `a`/`b` y un esquema core aleatorio de fixture, sin tocar `core_schema` real ni procesos existentes. Tras verificar todas las barreras del destino, aplica las migraciones públicas existentes **solo en `cepr_records_test`** para preparar incidencias/avisos/catálogo; nunca sobre una base del usuario. Los mismos IDs de cuenta/persona/aula/parte pueden existir en ambos procesos para verificar caché. Administración reside en el core del fixture y su JWT declara `core_schema`; el proceso operativo procede del runtime.
 
 `GET /__test/fixtures` entrega origen, fecha de Lima, nombres de los procesos, IDs de escenarios/personas/aula y cuentas ficticias. Nunca entrega secretos/tokens. Los IDs cambian al reiniciar, salvo los IDs enteros de parte que empiezan desde 1 por proceso.
 
@@ -55,6 +55,17 @@ Cada arranque crea dos procesos académicos aleatorios `a`/`b` y un esquema core
 | `future`                | Bloque todavía no iniciado; edición ordinaria prohibida                                                 |
 
 Hay un docente titular y otro reemplazante del mismo curso, monitor titular y otro monitor, supervisores propio/ajeno, docente/coordinador para accesos prohibidos y administración. Todas las direcciones usan `test.invalid` o `browser.invalid`. Las capturas son PNG sintéticos, no personas ni documentos reales. Las alertas se generan con el servicio real sobre los bloques sin inicio confirmado. Las horas son relativas al arranque: los escenarios abiertos permanecen editables aproximadamente 3,5 horas; después reiniciar para nuevos fixtures.
+
+El titular y los monitores tienen DNI sintéticos; el reemplazante no tiene DNI.
+`pendingReplacement` representa un antecedente legado PENDING sembrado directamente,
+no una solicitud retirada que se vuelva a autorizar al monitor. El escenario con
+evidencias se prepara mediante corrección administrativa; los permisos productivos
+no se relajan para hacer arrancar un fixture.
+
+Además, cada proceso contiene un salón sin partes (ID `ids.emptyClass`), un aviso
+por cuenta/rol y una jornada histórica de 105 bloques (`processes.a.historical` y
+`b.historical`: fecha, primer ID y cantidad). Esta última comprueba agrupación antes
+de paginar y lectura completa de más de 100 bloques sin materializar el pasado.
 
 ## Controles locales
 
@@ -100,5 +111,11 @@ docker compose -f backend/compose.records.yaml -f backend/test/compose.records.b
 ```
 
 SIGTERM/SIGINT cierra Nest, desconecta pools y elimina exclusivamente los tres esquemas aleatorios del propio arranque. No usar `kill -9` ni eliminar volúmenes. Los objetos GCS permanecen en buckets únicos de prueba, como en las suites existentes; no se prueba IAM ni bucket productivo. DB/GCS pueden quedar encendidos para otras verificaciones; no se detiene ni inicia frontend.
+
+También retira los avisos y entradas del catálogo de sus procesos aleatorios. Los
+antecedentes públicos sintéticos se conservan por su contrato de inmutabilidad:
+filtrar las regresiones por el proceso del manifest, no suponer que un DNI ficticio
+solo tiene un registro después de reiniciar. Para una base pública completamente
+nueva utilizar `test:records:all`, que aprovisiona y elimina su propia base aleatoria.
 
 Límite deliberado: este harness verifica el flujo de partes con identidades y runtime ficticios, no OAuth, Firestore, revocación distribuida ni la aplicación completa en producción.

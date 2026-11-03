@@ -35,6 +35,7 @@ import {
   ReviewDto,
   SessionPeopleQueryDto,
   SessionQueryDto,
+  SessionJournalsQueryDto,
   UpdateSessionDto,
 } from './session.dto';
 import { SessionPrincipal } from './session.types';
@@ -97,6 +98,13 @@ export class ClassSessionRecordsController {
   })
   list(@Req() req: AuthRequest, @Query() query: SessionQueryDto) {
     return this.records.list(req.user, query);
+  }
+  @Get('journals')
+  @Authorization({ roles: [Role.MONITOR], permission: 'class-session-records.journals' })
+  @Header('Cache-Control', 'private, no-store')
+  @ApiOperation({ summary: 'Jornadas del monitor agrupadas antes de paginar, sin reconstruir históricos' })
+  journals(@Req() req: AuthRequest, @Query() query: SessionJournalsQueryDto) {
+    return this.records.journals(req.user, query);
   }
   @Post('recoveries')
   @Authorization({

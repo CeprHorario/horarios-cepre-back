@@ -73,7 +73,7 @@ El proceso se selecciona con `schemaRouting.adminSchema/userSchema` del runtime.
 
 Los parámetros inicialmente nulos son pendientes institucionales, **no cinco minutos predeterminados**. La espera de reemplazo no autoriza ni acredita automáticamente una cobertura. El umbral de alerta controla la falta de confirmación de inicio; la tolerancia de llegada y el intervalo de continuidad son políticas distintas. Cada parte conserva su política aplicada y los cambios no reclasifican silenciosamente el histórico.
 
-Activar `CLASS_RECORDS_TASK_ENABLED=true` antes de la jornada. Cada minuto se enumeran esquemas académicos registrados y habilitados, excluyendo core/public. La tarea respeta mantenimiento y requiere runtime válido; un proceso defectuoso no detiene los demás. Solo materializa bloques **futuros del día en Lima**: una caída que impide prepararlos no se soluciona reconstruyendo el pasado con el horario actual. Recuperaciones se programan explícitamente antes de su inicio, incluidos domingos, sin cambiar el horario semanal.
+Activar `CLASS_RECORDS_TASK_ENABLED=true` antes de la jornada. Cada minuto se enumeran esquemas académicos registrados y habilitados, excluyendo core/public. La tarea respeta mantenimiento y requiere runtime válido; un proceso defectuoso no detiene los demás. Materializa todos los bloques programados **del día actual en Lima**, incluso los iniciados, sin confirmar ejecución ni reescribir registros existentes. Nunca reconstruye días anteriores con el horario vigente. Recuperaciones se programan explícitamente antes de su inicio, incluidos domingos, sin cambiar el horario semanal.
 
 ## API
 
@@ -86,6 +86,7 @@ Base `/class-session-records`:
 | `GET context`                               | Cuenta, proceso operativo validado y reloj del servidor; sin parámetros ni caché               |
 | `GET agenda?date=YYYY-MM-DD`                | Agenda, hasta 100; para más, listado paginado                                                  |
 | `GET ?from=...&to=...&page=1&limit=25`      | Rango obligatorio, máximo 93 días y 100 filas por página                                       |
+| `GET journals?from=...&to=...&page=1&limit=25` | Jornadas del monitor agrupadas antes de paginar; no materializa históricos |
 | `GET :id`, `GET :id/history?page=1`         | Detalle e historial paginado                                                                   |
 | `GET :id/people?kind=TEACHER`               | Catálogo mínimo de personas para un parte autorizado                                           |
 | `PATCH :id`                                 | Registrar/corregir ordinariamente con `expectedVersion`                                        |
@@ -100,6 +101,30 @@ Base `/class-session-records`:
 | `GET reports/detail`, `GET reports/summary` | Administración: detalle/resumen sin evidencias                                                 |
 
 Filtros: `classId`, `teacherId` efectivo, `monitorId` titular, `shiftId`, `courseId`, `pendingReview=true`, `includeDeleted=true` solo admin. No permiten elegir otro esquema.
+
+### Jornadas del monitor (Fase 1 de modernización)
+
+`GET /class-session-records/journals` es una lectura adicional, exclusiva del
+monitor. Reutiliza contexto, cuenta activa, precondiciones y transacción del módulo.
+Acepta únicamente `from`, `to`, `page` y `limit`: fechas `YYYY-MM-DD`, rango máximo
+93 días, página positiva, límite 1–100 (25 por defecto). Rechaza selectores y los
+demás roles también en el servicio; no amplía permisos de catálogos.
+
+La consulta filtra `monitor_account_id` y anulados antes de agrupar por
+fecha/salón/turno; después ordena por fecha descendente, UUID de salón y turno
+ascendentes y aplica paginación. `total` cuenta jornadas, incluso si la página
+solicitada está vacía. No crea un identificador diario ni ejecuta materialización.
+
+Respuesta: `{ data, total, page, limit }`. Cada fila contiene `date` (aquí
+`YYYY-MM-DD`), `classId`, `shiftId`, `className` y `shift` de snapshots históricos,
+`scheduledStart`, `scheduledEnd` (ISO), y `blocks` entero. El frontend abre el grupo
+con el listado existente, recuperando todas sus páginas y comprobando la cantidad;
+no confundir esa agrupación visual con el ID persistido por bloque.
+
+Regresión: `test/class-session-records.e2e-spec.ts` agrupa 105 bloques, mantiene
+total/orden/páginas vacías y rechaza roles/rangos/selectores incorrectos. El harness
+también incluye 105 bloques históricos para comprobar la segunda página HTTP
+desde navegador. No requiere migraciones de datos ni modifica endpoints previos.
 
 ### Contexto operativo para frontend
 

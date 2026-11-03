@@ -87,7 +87,7 @@ export class DateDto {
   @IsDateString()
   date: string;
 }
-export class SessionQueryDto {
+export class SessionJournalsQueryDto {
   @ApiProperty() @Matches(/^\d{4}-\d{2}-\d{2}$/) @IsDateString() from: string;
   @ApiProperty() @Matches(/^\d{4}-\d{2}-\d{2}$/) @IsDateString() to: string;
   @ApiPropertyOptional({ default: 1 })
@@ -101,6 +101,8 @@ export class SessionQueryDto {
   @Min(1)
   @Max(100)
   limit = 25;
+}
+export class SessionQueryDto extends SessionJournalsQueryDto {
   @ApiPropertyOptional() @IsOptional() @IsUUID() classId?: string;
   @ApiPropertyOptional() @IsOptional() @IsUUID() teacherId?: string;
   @ApiPropertyOptional() @IsOptional() @IsUUID() monitorId?: string;

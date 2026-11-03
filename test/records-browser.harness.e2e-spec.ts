@@ -214,10 +214,13 @@ suite('Harness local de navegador (solo Compose)', () => {
           reason: 'Autorizar cobertura ficticia',
         })
         .expect(201);
+      await post(`${root}/${a.records.closed}/grants`)
+        .send({ expectedVersion: 1, accountId: harness.manifest.accounts.monitor.accountId, expiresAt: new Date(Date.now() + 60000).toISOString(), reason: 'No ampliar cierre histórico' })
+        .expect(400);
       const grant = body<{ id: number }>(
-        await post(`${root}/${a.records.closed}/grants`)
+        await post(`${root}/${a.records.editable}/grants`)
           .send({
-            expectedVersion: 1,
+            expectedVersion: 3,
             accountId: harness.manifest.accounts.monitor.accountId,
             expiresAt: new Date(Date.now() + 60000).toISOString(),
             reason: 'Habilitación ficticia smoke',
@@ -225,16 +228,16 @@ suite('Harness local de navegador (solo Compose)', () => {
           .expect(201),
       );
       await session('monitor');
-      await patch(`${root}/${a.records.closed}`)
-        .send({ expectedVersion: 1, incidents: 'Edición con habilitación' })
+      await patch(`${root}/${a.records.editable}`)
+        .send({ expectedVersion: 3, structuredObservations: [{ id: 'a7576dfe-4215-4ffd-864c-9076ad19a502', target: 'CLASSROOM', description: 'Edición dentro del plazo original' }] })
         .expect(200);
       await session('admin');
       await post(`${root}/grants/${grant.id}/revoke`)
-        .send({ expectedVersion: 2, reason: 'Revocación ficticia smoke' })
+        .send({ expectedVersion: 4, reason: 'Revocación ficticia smoke' })
         .expect(201);
       await post(`${root}/${a.records.closed}/corrections`)
         .send({
-          expectedVersion: 2,
+          expectedVersion: 1,
           incidents: 'Corrección extraordinaria ficticia',
           reason: 'Verificar corrección administrativa',
         })

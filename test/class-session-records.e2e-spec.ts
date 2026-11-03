@@ -2000,4 +2000,47 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
     );
     expect(warnings.total).toBeGreaterThan(0);
   });
+
+  it('agrupa jornadas completas antes de paginar y conserva el total en páginas vacías', async () => {
+    const date = '2025-01-12';
+    const base = await fixture.record();
+    const data = {
+      date: new Date(date), classId: base.classId, shiftId: base.shiftId,
+      areaId: base.areaId, courseId: base.courseId, period: base.period,
+      pedagogicalMinutes: base.pedagogicalMinutes, scheduledStart: base.scheduledStart,
+      scheduledEnd: base.scheduledEnd, shiftEnd: base.shiftEnd, editDeadline: base.editDeadline,
+      monitorAccountId: base.monitorAccountId, supervisorId: base.supervisorId,
+    };
+    await db().hourSession.createMany({ data: Array.from({ length: 108 }, (_, index) => ({
+      id: 2000 + index, shiftId: 1, period: 2000 + index,
+      startTime: new Date('1970-01-01T08:00Z'), endTime: new Date('1970-01-01T08:40Z'),
+    })) });
+    await db().classSessionRecord.createMany({ data: Array.from({ length: 105 }, (_, index) => ({
+      ...data, snapshot: { className: 'Histórico intacto', shift: 'Turno histórico' },
+      effectiveSnapshot: {}, timingPolicy: {}, date: new Date(date), hourSessionId: 2000 + index,
+    })) });
+    await db().classSessionRecord.createMany({ data: [
+      { ...data, snapshot: {}, effectiveSnapshot: {}, timingPolicy: {}, date: new Date('2025-01-11'), hourSessionId: 2105 },
+      { ...data, snapshot: {}, effectiveSnapshot: {}, timingPolicy: {}, date: new Date('2025-01-11'), hourSessionId: 2106, classId: otherClass },
+      { ...data, snapshot: {}, effectiveSnapshot: {}, timingPolicy: {}, date: new Date(date), hourSessionId: 2107, classId: otherClass, monitorAccountId: actor('otherMonitor').userId },
+    ] });
+    const path = '/journals?from=2025-01-01&to=2025-01-31&limit=1';
+    const first = body<{ data: { blocks: number; date: string; className: string }[]; total: number }>(await api('get', path).expect(200));
+    expect(first.total).toBe(3);
+    expect(first.data).toEqual([expect.objectContaining({ date, blocks: 105, className: 'Histórico intacto' })]);
+    const second = body<{ data: unknown[]; total: number }>(await api('get', `${path}&page=2`).expect(200));
+    expect(second.data).toHaveLength(1);
+    expect(second.total).toBe(3);
+    expect(body<{ total: number; data: unknown[] }>(await api('get', `${path}&page=4`).expect(200))).toMatchObject({ total: 3, data: [] });
+    expect(await db().classSessionRecord.count({ where: { date: new Date(date), monitorAccountId: actor().userId } })).toBe(105);
+  });
+
+  it('jornadas rechaza otros roles, selectores y rangos inválidos sin ampliar acceso', async () => {
+    const path = '/journals?from=2025-01-01&to=2025-01-31';
+    await api('get', path, 'supervisor').expect(403);
+    await api('get', path, 'admin').expect(403);
+    await api('get', `${path}&classId=${fixture.classId}`).expect(400);
+    await api('get', '/journals?from=2025-01-01&to=2025-12-31').expect(400);
+    await api('get', `${path}&page=0`).expect(400);
+  });
 });

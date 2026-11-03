@@ -130,6 +130,23 @@ suite('Disponibilidad persistida y asignaciones en PostgreSQL', () => {
     }),
   );
 
+  it('caracteriza K-01: fallo entre desasignar y asignar no restaura automáticamente al titular', async () =>
+    run(async () => {
+      const client = prisma.getClient();
+      const original = await client.teacher.findUniqueOrThrow({ where: { id: teacherId } });
+      const user = await client.user.create({ data: { email: 'replacement-failure@test.invalid', role: 'profesor' } });
+      const replacement = await client.teacher.create({ data: { userId: user.id, courseId: original.courseId, maxHours: 20, jobStatus: 'PartTime' } });
+      await service.saveAvailability(teacherId, { intervals: [{ weekday: Weekday.Lunes, start: '07:00', end: '07:40' }] });
+      await service.assignTeacherToSchedules([classes[0]], teacherId);
+      await service.unassignTeacherFromSchedules([classes[0]], teacherId);
+      await expect(service.assignTeacherToSchedules([classes[0]], replacement.id)).rejects.toThrow('fuera de la disponibilidad');
+      expect(await client.schedule.findFirst({ where: { classId: classes[0] } })).toMatchObject({ teacherId: null });
+      expect(await client.teacher.findUnique({ where: { id: teacherId } })).toMatchObject({ scheduledHours: 0 });
+      // Recuperación explícita disponible; no se inventa atomicidad entre dos solicitudes.
+      await service.assignTeacherToSchedules([classes[0]], teacherId);
+      expect(await client.schedule.findFirst({ where: { classId: classes[0] } })).toMatchObject({ teacherId });
+    }));
+
   it('persiste, normaliza y aísla por proceso; permite vaciar', async () =>
     run(async () => {
       await service.saveAvailability(teacherId, {
