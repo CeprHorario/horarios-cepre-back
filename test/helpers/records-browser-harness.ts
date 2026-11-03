@@ -14,6 +14,7 @@ import type { Request, Response, NextFunction } from 'express';
 import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
+import { DrizzleService } from '../../src/database/drizzle/drizzle.service';
 import { configureApp } from '../../src/app.setup';
 import { PrismaService } from '../../src/database/prisma/prisma.service';
 import { PrismaExceptionInterceptor } from '../../src/database/prisma/interceptors/exception.interceptor';
@@ -59,6 +60,16 @@ import { AvailabilityWorkbook } from '../../src/modules/operations/availability-
 import { AvailabilityWorkbookController } from '../../src/modules/operations/availability-workbook.controller';
 import { IncidencesController } from '../../src/modules/incidences/incidences.controller';
 import { IncidencesService } from '../../src/modules/incidences/incidences.service';
+import { MonitorController } from '../../src/modules/monitors/monitor.controller';
+import { MonitorService } from '../../src/modules/monitors/monitor.service';
+import { ImportsController } from '../../src/modules/imports/imports.controller';
+import { ImportsService } from '../../src/modules/imports/imports.service';
+import { TeacherController } from '../../src/modules/teachers/teacher.controller';
+import { TeacherService } from '../../src/modules/teachers/teacher.service';
+import { AreaController } from '../../src/modules/areas/area.controller';
+import { AreaService } from '../../src/modules/areas/area.service';
+import { ShiftController } from '../../src/modules/shifts/shift.controller';
+import { ShiftService } from '../../src/modules/shifts/shift.service';
 
 const frontend =
   process.env.RECORDS_BROWSER_FRONTEND_ORIGIN ?? 'http://127.0.0.1:5174';
@@ -155,6 +166,8 @@ export async function createRecordsBrowserHarness() {
       GCS_BUCKET: bucket,
       STORAGE_EMULATOR_HOST: process.env.STORAGE_EMULATOR_HOST,
       CLASS_RECORDS_TASK_ENABLED: 'false',
+      DATABASE_URL: process.env.TEST_DATABASE_URL,
+      DB_POOL_MAX: 2,
     });
     const revoked = new Map<string, number>();
     const revocations = {
@@ -204,6 +217,11 @@ export async function createRecordsBrowserHarness() {
         OperationsController,
         AvailabilityWorkbookController,
         IncidencesController,
+        MonitorController,
+        ImportsController,
+        TeacherController,
+        AreaController,
+        ShiftController,
       ],
       providers: [
         AuthService,
@@ -227,6 +245,12 @@ export async function createRecordsBrowserHarness() {
         RequestDocuments,
         AvailabilityWorkbook,
         IncidencesService,
+        MonitorService,
+        ImportsService,
+        DrizzleService,
+        TeacherService,
+        AreaService,
+        ShiftService,
         { provide: JwtService, useValue: jwt },
         { provide: PrismaService, useValue: fixture.apiPrisma },
         { provide: RequestContext, useValue: fixture.context },
@@ -728,6 +752,20 @@ export async function createRecordsBrowserHarness() {
           if (audience !== 'admin')
             runtime.schemaRouting.userSchema = entry.process;
           res.json({ ...runtime.schemaRouting });
+          return;
+        }
+        if (req.path === '/replacement-dni') {
+          if (req.query.present !== 'true' && req.query.present !== 'false')
+            throw new BadRequestException('present obligatorio');
+          const db = fixture.client(entry.process);
+          const teacher = await db.teacher.findUniqueOrThrow({
+            where: { id: ids.replacementTeacher },
+          });
+          await db.userProfile.update({
+            where: { userId: teacher.userId },
+            data: { dni: req.query.present === 'true' ? '91000002' : null },
+          });
+          res.json({ updated: true });
           return;
         }
         const id = Number(req.query.recordId);

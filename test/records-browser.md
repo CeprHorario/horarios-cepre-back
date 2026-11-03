@@ -24,7 +24,7 @@ docker compose -f backend/compose.records.yaml -f backend/test/compose.records.b
 
 ## Qué se ejecuta realmente
 
-Reutiliza `SessionFilesFixture` y la composición de `class-session-records.e2e-spec.ts`: Nest y controladores/servicios reales de auth, estado runtime, partes, archivos, aulas, bloques, solicitudes/notificaciones, disponibilidad Excel e incidencias; JWT firmado, guards de autenticación/autorización, `RequestContext`, interceptores de esquema/errores, configuración HTTP/CORS/CSRF real, PrismaPg/PostgreSQL 18 y GCS emulado. No compone todos los catálogos/pantallas de la aplicación; las pruebas de estados con respuestas inyectadas se identifican por separado.
+Reutiliza `SessionFilesFixture` y la composición de `class-session-records.e2e-spec.ts`: Nest y controladores/servicios reales de auth, estado runtime, partes, archivos, aulas, bloques, solicitudes/notificaciones, disponibilidad Excel e incidencias; JWT firmado, guards de autenticación/autorización, `RequestContext`, interceptores de esquema/errores, configuración HTTP/CORS/CSRF real, PrismaPg/PostgreSQL 18 y GCS emulado. También compone monitores, docentes, áreas, turnos e importaciones con DrizzleService real para probar avisos/preview sin simular esos endpoints. No compone todas las pantallas; las pruebas de estados con respuestas inyectadas se identifican por separado.
 
 No importa `AuthModule` completo, ya que instalaría estrategias OAuth y clientes externos innecesarios. En su lugar registra `AuthController`, `AuthService` y los proveedores reales necesarios. Solo runtime/registro de esquemas y almacén de revocación se sustituyen por fixtures locales; permisos generales devuelven false, conservando el acceso explícito por rol. La revocación se conserva por hash en memoria para probar logout. OAuth está bloqueado con 404 y no hay estrategia ni credenciales reales de Google. Los controles no pertenecen a ningún módulo productivo.
 
@@ -57,6 +57,10 @@ Cada arranque crea dos procesos académicos aleatorios `a`/`b` y un esquema core
 Hay un docente titular y otro reemplazante del mismo curso, monitor titular y otro monitor, supervisores propio/ajeno, docente/coordinador para accesos prohibidos y administración. Todas las direcciones usan `test.invalid` o `browser.invalid`. Las capturas son PNG sintéticos, no personas ni documentos reales. Las alertas se generan con el servicio real sobre los bloques sin inicio confirmado. Las horas son relativas al arranque: los escenarios abiertos permanecen editables aproximadamente 3,5 horas; después reiniciar para nuevos fixtures.
 
 El titular y los monitores tienen DNI sintéticos; el reemplazante no tiene DNI.
+`POST /__test/replacement-dni?process=a|b&present=true|false` permite exclusivamente
+alternar el DNI sintético `91000002` de ese reemplazante en esos procesos conocidos.
+No admite personas, esquemas o DNI arbitrarios; no existe en la aplicación productiva.
+El smoke rechaza proceso/booleano inválidos y confirma el cambio/reversión locales.
 `pendingReplacement` representa un antecedente legado PENDING sembrado directamente,
 no una solicitud retirada que se vuelva a autorizar al monitor. El escenario con
 evidencias se prepara mediante corrección administrativa; los permisos productivos

@@ -99,6 +99,12 @@ suite('Harness local de navegador (solo Compose)', () => {
       }
       await get('/api/classes').expect(200);
       await get('/api/hour-sessions').expect(200);
+      await get('/api/monitors').expect(200);
+      await get('/api/imports/monitores/columns').expect(200);
+      await post('/__test/replacement-dni?process=public&present=true').expect(400);
+      await post('/__test/replacement-dni?present=invalid').expect(400);
+      await post('/__test/replacement-dni?present=true').expect(200);
+      await post('/__test/replacement-dni?present=false').expect(200);
       await session('monitor');
       await agent
         .post('/__test/maintenance?enabled=false')
