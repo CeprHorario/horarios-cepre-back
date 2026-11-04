@@ -1,4 +1,5 @@
 import { ConfigService } from '@nestjs/config';
+import { ServiceUnavailableException } from '@nestjs/common';
 import { Firestore } from '@google-cloud/firestore';
 import { RuntimeConfigService } from './runtime-config.service';
 import { RuntimeConfig } from './interfaces/runtime-config.interface';
@@ -8,6 +9,8 @@ describe('Firestore runtime contract', () => {
   let documents: Map<string, Record<string, unknown>>;
   let first: RuntimeConfigService;
   let second: RuntimeConfigService;
+  let firestore: Firestore;
+  let reads: number;
 
   beforeEach(() => {
     jest.useFakeTimers();
@@ -24,9 +27,13 @@ describe('Firestore runtime contract', () => {
       exists: documents.has(path),
       data: () => documents.get(path),
     });
+    reads = 0;
     const reference = (path: string) => ({
       path,
-      get: () => Promise.resolve(snapshot(path)),
+      get: () => {
+        reads++;
+        return Promise.resolve(snapshot(path));
+      },
       collection: (name: string) => collection(`${path}/${name}`),
     });
     const collection = (path: string) => ({
@@ -45,7 +52,7 @@ describe('Firestore runtime contract', () => {
       }),
     });
     let lock = Promise.resolve();
-    const firestore = {
+    firestore = {
       collection,
       runTransaction: (
         callback: (tx: {
@@ -73,6 +80,42 @@ describe('Firestore runtime contract', () => {
   });
 
   afterEach(() => jest.useRealTimers());
+
+  it('uses the existing fallback without Firestore reads or writes in local mode', async () => {
+    const local = new RuntimeConfigService(
+      firestore,
+      new ConfigService({
+        NODE_ENV: 'development',
+        FIRESTORE_ENABLED: 'false',
+      }),
+    );
+    const transaction = jest.spyOn(firestore, 'runTransaction');
+    await expect(local.getCurrent()).resolves.toBeNull();
+    await expect(local.getCurrent(true)).resolves.toBeNull();
+    await expect(local.getHistory(10)).rejects.toBeInstanceOf(
+      ServiceUnavailableException,
+    );
+    const initial = documents.get(
+      'system_config/runtime',
+    ) as unknown as RuntimeConfig;
+    await expect(
+      local.update({ ...initial, expectedVersion: 1 }, actor),
+    ).rejects.toBeInstanceOf(ServiceUnavailableException);
+    await expect(local.rollback(1, actor)).rejects.toBeInstanceOf(
+      ServiceUnavailableException,
+    );
+    expect(reads).toBe(0);
+    expect(transaction).not.toHaveBeenCalled();
+  });
+
+  it('does not disable Firestore in production', async () => {
+    const production = new RuntimeConfigService(
+      firestore,
+      new ConfigService({ NODE_ENV: 'production', FIRESTORE_ENABLED: 'false' }),
+    );
+    expect((await production.getCurrent())?.version).toBe(1);
+    expect(reads).toBeGreaterThan(0);
+  });
 
   it('invalidates locally after commit and converges on another replica at TTL', async () => {
     const old = (await second.getCurrent())!;

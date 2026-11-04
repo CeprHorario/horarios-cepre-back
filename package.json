@@ -27,6 +27,7 @@
     "test:e2e": "npm test -- --runTestsByPath test/app.e2e-spec.ts",
     "test:records": "npm test -- --runInBand --runTestsByPath test/class-session-records.e2e-spec.ts test/session-files.e2e-spec.ts src/modules/session-files/session-files.service.spec.ts src/modules/session-files/session-file.validation.spec.ts",
     "test:records:all": "node test/run-records-tests.cjs",
+    "test:records:volume": "RECORDS_VOLUME=1 node test/run-records-tests.cjs test/records-volume.e2e-spec.ts",
     "test:compatibility": "node test/compatibility/run.cjs",
     "test:production": "node test/compatibility/production.cjs",
     "prisma:generate": "prisma generate",

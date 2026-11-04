@@ -58,6 +58,8 @@ export function uploadFixture(
 }
 
 export class SessionFilesFixture {
+  constructor(private readonly measureSql = false) {}
+  readonly queryCounts = new Map<string, number>();
   readonly prefix = `sr_${randomUUID().replace(/-/g, '')}`;
   readonly schema = `${this.prefix}_a`;
   readonly otherSchema = `${this.prefix}_b`;
@@ -96,7 +98,18 @@ export class SessionFilesFixture {
       this.pools.push(pool);
       client = new PrismaClient({
         adapter: new PrismaPg(pool, { schema, disposeExternalPool: false }),
+        ...(this.measureSql
+          ? { log: [{ emit: 'event' as const, level: 'query' as const }] }
+          : {}),
       });
+      if (this.measureSql)
+        (
+          client as unknown as {
+            $on: (event: 'query', listener: () => void) => void;
+          }
+        ).$on('query', () =>
+          this.queryCounts.set(schema, (this.queryCounts.get(schema) ?? 0) + 1),
+        );
       this.clients.set(schema, client);
     }
     return client;

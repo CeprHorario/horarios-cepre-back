@@ -1,5 +1,39 @@
 # Partes operativos — feat/update
 
+## Contrato actualizado de la propuesta oficial (2026-11-03)
+
+El encargo específico de Partes sustituye las restricciones antiguas de este
+documento sobre supervisión de solo lectura, cierre sin excepción y capturas sin
+retirada. El contrato nuevo y su **estado parcial de implementación** están en
+[partes-propuesta-oficial.md](partes-propuesta-oficial.md). No presentar la UI
+anterior ni los resultados históricos siguientes como entrega de la propuesta.
+
+- Supervisor edita horas/estado/notas/capturas **solo de su recurso fotografiado**,
+  con el mismo cierre exclusivo del monitor y efectivos del aula, no de su cuenta.
+- Habilitación para cuenta monitor propietaria o supervisor activo ya autorizado,
+  con vencimiento; después del cierre cada escritura requiere motivo propio y el
+  trigger también lo exige. Revocación y escritura comparten lock del parte.
+- `PATCH :id` con RN/RE, `replacementEmail` y `operationId` crea propuesta PENDING
+  idempotente; solo admin autoriza/rechaza. Solicitud/autorización/ejecución son
+  distintas. La ruta antigua `POST replacements` no autoriza docentes a supervisión;
+  sí permite sus sustituciones de monitor registradas/activas, sin cambiar cuenta.
+- Subida ordinaria admite `file` y `reason` opcional (obligatorio bajo excepción).
+  Asociación ordinaria también admite `reason`; cada operación conserva su motivo.
+- La nueva retirada de captura es lógica, versionada y auditada; no borra `File`,
+  objetos GCS ni revisiones históricas. Solo una asociación exitosa sustituye el slot.
+- Los lectores y escritores siguen excluyendo docentes/coordinación, incluso con
+  permisos globales. Las notas privadas del monitor no se serializan al monitor.
+- `GET workspace` integra bootstrap y jornada completa sin paginación de bloques;
+  `GET /class-session-files/thumbnails` integra el lote de derivadas. `/context`
+  sigue compatible; no es obligatorio encadenarlo al nuevo bootstrap.
+
+Estas APIs están implementadas e integradas en la hoja React: A/B, capacidades,
+motivos, propuestas RN/RE, retiro lógico y seguimiento privado. Las propuestas y
+resoluciones, notas privadas y sustituciones ya generan avisos persistentes
+deduplicados; faltan destinatarios docentes/coordinación y el listener SSE. El
+**portado visual oficial exacto** (timeline, ayudas y cuatro modales) sigue
+pendiente. No desplegar esta etapa como si completara F0–F7.
+
 ## Adaptación a esta rama
 
 Base revisada: `feat/update`, commit `dac1591`. Se conservan Node 24, Nest 12, Prisma 7.10.1, `PrismaPg`, PostgreSQL 18, el cliente generado en `src/generated/prisma` y las mejoras de seguridad/asignaciones/importaciones de la rama. No se restauraron los archivos compartidos antiguos de `main`.

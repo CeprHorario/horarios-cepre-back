@@ -3,9 +3,6 @@ import { ScheduleDto } from './schedule.dto';
 import { ScheduleForTeacherDto } from './scheduleForTeacher.dto';
 import { ScheduleWeekDto } from './schedule-week.dto';
 
-// DTO para cargar horario
-export class LoadScheduleDto extends ScheduleWeekDto {}
-
 // DTO idéntico al ScheduleDto
 export { ScheduleDto, ScheduleWeekDto };
 

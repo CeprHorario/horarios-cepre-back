@@ -1,17 +1,18 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '@database/prisma/prisma.service';
 import { ScheduleBaseDto, CreateScheduleDto, UpdateScheduleDto } from './dto';
 import { plainToInstance } from 'class-transformer';
-import { LoadScheduleDto } from './dto';
 import { Weekday, Prisma } from '../../generated/prisma/client';
 import { Role } from '@modules/auth/decorators/authorization.decorator';
 import { covers, normalizeIntervals, overlaps, scheduleInterval } from './availability';
 import { SaveAvailabilityDto } from './dto/availability.dto';
 import { compatibleClassroomsSql } from './compatibility.sql';
+import { ReplaceTeacherDto } from './dto/replace-teacher.dto';
 
 @Injectable()
 export class ScheduleService {
@@ -58,10 +59,6 @@ export class ScheduleService {
 
   private formatMinute(minute: number) {
     return `${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`;
-  }
-
-  loadWithCourses(data: LoadScheduleDto) {
-    return data;
   }
 
   async getPublicScheduleByTeacher(email: string, dni: string) {
@@ -223,14 +220,7 @@ export class ScheduleService {
       );
     }
 
-    const occupied = teacher.schedules.map(scheduleInterval);
-    const requested = schedulesToAssign.map(scheduleInterval);
-    for (const [index, interval] of requested.entries()) {
-      if (!covers(teacher.availabilities, interval)) throw new BadRequestException('El horario está fuera de la disponibilidad del docente');
-      if ([...occupied, ...requested.slice(0, index)].some((other) => overlaps(interval, other))) {
-        throw new BadRequestException('El horario se cruza con otra clase del docente');
-      }
-    }
+    this.assertAssignmentCompatible(teacher, schedulesToAssign);
 
     const totalHoursToAdd = schedulesToAssign.length;
     const newTotalScheduledHours = scheduledHours + totalHoursToAdd;
@@ -320,6 +310,67 @@ export class ScheduleService {
 
         return updatedSchedules;
       });
+  }
+
+  private assertAssignmentCompatible(
+    teacher: Prisma.TeacherGetPayload<{ include: { schedules: { include: { hourSession: true } }; availabilities: true } }>,
+    schedules: Prisma.ScheduleGetPayload<{ include: { hourSession: true } }>[],
+  ) {
+    const occupied = teacher.schedules.map(scheduleInterval);
+    const requested = schedules.map(scheduleInterval);
+    for (const [index, interval] of requested.entries()) {
+      if (!covers(teacher.availabilities, interval))
+        throw new BadRequestException('El horario está fuera de la disponibilidad del docente');
+      if ([...occupied, ...requested.slice(0, index)].some((other) => overlaps(interval, other)))
+        throw new BadRequestException('El horario se cruza con otra clase del docente');
+    }
+  }
+
+  async replaceTeacher(data: ReplaceTeacherDto) {
+    try {
+      return await this.assignmentTransaction(async (tx) => {
+        const { classId, courseId, expectedTeacherId, teacherId } = data;
+        if (teacherId === expectedTeacherId)
+          throw new BadRequestException('El nuevo docente debe ser diferente del anterior');
+        const classroom = await tx.class.findUnique({ where: { id: classId } });
+        const course = await tx.course.findUnique({ where: { id: courseId } });
+        const previous = await tx.teacher.findUnique({ where: { id: expectedTeacherId } });
+        const teacher = await tx.teacher.findUnique({
+          where: { id: teacherId },
+          include: { schedules: { include: { hourSession: true } }, availabilities: true, user: true },
+        });
+        if (!classroom || !course || !previous || !teacher)
+          throw new NotFoundException('Salón, curso o docente no encontrado en este proceso');
+        const schedules = await tx.schedule.findMany({
+          where: { classId, courseId }, include: { hourSession: true },
+        });
+        if (!schedules.length)
+          throw new NotFoundException('El salón no tiene bloques de este curso');
+        if (schedules.some((schedule) => schedule.teacherId !== expectedTeacherId))
+          throw new ConflictException('La asignación del curso cambió. Actualiza el salón');
+        if (!teacher.user.isActive || teacher.courseId !== courseId)
+          throw new BadRequestException('El nuevo docente no está activo o no pertenece al curso');
+        const previousCount = await tx.schedule.count({ where: { teacherId: expectedTeacherId } });
+        if (previous.scheduledHours !== previousCount || teacher.scheduledHours !== teacher.schedules.length)
+          throw new ConflictException('Las cargas registradas no coinciden con los horarios; no se cambió la asignación');
+        this.assertAssignmentCompatible(teacher, schedules);
+        if (teacher.maxHours === null || teacher.scheduledHours + schedules.length > teacher.maxHours)
+          throw new BadRequestException('El profesor no tiene suficiente capacidad para asumir estos horarios');
+        const changed = await tx.schedule.updateMany({
+          where: { id: { in: schedules.map((schedule) => schedule.id) }, teacherId: expectedTeacherId },
+          data: { teacherId },
+        });
+        if (changed.count !== schedules.length)
+          throw new ConflictException('La asignación cambió durante la sustitución');
+        await tx.teacher.update({ where: { id: expectedTeacherId }, data: { scheduledHours: { decrement: changed.count } } });
+        await tx.teacher.update({ where: { id: teacherId }, data: { scheduledHours: { increment: changed.count } } });
+        return { classId, courseId, previousTeacherId: expectedTeacherId, teacherId, updatedSchedules: changed.count };
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034')
+        throw new ConflictException('La asignación cambió concurrentemente. Actualiza el salón');
+      throw error;
+    }
   }
 
   private async assignmentTransaction<T>(operation: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {

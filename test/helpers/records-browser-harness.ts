@@ -52,6 +52,7 @@ import { SessionFilesController } from '../../src/modules/session-files/session-
 import { SessionFilesService } from '../../src/modules/session-files/session-files.service';
 import { SessionObjectStorage } from '../../src/modules/session-files/session-object-storage.service';
 import { SessionFilesFixture, uploadFixture } from './session-files-fixtures';
+import { installPartTestClock } from './part-test-clock';
 import { OperationsController } from '../../src/modules/operations/operations.controller';
 import { OperationsService } from '../../src/modules/operations/operations.service';
 import { OperationsContext } from '../../src/modules/operations/operations-context.service';
@@ -82,6 +83,10 @@ import { ScheduleController } from '../../src/modules/schedules/schedules.contro
 import { SedeController } from '../../src/modules/sedes/sede.controller';
 import { SedeService } from '../../src/modules/sedes/sede.service';
 import { OperationsReportsController } from '../../src/modules/operations/operations-reports.controller';
+import { seedOfficialPartsFixture } from './official-parts-fixture';
+import { seedFinalizationFixtures } from './finalization-fixtures';
+import { finalizationPrisma } from './finalization-prisma';
+import { finalizationRuntime } from './finalization-runtime';
 
 const frontend =
   process.env.RECORDS_BROWSER_FRONTEND_ORIGIN ?? 'http://127.0.0.1:5174';
@@ -150,6 +155,11 @@ export async function createRecordsBrowserHarness() {
         historical: { date: '', firstId: 0, blocks: 105 },
       },
     };
+    // Solo esquemas aleatorios del harness: reloj progresivo para probar fronteras.
+    const clocks = {
+      a: await installPartTestClock(fixture.client(processes.a.process), processes.a.process),
+      b: await installPartTestClock(fixture.client(processes.b.process), processes.b.process),
+    };
     const runtime: RuntimeConfig = {
       version: 1,
       schemaRouting: {
@@ -200,6 +210,7 @@ export async function createRecordsBrowserHarness() {
       },
     };
     const schemas = {
+      schemaExists: (schema: string) => Promise.resolve([fixture.schema, fixture.otherSchema, fixture.coreSchema].includes(schema)),
       assertAvailable: (schema: string) => {
         if (
           ![
@@ -276,13 +287,13 @@ export async function createRecordsBrowserHarness() {
         AdmissionsService,
         SedeService,
         { provide: JwtService, useValue: jwt },
-        { provide: PrismaService, useValue: fixture.apiPrisma },
+        { provide: PrismaService, useValue: process.env.RECORDS_BROWSER_FINALIZATION === '1' ? finalizationPrisma(fixture.prisma, fixture.coreSchema) : { ...fixture.apiPrisma, getSchemaName: () => fixture.prisma.getSchemaName() } },
         { provide: RequestContext, useValue: fixture.context },
         { provide: ConfigService, useValue: config },
         { provide: SchemaManagerService, useValue: schemas },
         {
           provide: RuntimeConfigService,
-          useValue: {
+          useValue: process.env.RECORDS_BROWSER_FINALIZATION === '1' ? finalizationRuntime(runtime) : {
             getCurrent: () => Promise.resolve(runtime),
             getHistory: () => Promise.resolve([runtime]),
           },
@@ -505,6 +516,9 @@ export async function createRecordsBrowserHarness() {
           },
         ],
       });
+      // Declared synthetic intervals for replacement tests, never inferred availability.
+      await db.$executeRaw`INSERT INTO teacher_availabilities(teacher_id,weekday,start_minute,end_minute)
+        SELECT ${ids.replacementTeacher}::uuid,day,0,1440 FROM unnest(enum_range(NULL::"Weekday")) day`;
       await db.shift.update({
         where: { id: 1 },
         data: {
@@ -681,7 +695,19 @@ export async function createRecordsBrowserHarness() {
         await db.$executeRaw`INSERT INTO public.operation_notifications(recipient_id,recipient_origin,process_schema,kind,title,message,dedupe_key) VALUES(${principal.userId}::uuid,${name === 'admin' ? 'core_schema' : entry.process},${entry.process},'TEST',${`Aviso sintético ${name} ${label.toUpperCase()}`},'Aviso aislado de prueba, no representa una decisión',${`browser:${entry.process}:${name}`})`;
       }
     }
+    const visual=process.env.RECORDS_BROWSER_VISUAL==='1' ? await inProcess(processes.a.process,async()=>{
+      await clocks.a.set(new Date('2026-11-03T18:00:00Z'),0);
+      const result=await seedOfficialPartsFixture(fixture,records,files,processes.a.process,ids);
+      await clocks.a.set(new Date('2026-11-03T15:17:00Z'),0);
+      return result;
+    }) : undefined;
+    const finalization = process.env.RECORDS_BROWSER_FINALIZATION === '1'
+      ? await seedFinalizationFixtures(Object.values(processes).map(entry => fixture.client(entry.process)))
+      : undefined;
+    const principals = { ...fixture.principals, ...(finalization ? { courseCoordinator: finalization.principal } : {}) };
     const manifest = {
+      finalization,
+      visual,
       origin: 'http://127.0.0.1:3000',
       date: limaDate(),
       processes,
@@ -689,7 +715,7 @@ export async function createRecordsBrowserHarness() {
       classId: fixture.classId,
       supervisorId: fixture.supervisorId,
       accounts: Object.fromEntries(
-        Object.entries(fixture.principals).map(([role, p]) => [
+        Object.entries(principals).map(([role, p]) => [
           role,
           { accountId: p.userId, email: p.email, role: p.role },
         ]),
@@ -738,10 +764,10 @@ export async function createRecordsBrowserHarness() {
           const role = req.query.role;
           if (
             typeof role !== 'string' ||
-            !Object.hasOwn(fixture.principals, role)
+            !Object.hasOwn(principals, role)
           )
             throw new BadRequestException('Rol ficticio inválido');
-          const p = fixture.principals[role];
+          const p = (principals as Record<string, { userId: string; email: string; role: string }>)[role];
           const schema =
             role === 'admin' ? 'core_schema' : runtime.schemaRouting.userSchema;
           const token = jwt.sign(
@@ -755,6 +781,35 @@ export async function createRecordsBrowserHarness() {
           );
           setSessionCookie(res, token, false, 8 * 3600);
           res.json({ authenticated: true, role: p.role });
+          return;
+        }
+        if (req.method === 'GET' && req.path === '/clock') {
+          const key = req.query.process ?? 'a';
+          if (key !== 'a' && key !== 'b')
+            throw new BadRequestException('Proceso ficticio a/b');
+          const db = fixture.client(processes[key].process);
+          const [row] = await db.$queryRaw<{ now: Date }[]>`
+            SELECT session_clock_now() AS now`;
+          res.json({ process: key, now: row.now.toISOString() });
+          return;
+        }
+        if (req.method === 'GET' && req.path === '/clock-panel') {
+          res.type('html').send(`<!doctype html><html lang="es"><meta charset="utf-8">
+<title>Reloj de pruebas — Partes</title>
+<style>body{font:14px system-ui;max-width:42rem;margin:2rem auto;padding:0 1rem}label{display:block;margin:.8rem 0}input,select,button{font:inherit;padding:.35rem}pre{background:#f4f5f7;padding:1rem;overflow:auto}</style>
+<h1>Reloj de pruebas</h1><p><strong>Solo harness local.</strong> No forma parte del producto ni del bundle. El reloj sigue avanzando con la velocidad indicada; no simula JWT.</p>
+<label>Proceso <select id="process"><option>a</option><option>b</option></select></label>
+<label>Base (hora local del navegador) <input id="base" type="datetime-local" step="1"></label>
+<label>Velocidad <input id="speed" type="number" min="0" max="60" step="0.1" value="1"></label>
+<button id="set">Fijar</button> <button id="reset">Volver al tiempo real</button>
+<pre id="out">Consultando…</pre>
+<script>
+const out=document.getElementById('out'),proc=document.getElementById('process');
+const show=async()=>{const r=await fetch('/__test/clock?process='+proc.value);out.textContent=JSON.stringify(await r.json(),null,2)};
+document.getElementById('set').onclick=async()=>{const base=new Date(document.getElementById('base').value).toISOString();const speed=document.getElementById('speed').value;const r=await fetch('/__test/clock?process='+proc.value+'&base='+encodeURIComponent(base)+'&speed='+encodeURIComponent(speed),{method:'POST'});out.textContent=JSON.stringify(await r.json(),null,2)};
+document.getElementById('reset').onclick=async()=>{const r=await fetch('/__test/clock/reset?process='+proc.value,{method:'POST'});out.textContent=JSON.stringify(await r.json(),null,2)};
+proc.onchange=show;show();setInterval(show,5000);
+</script></html>`);
           return;
         }
         if (req.method !== 'POST') throw new NotFoundException();
@@ -773,6 +828,25 @@ export async function createRecordsBrowserHarness() {
         if (key !== 'a' && key !== 'b')
           throw new BadRequestException('Proceso ficticio a/b');
         const entry = processes[key];
+        if (req.path === '/clock' || req.path === '/clock/reset') {
+          if (req.path === '/clock/reset') {
+            await clocks[key].set(new Date(), 1);
+          } else {
+            const raw = req.query.base;
+            const base = typeof raw === 'string' ? new Date(raw) : new Date(NaN);
+            const speed = Number(
+              typeof req.query.speed === 'string' ? req.query.speed : 1,
+            );
+            if (!Number.isFinite(+base))
+              throw new BadRequestException('base ISO obligatoria');
+            await clocks[key].set(base, speed);
+          }
+          const db = fixture.client(entry.process);
+          const [row] = await db.$queryRaw<{ now: Date }[]>`
+            SELECT session_clock_now() AS now`;
+          res.json({ process: key, now: row.now.toISOString() });
+          return;
+        }
         if (req.path === '/process') {
           const audience = req.query.audience ?? 'both';
           if (
@@ -837,6 +911,7 @@ export async function createRecordsBrowserHarness() {
       manifest,
       close: async () => {
         await closeApp?.();
+        await Promise.all(Object.values(clocks).map((clock) => clock.close()));
         for (const { process } of Object.values(processes)) {
           await fixture.pg.query('DELETE FROM public.operation_notifications WHERE process_schema=$1', [process]);
           await fixture.pg.query('DELETE FROM public.admission_processes WHERE name=$1', [process]);

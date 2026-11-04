@@ -57,6 +57,12 @@ Cada arranque crea dos procesos académicos aleatorios `a`/`b` y un esquema core
 Hay un docente titular y otro reemplazante del mismo curso, monitor titular y otro monitor, supervisores propio/ajeno, docente/coordinador para accesos prohibidos y administración. Todas las direcciones usan `test.invalid` o `browser.invalid`. Las capturas son PNG sintéticos, no personas ni documentos reales. Las alertas se generan con el servicio real sobre los bloques sin inicio confirmado. Las horas son relativas al arranque: los escenarios abiertos permanecen editables aproximadamente 3,5 horas; después reiniciar para nuevos fixtures.
 
 El titular y los monitores tienen DNI sintéticos; el reemplazante no tiene DNI.
+El reemplazante tiene intervalos sintéticos declarados de disponibilidad para las
+pruebas de cobertura; no se deduce disponibilidad de tener horas libres. El smoke
+actual admite habilitación excepcional posterior al cierre (P-03), sin modificar
+el plazo original, y comprueba workspace/miniaturas reales. El runner de navegador
+de Partes ejercita A/B y los editores; el portado visual oficial y los avisos
+dirigidos siguen pendientes según `docs/partes-propuesta-oficial.md`.
 `POST /__test/replacement-dni?process=a|b&present=true|false` permite exclusivamente
 alternar el DNI sintético `91000002` de ese reemplazante en esos procesos conocidos.
 No admite personas, esquemas o DNI arbitrarios; no existe en la aplicación productiva.
@@ -86,6 +92,14 @@ Prefijo `/__test`, fuera de `/api`. Los POST también deben llevar los encabezad
 | `GET/POST /hold-upload?enabled=true`    | Arma la retención de respuesta de la próxima subida exacta `POST /api/class-session-files/records/5`; `false` desarma futuras capturas, sin liberar una ya retenida |
 | `GET /held-upload`                      | `{held:false}` mientras no hay respuesta terminada retenida; `{held:true,status:201}` cuando Nest/GCS terminó correctamente y solo falta entregar la respuesta      |
 | `POST /release-upload`                  | Libera la respuesta retenida una sola vez; `{released:true}` o `{released:false}` si no hay ninguna lista                                                           |
+| `GET /clock?process=a\|b`               | Hora del reloj SQL simulado del esquema aleatorio; solo harness                                                                                                     |
+| `POST /clock?process=a\|b&base=ISO&speed=N` | Fija base/ancla y velocidad; el reloj sigue avanzando por `session_clock_now()`                                                                                 |
+| `POST /clock/reset?process=a\|b`        | Vuelve al tiempo real y velocidad 1                                                                                                                                 |
+| `GET /clock-panel`                      | Panel HTML mínimo, fuera del bundle y de las rutas productivas                                                                                                      |
+
+El reloj de pruebas usa una tabla y función `session_clock_now()` exclusivas de los
+esquemas aleatorios; se retiran al cerrar el harness. No cambia JWT, cookies,
+revocación ni el reloj de seguridad. El panel no se sirve desde el frontend.
 
 Los cambios de proceso de usuario invalidan su JWT anterior: volver a `/__test/session` para emitir cookie del proceso activo. Cambiar solo `audience=admin` no exige renovar el JWT core, pero `/api/class-session-records/context` debe devolver el nuevo proceso y el frontend debe descartar la caché anterior. Cerrar sesión usa **`POST /api/auth/logout` real**, no un login/logout productivo alternativo.
 

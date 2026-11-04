@@ -2,11 +2,13 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   Param,
   ParseIntPipe,
   ParseUUIDPipe,
   Post,
   Req,
+  Query,
   StreamableFile,
   UploadedFile,
   UseGuards,
@@ -25,7 +27,10 @@ import {
   AdministrativeCaptureDto,
   AdministrativeFileUploadDto,
   AssociateSessionCaptureDto,
+  SessionFileUploadDto,
+  ThumbnailsQueryDto,
 } from './session-files.dto';
+import { VersionDto } from '../class-session-records/session.dto';
 import {
   ApiTags,
   ApiBearerAuth,
@@ -53,12 +58,17 @@ export class SessionFilesController {
 
   @Post('records/:recordId')
   @Authorization({
-    roles: [Role.MONITOR, Role.ADMIN],
+    roles: [Role.MONITOR, Role.SUPERVISOR, Role.ADMIN],
     permission: 'class-session-files.upload',
   })
   @UseInterceptors(
     FileInterceptor('file', {
-      limits: { fileSize: MAX_SESSION_FILE_SIZE, files: 1, fields: 0 },
+      limits: {
+        fileSize: MAX_SESSION_FILE_SIZE,
+        files: 1,
+        fields: 1,
+        fieldSize: 8000,
+      },
     }),
   )
   @ApiConsumes('multipart/form-data')
@@ -72,9 +82,23 @@ export class SessionFilesController {
   upload(
     @Req() request: Request & { user: SessionPrincipal },
     @Param('recordId', ParseIntPipe) recordId: number,
+    @Body() dto: SessionFileUploadDto,
     @UploadedFile() file?: Express.Multer.File,
   ) {
-    return this.files.upload(request.user, recordId, file);
+    return this.files.upload(request.user, recordId, file, false, dto.reason);
+  }
+
+  @Get('thumbnails')
+  @Authorization({
+    roles: [Role.MONITOR, Role.SUPERVISOR],
+    permission: 'class-session-files.thumbnails',
+  })
+  @Header('Cache-Control', 'private, no-store')
+  thumbnails(
+    @Req() request: Request & { user: SessionPrincipal },
+    @Query() query: ThumbnailsQueryDto,
+  ) {
+    return this.files.thumbnails(request.user, query.refs);
   }
 
   @Get(':fileId/content')
@@ -101,7 +125,7 @@ export class SessionFilesController {
 
   @Post('records/:recordId/captures/:slot')
   @Authorization({
-    roles: [Role.MONITOR, Role.ADMIN],
+    roles: [Role.MONITOR, Role.SUPERVISOR, Role.ADMIN],
     permission: 'class-session-files.associate',
   })
   associate(
@@ -111,6 +135,26 @@ export class SessionFilesController {
     @Body() dto: AssociateSessionCaptureDto,
   ) {
     return this.files.associate(request.user, recordId, slot, dto);
+  }
+
+  @Post('records/:recordId/captures/:slot/detach')
+  @Authorization({
+    roles: [Role.MONITOR, Role.SUPERVISOR],
+    permission: 'class-session-files.detach',
+  })
+  detach(
+    @Req() request: Request & { user: SessionPrincipal },
+    @Param('recordId', ParseIntPipe) recordId: number,
+    @Param('slot') slot: string,
+    @Body() dto: VersionDto,
+  ) {
+    return this.files.detach(
+      request.user,
+      recordId,
+      slot,
+      dto,
+      request.user.role === String(Role.ADMIN),
+    );
   }
 
   @Post('records/:recordId/corrections/upload')

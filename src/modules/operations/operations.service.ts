@@ -1,4 +1,5 @@
 import { applyApprovedReplacements } from './apply-approved-replacements';
+import { teacherAvailabilitySql } from './teacher-availability';
 import { isDeepStrictEqual } from 'node:util';
 import {
   BadRequestException,
@@ -6,7 +7,12 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  OnModuleInit,
+  OnModuleDestroy,
+  Logger,
 } from '@nestjs/common';
+import { Client } from 'pg';
+import { parseCoordinatorRole } from '../auth/utils/coordinator-role';
 import { Prisma } from '../../generated/prisma/client';
 import { Role } from '../auth/decorators/authorization.decorator';
 import {
@@ -89,17 +95,75 @@ const weekdays = [
   'SATURDAY',
 ];
 @Injectable()
-export class OperationsService {
+export class OperationsService implements OnModuleInit, OnModuleDestroy {
+  private listener?: Client;
+  private reconnect?: ReturnType<typeof setTimeout>;
+  private stopped = false;
+  listening = false;
+  private readonly logger = new Logger(OperationsService.name);
+  listenerReady: Promise<void> = Promise.resolve();
   readonly changes = new Subject<{
     recipientId: string;
     origin: string;
     schema: string;
+    recordId?: number;
+    version?: number;
+    resync?: boolean;
+    transportDown?: boolean;
   }>();
   constructor(
     readonly contexts: OperationsContext,
     private readonly records: ClassSessionRecordsService,
     private readonly documents: RequestDocuments,
   ) {}
+  async onModuleInit() {
+    this.listenerReady = this.listen();
+    await this.listenerReady;
+  }
+  async onModuleDestroy() {
+    this.stopped = true;
+    this.listening = false;
+    clearTimeout(this.reconnect);
+    const listener = this.listener;
+    this.listener = undefined;
+    await listener?.end().catch(() => undefined);
+    this.changes.complete();
+  }
+  private async listen() {
+    if (this.stopped) return;
+    const listener = new Client({ connectionString: process.env.DATABASE_URL, application_name: 'cepr-notifications-listener', connectionTimeoutMillis: 5000 });
+    this.listener = listener;
+    const reconnect = () => {
+      if (this.listener !== listener || this.stopped) return;
+      this.listener = undefined;
+      this.listening = false;
+      this.changes.next({schema:'*',recipientId:'*',origin:'',resync:true,transportDown:true});
+      void listener.end().catch(() => undefined);
+      // ponytail: one dedicated listener per instance; durable rows plus resync replace replay.
+      this.reconnect = setTimeout(() => { this.listenerReady = this.listen(); }, 2000);
+      this.reconnect.unref();
+    };
+    listener.on('error', reconnect);
+    listener.on('end', reconnect);
+    listener.on('notification', (event) => {
+      if (!event.payload) return;
+      try {
+        const signal = JSON.parse(event.payload) as { schema?: string; recipients?: { id: string; origin: string }[]; recordId?: number; version?: number };
+        if (typeof signal.schema !== 'string') return;
+        for (const recipient of signal.recipients ?? [{ id: '*', origin: '' }])
+          this.changes.next({ schema: signal.schema, recipientId: recipient.id, origin: recipient.origin, recordId: signal.recordId, version: signal.version });
+      } catch { this.logger.warn('Se ignoró una señal de notificaciones inválida'); }
+    });
+    try {
+      await listener.connect();
+      await listener.query('LISTEN operations_changed');
+      this.listening = true;
+      this.changes.next({ schema: '*', recipientId: '*', origin: '', resync: true });
+    } catch {
+      this.logger.warn('Listener no disponible; se reintentará sin perder avisos persistidos');
+      reconnect();
+    }
+  }
   private tx<T>(ctx: Context, work: (tx: SessionTx) => Promise<T>) {
     return this.records.transaction(ctx.client, ctx.schema, work, 20000);
   }
@@ -368,9 +432,7 @@ export class OperationsService {
           : Prisma.sql`JOIN supervisors person ON person.user_id=u.id`;
     const conflicts =
       work.subjectRole === 'profesor'
-        ? Prisma.sql`AND person.course_id=${work.courseId}
-      AND NOT EXISTS(SELECT 1 FROM schedules s JOIN hour_sessions h ON h.id=s.hour_session_id CROSS JOIN jsonb_array_elements(${json}::jsonb) b WHERE s.teacher_id=person.id AND s.weekday::text=${weekday} AND (EXTRACT(HOUR FROM h.start_time)*60+EXTRACT(MINUTE FROM h.start_time))<(b->>'endMinute')::int AND (EXTRACT(HOUR FROM h.end_time)*60+EXTRACT(MINUTE FROM h.end_time))>(b->>'startMinute')::int)
-      AND NOT EXISTS(SELECT 1 FROM jsonb_array_elements(${json}::jsonb) b WHERE NOT COALESCE((SELECT range_agg(int4range(a.start_minute,a.end_minute,'[)')) @> int4range((b->>'startMinute')::int,(b->>'endMinute')::int,'[)') FROM teacher_availabilities a WHERE a.teacher_id=person.id AND a.weekday::text=${weekday}),false))`
+        ? teacherAvailabilitySql(date, work.blocks, work.courseId)
         : work.subjectRole === 'monitor'
           ? Prisma.sql`AND owned.shift_id<>${work.shiftId}
       AND NOT EXISTS(SELECT 1 FROM schedules s JOIN hour_sessions h ON h.id=s.hour_session_id CROSS JOIN jsonb_array_elements(${json}::jsonb) b WHERE s.class_id=owned.id AND s.weekday::text=${weekday} AND (EXTRACT(HOUR FROM h.start_time)*60+EXTRACT(MINUTE FROM h.start_time))<(b->>'endMinute')::int AND (EXTRACT(HOUR FROM h.end_time)*60+EXTRACT(MINUTE FROM h.end_time))>(b->>'startMinute')::int)`
@@ -414,7 +476,8 @@ export class OperationsService {
       ...new Map(recipients.map((r) => [r.id + ':' + r.origin, r])).values(),
     ];
     if (!unique.length) return [];
-    await tx.$executeRaw`INSERT INTO public.operation_notifications(recipient_id,recipient_origin,process_schema,kind,title,message,request_id,dedupe_key) SELECT x.id::uuid,x.origin,${ctx.schema},${kind},${title},${message},${requestId}::uuid,${requestId + ':' + event} FROM jsonb_to_recordset(${JSON.stringify(unique)}::jsonb) x(id text,origin text) ON CONFLICT(recipient_id,recipient_origin,dedupe_key) DO NOTHING`;
+    await tx.$executeRaw`INSERT INTO public.operation_notifications(recipient_id,recipient_origin,process_schema,kind,title,message,request_id,dedupe_key) SELECT x.id::uuid,x.origin,${ctx.schema},${kind},${title},${message},${requestId}::uuid,${ctx.schema + ':' + requestId + ':' + event} FROM jsonb_to_recordset(${JSON.stringify(unique)}::jsonb) x(id text,origin text) ON CONFLICT(recipient_id,recipient_origin,dedupe_key) DO NOTHING`;
+    await tx.$executeRaw`SELECT pg_notify('operations_changed',${JSON.stringify({ schema: ctx.schema, recipients: unique })})`;
     return unique;
   }
   private async approvers(tx: SessionTx, ctx: Context, w: Work) {
@@ -763,37 +826,44 @@ export class OperationsService {
   }
   async notifications(principal: SessionPrincipal, q: OperationPageDto) {
     const ctx = await this.contexts.get(principal);
-    const [data, total] = await Promise.all([
-      ctx.client
-        .$queryRaw`SELECT id,kind,title,message,request_id,resolved_at,created_at FROM public.operation_notifications WHERE recipient_id=${ctx.user.id}::uuid AND recipient_origin=${ctx.actor.origin} AND process_schema=${ctx.schema} ORDER BY created_at DESC,id DESC LIMIT ${q.limit} OFFSET ${(q.page - 1) * q.limit}`,
-      ctx.client.$queryRaw<
-        { total: number; pending: number }[]
-      >`SELECT count(*)::int total,count(*) FILTER(WHERE resolved_at IS NULL)::int pending FROM public.operation_notifications WHERE recipient_id=${ctx.user.id}::uuid AND recipient_origin=${ctx.actor.origin} AND process_schema=${ctx.schema}`,
-    ]);
-    return {
-      data,
-      total: total[0].total,
-      pending: total[0].pending,
-      page: q.page,
-      limit: q.limit,
-    };
+    if (![Role.ADMIN, Role.MONITOR, Role.SUPERVISOR, Role.TEACHER].includes(ctx.actor.role) && !parseCoordinatorRole(ctx.user.role).isCoordinator) throw new ForbiddenException('Rol sin avisos');
+    return this.tx(ctx, async tx => {
+      const [result] = await tx.$queryRaw<{data:unknown[];total:number;pending:number}[]>`
+        WITH notices AS (
+          SELECT n.id,n.kind,n.title,n.message,n.request_id,n.resolved_at,n.created_at,
+            n.kind LIKE 'part.pending.%' AND (r.id IS NULL OR r.deleted_at IS NOT NULL OR CASE split_part(n.kind,'.',3)
+              WHEN 'start' THEN r.actual_start IS NOT NULL OR r.teaching_status<>'UNCONFIRMED'
+              WHEN 'end' THEN r.actual_end IS NOT NULL OR r.teaching_status='NOT_TAUGHT'
+              WHEN 'initial' THEN r.initial_file_id IS NOT NULL OR r.teaching_status='NOT_TAUGHT'
+              WHEN 'final' THEN r.final_file_id IS NOT NULL OR r.teaching_status='NOT_TAUGHT' ELSE false END) obsolete
+          FROM public.operation_notifications n LEFT JOIN class_session_records r ON r.id=CASE WHEN n.kind LIKE 'part.pending.%' AND split_part(n.dedupe_key,':',3) ~ '^[0-9]{1,9}$' THEN split_part(n.dedupe_key,':',3)::int ELSE NULL END
+          WHERE n.recipient_id=${ctx.user.id}::uuid AND n.recipient_origin=${ctx.actor.origin} AND n.process_schema=${ctx.schema}
+        )
+        SELECT (SELECT count(*)::int FROM notices) total,
+          (SELECT count(*)::int FROM notices WHERE resolved_at IS NULL AND NOT obsolete) pending,
+          COALESCE((SELECT jsonb_agg(page) FROM (SELECT * FROM notices ORDER BY created_at DESC,id DESC LIMIT ${q.limit} OFFSET ${(q.page-1)*q.limit}) page),'[]'::jsonb) data`;
+      return {...result,page:q.page,limit:q.limit};
+    });
+  }
+  async streamRecords(ctx: Context, changed: [number, number][], permitted: { id: number; version: number; force?: boolean }[]) {
+    if (!changed.length) return;
+    const rows = await ctx.client.classSessionRecord.findMany({ where: { id: { in: changed.map(([id]) => id) }, ...(await this.records.scope(ctx.client, ctx.actor)) }, select: { id: true, version: true } });
+    permitted.push(...rows.map(row => ({ ...row, force: changed.some(([id, version]) => id === row.id && version === 0) })));
   }
   async resolveNotifications(principal: SessionPrincipal, id?: string) {
     const ctx = await this.contexts.get(principal);
+    return this.tx(ctx, async tx => {
     if (id) {
-      const rows = await ctx.client.$queryRaw<
+      const rows = await tx.$queryRaw<
         { id: string }[]
       >`UPDATE public.operation_notifications SET resolved_at=COALESCE(resolved_at,clock_timestamp()) WHERE id=${id}::uuid AND recipient_id=${ctx.user.id}::uuid AND recipient_origin=${ctx.actor.origin} AND process_schema=${ctx.schema} RETURNING id`;
       if (!rows.length)
         throw new NotFoundException('Notificación no encontrada');
     } else
-      await ctx.client
+      await tx
         .$executeRaw`UPDATE public.operation_notifications SET resolved_at=clock_timestamp() WHERE recipient_id=${ctx.user.id}::uuid AND recipient_origin=${ctx.actor.origin} AND process_schema=${ctx.schema} AND resolved_at IS NULL`;
-    this.changes.next({
-      recipientId: ctx.user.id,
-      origin: ctx.actor.origin,
-      schema: ctx.schema,
-    });
+    await tx.$executeRaw`SELECT pg_notify('operations_changed',${JSON.stringify({schema:ctx.schema,recipients:[{id:ctx.user.id,origin:ctx.actor.origin}]})})`;
     return { resolved: true };
+    });
   }
 }

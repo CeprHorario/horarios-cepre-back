@@ -22,19 +22,12 @@ import { FilesInterceptor } from '@nestjs/platform-express';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import type { Response } from 'express';
-import {
-  Observable,
-  catchError,
-  filter,
-  from,
-  interval,
-  map,
-  merge,
-  of,
-  switchMap,
-  takeUntil,
-  timer,
-} from 'rxjs';
+import { Observable } from 'rxjs';
+import { ModuleRef } from '@nestjs/core';
+import { RequestContext } from '@database/schema-manager/request-context';
+import { RuntimeConfigService } from '../runtime-config/runtime-config.service';
+import { JwtStrategy } from '../auth/strategies/jwt.strategy';
+import { parseCoordinatorRole } from '../auth/utils/coordinator-role';
 import {
   Authorization,
   Role,
@@ -50,6 +43,7 @@ import {
 } from './operations.dto';
 import { OperationsService } from './operations.service';
 const roles = [Role.ADMIN, Role.TEACHER, Role.MONITOR, Role.SUPERVISOR];
+const notificationRoles = [...roles, Role.COORDINATOR];
 @Controller('operations')
 @UseGuards(ClassSessionContextGuard)
 @UsePipes(
@@ -60,7 +54,13 @@ const roles = [Role.ADMIN, Role.TEACHER, Role.MONITOR, Role.SUPERVISOR];
   }),
 )
 export class OperationsController {
-  constructor(private readonly service: OperationsService) {}
+  constructor(private readonly service: OperationsService, private readonly modules: ModuleRef) {}
+  @Get('notifications/context')
+  @Authorization({ roles: notificationRoles, permission: 'operations.notifications.context' })
+  async notificationContext(@Req() req: AuthenticatedRequest) {
+    const ctx = await this.service.contexts.get(req.user);
+    return { accountId: ctx.user.id, role: parseCoordinatorRole(ctx.user.role).isCoordinator ? Role.COORDINATOR : ctx.user.role, process: ctx.schema };
+  }
   @Get('context')
   @Authorization({ roles, permission: 'operations.context' })
   context(@Req() req: AuthenticatedRequest) {
@@ -167,7 +167,7 @@ export class OperationsController {
     return this.service.decide(req.user, id, dto);
   }
   @Get('notifications')
-  @Authorization({ roles, permission: 'operations.notifications.list' })
+  @Authorization({ roles: notificationRoles, permission: 'operations.notifications.list' })
   notifications(
     @Req() req: AuthenticatedRequest,
     @Query() q: OperationPageDto,
@@ -175,12 +175,12 @@ export class OperationsController {
     return this.service.notifications(req.user, q);
   }
   @Post('notifications/resolve-all')
-  @Authorization({ roles, permission: 'operations.notifications.resolve-all' })
+  @Authorization({ roles: notificationRoles, permission: 'operations.notifications.resolve-all' })
   resolveAll(@Req() req: AuthenticatedRequest) {
     return this.service.resolveNotifications(req.user);
   }
   @Post('notifications/:id/resolve')
-  @Authorization({ roles, permission: 'operations.notifications.resolve' })
+  @Authorization({ roles: notificationRoles, permission: 'operations.notifications.resolve' })
   resolve(
     @Req() req: AuthenticatedRequest,
     @Param('id', ParseUUIDPipe) id: string,
@@ -188,33 +188,70 @@ export class OperationsController {
     return this.service.resolveNotifications(req.user, id);
   }
   @Sse('notifications/stream')
-  @Authorization({ roles, permission: 'operations.notifications.stream' })
+  @Authorization({ roles: notificationRoles, permission: 'operations.notifications.stream' })
   stream(@Req() req: AuthenticatedRequest): Observable<MessageEvent> {
-    return from(this.service.contexts.get(req.user)).pipe(
-      switchMap((ctx) =>
-        merge(
-          of(0),
-          interval(30000),
-          this.service.changes.pipe(
-            filter(
-              (e) =>
-                e.schema === ctx.schema &&
-                (e.recipientId === '*' ||
-                  (e.recipientId === ctx.user.id &&
-                    e.origin === ctx.actor.origin)),
-            ),
-          ),
-        ).pipe(
-          switchMap(() =>
-            this.service.notifications(req.user, { page: 1, limit: 20 }),
-          ),
-          map((data) => ({ type: 'notifications', data })),
-        ),
-      ),
-      catchError(() =>
-        of({ type: 'context-changed', data: { refresh: true } }),
-      ),
-      takeUntil(timer(60000)),
-    );
+    return new Observable<MessageEvent>((subscriber) => {
+      let active = true;
+      let timer: ReturnType<typeof setInterval> | undefined;
+      let flushTimer: ReturnType<typeof setTimeout> | undefined;
+      let chain = Promise.resolve();
+      const records = new Map<number, number>();
+      let snapshot = false;
+      const state = this.modules.get(RequestContext, { strict: false }).require();
+      const fail = () => {
+        if (!active) return;
+        subscriber.next({ type: 'context-changed', data: { refresh: true } });
+        subscriber.complete();
+      };
+      const enqueue = (work: () => Promise<void>) => { chain = chain.then(async () => { if (active) await work(); }).catch(fail); };
+      let unsubscribe = () => {};
+      enqueue(async () => {
+        const ctx = await this.service.contexts.get(req.user);
+        const validate = async () => {
+          const runtime = await this.modules.get(RuntimeConfigService, { strict: false }).getCurrent();
+          const selected = req.user.role === String(Role.ADMIN) ? runtime?.schemaRouting.adminSchema : runtime?.schemaRouting.userSchema;
+          if (!runtime || selected !== ctx.schema || (runtime.maintenance.enabled && req.user.role !== String(Role.ADMIN))) throw new Error('Contexto cambiado');
+          state.runtime = runtime;
+          state.routing = runtime.schemaRouting;
+          await this.modules.get(JwtStrategy, { strict: false }).validate(req, { id: req.user.userId, role: req.user.role, email: req.user.email, schema: ctx.actor.origin, exp: req.user.expiresAt });
+        };
+        const sendSnapshot = async () => {
+          await validate();
+          const data = await this.service.notifications(req.user, { page: 1, limit: 20 });
+          if (active) subscriber.next({ type: 'notifications', data: { ...data, context: { accountId: ctx.user.id, role: parseCoordinatorRole(ctx.user.role).isCoordinator ? Role.COORDINATOR : ctx.user.role, process: ctx.schema } } });
+        };
+        const subscription = this.service.changes.subscribe((event) => {
+          if (event.transportDown) { subscriber.next({type:'stream-unavailable',data:{retry:true}}); subscriber.complete(); return; }
+          if ((event.schema !== ctx.schema && !event.resync) || (event.recipientId !== '*' && (event.recipientId !== ctx.user.id || event.origin !== ctx.actor.origin))) return;
+          if (event.recordId) records.set(event.recordId, event.version ?? 0);
+          else snapshot = true;
+          if (flushTimer) return;
+          flushTimer = setTimeout(() => {
+            flushTimer = undefined;
+            const changed = [...records]; records.clear();
+            const refresh = snapshot; snapshot = false;
+            enqueue(async () => {
+              await validate();
+              if (refresh) await sendSnapshot();
+              const permitted: { id: number; version: number }[] = [];
+              if ([Role.ADMIN, Role.MONITOR, Role.SUPERVISOR].includes(ctx.actor.role)) {
+                await this.service.streamRecords(ctx, changed, permitted);
+              }
+              if (active && (permitted.length || event.resync)) subscriber.next({ type: 'parts-changed', data: { accountId: ctx.user.id, process: ctx.schema, records: permitted, resync: Boolean(event.resync) } });
+            });
+          }, 75);
+        });
+        unsubscribe = () => subscription.unsubscribe();
+        await this.service.listenerReady;
+        if (!active) return;
+        if (!this.service.listening) { subscriber.next({type:'stream-unavailable',data:{retry:true}}); subscriber.complete(); return; }
+        await sendSnapshot();
+        timer = setInterval(() => enqueue(async () => {
+          await validate();
+          if (active) subscriber.next({ type: 'heartbeat', data: { alive: true } });
+        }), 25000);
+      });
+      return () => { active = false; unsubscribe(); clearInterval(timer); clearTimeout(flushTimer); };
+    });
   }
 }

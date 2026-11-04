@@ -54,6 +54,8 @@ export class AuthorizationGuard implements CanActivate {
       context.getHandler(),
     );
     if (!metadata) throw new UnauthorizedException();
+    // Notification access is deliberately separate from documentary operations and Partes.
+    if (coordinatorScope.isCoordinator && ['operations.notifications.context', 'operations.notifications.list', 'operations.notifications.stream', 'operations.notifications.resolve', 'operations.notifications.resolve-all'].includes(metadata.permission)) return true;
     if (metadata.permission.startsWith('operations.') &&
         ![Role.ADMIN, Role.TEACHER, Role.MONITOR, Role.SUPERVISOR].includes(role as Role))
       throw new UnauthorizedException('Rol sin acceso a operaciones');

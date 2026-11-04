@@ -6,6 +6,7 @@ import {
   IsArray,
   IsBoolean,
   IsDateString,
+  IsEmail,
   IsIn,
   IsInt,
   IsOptional,
@@ -36,6 +37,8 @@ export class ReasonDto extends VersionDto {
   declare reason: string;
 }
 export class UpdateSessionDto extends VersionDto {
+  @IsOptional() @IsEmail() @MaxLength(254) replacementEmail?: string;
+  @IsOptional() @IsUUID() operationId?: string;
   @IsOptional()
   @IsArray()
   @ArrayMaxSize(20)
@@ -84,8 +87,37 @@ export class UpdateSessionDto extends VersionDto {
 export class DateDto {
   @ApiProperty({ example: '2026-10-28' })
   @Matches(/^\d{4}-\d{2}-\d{2}$/)
-  @IsDateString()
+  @IsDateString({ strict: true })
   date: string;
+}
+export class SessionWorkspaceQueryDto {
+  @IsOptional() @Matches(/^\d{4}-\d{2}-\d{2}$/) @IsDateString() date?: string;
+  @IsOptional() @IsUUID() classId?: string;
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(32767)
+  shiftId?: number;
+}
+export class MonitorJournalDto extends DateDto {
+  @IsUUID() classId: string;
+  @Type(() => Number) @IsInt() @Min(1) @Max(32767) shiftId: number;
+  @IsUUID() monitorId: string;
+}
+export class MonitorObservationQueryDto extends MonitorJournalDto {
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) page = 1;
+}
+export class CreateMonitorObservationDto extends MonitorJournalDto {
+  @IsString() @MinLength(3) @MaxLength(2000) text: string;
+}
+export class UpdateMonitorObservationDto extends CreateMonitorObservationDto {
+  @IsInt() @Min(1) expectedVersion: number;
+  @IsOptional() @IsString() @MaxLength(2000) reason?: string;
+}
+export class WithdrawMonitorObservationDto extends MonitorJournalDto {
+  @IsInt() @Min(1) expectedVersion: number;
+  @IsString() @MinLength(3) @MaxLength(2000) reason: string;
 }
 export class SessionJournalsQueryDto {
   @ApiProperty() @Matches(/^\d{4}-\d{2}-\d{2}$/) @IsDateString() from: string;
@@ -158,6 +190,7 @@ export class CoverageTargetDto extends VersionDto {
   @ApiProperty() @IsInt() @Min(1) recordId: number;
 }
 export class CoverageDto {
+  @ApiPropertyOptional() @IsOptional() @IsUUID() operationId?: string;
   @ApiProperty({ type: [CoverageTargetDto], maxItems: 200 })
   @IsArray()
   @ArrayMinSize(1)
@@ -203,7 +236,7 @@ export class OperationalConfigDto extends ReasonDto {
   @ApiPropertyOptional({ nullable: true })
   @IsOptional()
   @Matches(/^\d{4}-\d{2}-\d{2}$/)
-  @IsDateString()
+  @IsDateString({ strict: true })
   startsOn?: string | null;
   @ApiPropertyOptional({ nullable: true })
   @IsOptional()
@@ -228,6 +261,12 @@ export class OperationalConfigDto extends ReasonDto {
   @Min(0)
   @Max(1440)
   alertThresholdMinutes?: number | null;
+  @ApiPropertyOptional({ nullable: true })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(1440)
+  escalationDelayMinutes?: number | null;
   @ApiPropertyOptional({ nullable: true })
   @IsOptional()
   @IsInt()

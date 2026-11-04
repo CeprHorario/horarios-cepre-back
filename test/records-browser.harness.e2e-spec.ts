@@ -76,6 +76,12 @@ suite('Harness local de navegador (solo Compose)', () => {
         message: 'Mantenimiento ficticio para pruebas',
         endsAt: null,
       });
+      const clockBase = new Date(Date.now() - 60_000).toISOString();
+      await post(`/__test/clock?process=a&base=${encodeURIComponent(clockBase)}&speed=0`).expect(200);
+      const frozen = body<{ now: string }>(await get('/__test/clock?process=a').expect(200));
+      expect(frozen.now).toBe(clockBase);
+      await post('/__test/clock/reset?process=a').expect(200);
+      expect(Date.parse(body<{ now: string }>(await get('/__test/clock?process=a').expect(200)).now)).toBeGreaterThan(Date.parse(clockBase));
       await get(`${root}/context`).expect(401);
       for (const role of ['monitor', 'supervisor', 'admin']) {
         const signedIn = await session(role);
@@ -101,7 +107,9 @@ suite('Harness local de navegador (solo Compose)', () => {
       await get('/api/hour-sessions').expect(200);
       await get('/api/monitors').expect(200);
       await get('/api/imports/monitores/columns').expect(200);
-      await post('/__test/replacement-dni?process=public&present=true').expect(400);
+      await post('/__test/replacement-dni?process=public&present=true').expect(
+        400,
+      );
       await post('/__test/replacement-dni?present=invalid').expect(400);
       await post('/__test/replacement-dni?present=true').expect(200);
       await post('/__test/replacement-dni?present=false').expect(200);
@@ -137,7 +145,7 @@ suite('Harness local de navegador (solo Compose)', () => {
         .patch(`${root}/${a.records.editable}`)
         .send({ expectedVersion: 1 })
         .expect(403);
-      const uploaded = body<{ id: string; status: string }>(
+      const uploaded = body<{ id: string; status: string; generation: string }>(
         await post(`/api/class-session-files/records/${a.records.editable}`)
           .attach('file', pngFixture(), {
             filename: 'smoke.png',
@@ -158,6 +166,34 @@ suite('Harness local de navegador (solo Compose)', () => {
           .expect(201),
       );
       expect(attached.version).toBe(2);
+      const workspace = body<{
+        selection: { blocks: number };
+        rows: { id: number; version: number }[];
+      }>(
+        await get(
+          `${root}/workspace?date=${harness.manifest.date}&classId=${harness.manifest.classId}`,
+        ).expect(200),
+      );
+      expect(workspace.selection.blocks).toBe(6);
+      expect(
+        workspace.rows.find((row) => row.id === a.records.editable)?.version,
+      ).toBe(2);
+      const refs = encodeURIComponent(
+        JSON.stringify([
+          {
+            recordId: a.records.editable,
+            slot: 'initial',
+            fileId: uploaded.id,
+            generation: uploaded.generation,
+          },
+        ]),
+      );
+      const thumbnails = body<{ data: { status: string }[] }>(
+        await get(`/api/class-session-files/thumbnails?refs=${refs}`).expect(
+          200,
+        ),
+      );
+      expect(thumbnails.data[0].status).toBe('AVAILABLE');
       await session('admin');
       const oldAccount = harness.manifest.accounts.monitor.accountId;
       await get(`${root}/${a.records.editable}`)
@@ -221,8 +257,13 @@ suite('Harness local de navegador (solo Compose)', () => {
         })
         .expect(201);
       await post(`${root}/${a.records.closed}/grants`)
-        .send({ expectedVersion: 1, accountId: harness.manifest.accounts.monitor.accountId, expiresAt: new Date(Date.now() + 60000).toISOString(), reason: 'No ampliar cierre histórico' })
-        .expect(400);
+        .send({
+          expectedVersion: 1,
+          accountId: harness.manifest.accounts.monitor.accountId,
+          expiresAt: new Date(Date.now() + 60000).toISOString(),
+          reason: 'Habilitación excepcional sin mover el cierre original',
+        })
+        .expect(201);
       const grant = body<{ id: number }>(
         await post(`${root}/${a.records.editable}/grants`)
           .send({
@@ -235,7 +276,16 @@ suite('Harness local de navegador (solo Compose)', () => {
       );
       await session('monitor');
       await patch(`${root}/${a.records.editable}`)
-        .send({ expectedVersion: 3, structuredObservations: [{ id: 'a7576dfe-4215-4ffd-864c-9076ad19a502', target: 'CLASSROOM', description: 'Edición dentro del plazo original' }] })
+        .send({
+          expectedVersion: 3,
+          structuredObservations: [
+            {
+              id: 'a7576dfe-4215-4ffd-864c-9076ad19a502',
+              target: 'CLASSROOM',
+              description: 'Edición dentro del plazo original',
+            },
+          ],
+        })
         .expect(200);
       await session('admin');
       await post(`${root}/grants/${grant.id}/revoke`)

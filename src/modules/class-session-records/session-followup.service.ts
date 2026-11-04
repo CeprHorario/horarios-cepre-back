@@ -55,7 +55,10 @@ export class SessionFollowupService implements OnModuleInit, OnModuleDestroy {
             { present: boolean }[]
           >`SELECT to_regclass(${`"${schema}".session_operational_config`}) IS NOT NULL AS present`;
           if (!present[0]?.present) continue;
-          await this.journal.materialize(client, schema, limaDate());
+          const now = await this.records.transaction(client, schema, (tx) =>
+            this.records.now(tx),
+          );
+          await this.journal.materialize(client, schema, limaDate(now));
           await this.generate(schema);
         } catch (error) {
           this.logger.error(
@@ -71,6 +74,11 @@ export class SessionFollowupService implements OnModuleInit, OnModuleDestroy {
     const client = this.records.prisma.getClientForSchema(schema);
     const actor = systemActor(schema);
     return this.records.transaction(client, schema, async (tx) => {
+      const [lock] = await tx.$queryRaw<
+        { locked: boolean }[]
+      >`SELECT pg_try_advisory_xact_lock(hashtextextended(${schema + ':session-followup'},0)) AS locked`;
+      if (!lock.locked) return { created: 0 };
+      const now = await this.records.now(tx);
       const config = await tx.sessionOperationalConfig.findUniqueOrThrow({
         where: { id: 1 },
       });
@@ -80,7 +88,8 @@ export class SessionFollowupService implements OnModuleInit, OnModuleDestroy {
         SELECT r.id,'NO_START_CONFIRMATION',r.supervisor_id FROM class_session_records r
         WHERE r.deleted_at IS NULL AND r.actual_start IS NULL AND r.teaching_status='UNCONFIRMED'
           AND r.timing_policy->>'alertThresholdMinutes' IS NOT NULL
-          AND r.scheduled_start+make_interval(mins=>(r.timing_policy->>'alertThresholdMinutes')::int)<=clock_timestamp()
+          AND r.date=${new Date(limaDate(now))}::date
+          AND r.scheduled_start+make_interval(mins=>(r.timing_policy->>'alertThresholdMinutes')::int)<=${now}
         ON CONFLICT(record_id,type) DO NOTHING RETURNING id,record_id`;
       for (const alert of inserted)
         await this.records.audit(
@@ -91,6 +100,42 @@ export class SessionFollowupService implements OnModuleInit, OnModuleDestroy {
           null,
           alert,
         );
+      const admins = await this.records.prisma.getClientForSchema('core_schema').user.findMany({ where: { role: String(Role.ADMIN), isActive: true }, select: { id: true } });
+      // Set-based reminders; only today's facts, never an inferred personal absence.
+      const notices = await tx.$queryRaw<{ id: string }[]>`
+        WITH pending AS (
+          SELECT r.*, issue.kind, issue.due_at,
+            (r.timing_policy->>'alertThresholdMinutes')::int reminder,
+            (r.timing_policy->>'escalationDelayMinutes')::int escalation
+          FROM class_session_records r
+          CROSS JOIN LATERAL (VALUES
+            ('start',r.scheduled_start,r.actual_start IS NULL AND r.teaching_status='UNCONFIRMED'),
+            ('end',r.scheduled_end,r.actual_end IS NULL AND r.teaching_status IN ('UNCONFIRMED','TAUGHT','INTERRUPTED')),
+            ('initial',r.scheduled_start,r.initial_file_id IS NULL AND r.teaching_status<>'NOT_TAUGHT'),
+            ('final',r.scheduled_end,r.final_file_id IS NULL AND r.teaching_status<>'NOT_TAUGHT')
+          ) issue(kind,due_at,missing)
+          WHERE r.date=${new Date(limaDate(now))}::date AND r.deleted_at IS NULL AND issue.missing
+            AND r.timing_policy->>'alertThresholdMinutes' IS NOT NULL
+            AND issue.due_at+make_interval(mins=>(r.timing_policy->>'alertThresholdMinutes')::int)<=${now}
+        ), recipients AS (
+          SELECT p.id,p.kind,p.period,p.date,p.supervisor_id,p.due_at,p.reminder,p.escalation,u.id recipient_id,${schema} recipient_origin,'reminder' stage
+          FROM pending p JOIN users u ON u.id=p.monitor_account_id AND u.is_active AND u.role='monitor'
+          UNION ALL
+          SELECT p.id,p.kind,p.period,p.date,p.supervisor_id,p.due_at,p.reminder,p.escalation,u.id,${schema},'escalation'
+          FROM pending p JOIN supervisors s ON s.id=p.supervisor_id JOIN users u ON u.id=s.user_id AND u.is_active
+          WHERE p.escalation IS NOT NULL AND p.due_at+make_interval(mins=>p.reminder+p.escalation)<=${now}
+          UNION ALL
+          SELECT p.id,p.kind,p.period,p.date,p.supervisor_id,p.due_at,p.reminder,p.escalation,a.id::uuid,'core_schema','escalation'
+          FROM pending p CROSS JOIN jsonb_to_recordset(${JSON.stringify(admins)}::jsonb) a(id text)
+          WHERE p.escalation IS NOT NULL AND p.due_at+make_interval(mins=>p.reminder+p.escalation)<=${now}
+        )
+        INSERT INTO public.operation_notifications(recipient_id,recipient_origin,process_schema,kind,title,message,dedupe_key)
+        SELECT recipient_id,recipient_origin,${schema},'part.pending.'||kind||'.'||stage,
+          CASE kind WHEN 'start' THEN 'Inicio real sin confirmar' WHEN 'end' THEN 'Fin real sin confirmar' ELSE 'Captura pendiente de registro' END,
+          date::text||' · bloque '||period||'. Falta un registro; no se afirma ausencia ni sanción.'||CASE WHEN stage='escalation' AND supervisor_id IS NULL THEN ' Sin supervisor asignado: escalado a administración.' ELSE '' END,
+          ${schema}||':pending:'||id||':'||kind||':'||stage
+        FROM recipients ON CONFLICT(recipient_id,recipient_origin,dedupe_key) DO NOTHING RETURNING id`;
+      if (notices.length) await tx.$executeRaw`SELECT pg_notify('operations_changed',${JSON.stringify({schema})})`;
       return { created: inserted.length };
     });
   }

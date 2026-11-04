@@ -19,6 +19,7 @@ import { Request, Response, NextFunction } from 'express';
 import request from 'supertest';
 import { AuthorizationGuard } from '../src/modules/auth/guards/authorization.guard';
 import { ClassSessionRecordsService } from '../src/modules/class-session-records/class-session-records.service';
+import { SessionJournalService } from '../src/modules/class-session-records/session-journal.service';
 import { SessionPrincipal } from '../src/modules/class-session-records/session.types';
 import { SessionFilesController } from '../src/modules/session-files/session-files.controller';
 import { SessionFilesService } from '../src/modules/session-files/session-files.service';
@@ -65,14 +66,20 @@ suite('Session files (PostgreSQL + fake GCS)', () => {
       },
       { expiresIn: '1h', issuer: 'cepr', audience: 'cepr-api' },
     );
-  const upload = (name = 'monitor', authToken = token(name)) =>
-    request(server())
+  const upload = (
+    name = 'monitor',
+    authToken = token(name),
+    reason?: string,
+  ) => {
+    const req = request(server())
       .post(`/class-session-files/records/${currentRecord.id}`)
-      .auth(authToken, { type: 'bearer' })
-      .attach('file', pngFixture(), {
-        filename: 'captura.png',
-        contentType: 'image/png',
-      });
+      .auth(authToken, { type: 'bearer' });
+    if (reason !== undefined) req.field('reason', reason);
+    return req.attach('file', pngFixture(), {
+      filename: 'captura.png',
+      contentType: 'image/png',
+    });
+  };
   const content = (fileId: string, name = 'monitor', authToken = token(name)) =>
     request(server())
       .get(`/class-session-files/${fileId}/content`)
@@ -82,11 +89,16 @@ suite('Session files (PostgreSQL + fake GCS)', () => {
     expectedVersion: number,
     slot = 'initial',
     name = 'monitor',
+    reason?: string,
   ) =>
     request(server())
       .post(`/class-session-files/records/${currentRecord.id}/captures/${slot}`)
       .auth(token(name), { type: 'bearer' })
-      .send({ fileId, expectedVersion });
+      .send({
+        fileId,
+        expectedVersion,
+        ...(reason !== undefined ? { reason } : {}),
+      });
 
   beforeAll(async () => {
     if (!process.env.DATABASE_URL || !process.env.STORAGE_EMULATOR_HOST)
@@ -228,6 +240,75 @@ suite('Session files (PostgreSQL + fake GCS)', () => {
       expect.objectContaining({ initialFileId: second.id }),
     );
   });
+  it('carga miniaturas privadas en lote, reutiliza derivada y conserva original al retirar captura', async () => {
+    const first = body(await upload().expect(201));
+    await associate(first.id, 1).expect(201);
+    const refs = [
+      {
+        recordId: currentRecord.id,
+        slot: 'initial',
+        fileId: first.id,
+        generation: first.generation,
+      },
+    ];
+    const batch = (name = 'monitor', references = refs) =>
+      request(server())
+        .get('/class-session-files/thumbnails')
+        .auth(token(name), { type: 'bearer' })
+        .query({ refs: JSON.stringify(references) });
+    const download = jest.spyOn(objects, 'download');
+    const response = await batch().expect(200);
+    expect(response.headers['cache-control']).toBe('private, no-store');
+    const result = response.body as {
+      data: {
+        status: string;
+        contentType: string;
+        content: string;
+        width: number;
+        height: number;
+      }[];
+    };
+    expect(result.data[0]).toMatchObject({
+      status: 'AVAILABLE',
+      contentType: 'image/webp',
+      width: 1,
+      height: 1,
+    });
+    expect(
+      Buffer.from(result.data[0].content, 'base64').subarray(0, 4).toString(),
+    ).toBe('RIFF');
+    expect(download).toHaveBeenCalledTimes(1);
+    download.mockClear();
+    await batch().expect(200);
+    expect(download).toHaveBeenCalledTimes(1);
+    expect(download.mock.calls[0][1]).toContain('.thumbnail-');
+    for (const name of ['teacher', 'coordinator'])
+      await batch(name).expect(401);
+    await batch('otherMonitor').expect(404);
+    await batch('otherSupervisor').expect(404);
+    await batch('monitor', [refs[0], refs[0]]).expect(400);
+    await request(server())
+      .post(
+        `/class-session-files/records/${currentRecord.id}/captures/initial/detach`,
+      )
+      .auth(token('monitor'), { type: 'bearer' })
+      .send({ expectedVersion: 2 })
+      .expect(201);
+    const stale = await batch().expect(200);
+    expect((stale.body as { data: { status: string }[] }).data[0].status).toBe(
+      'STALE',
+    );
+    await content(first.id).expect(200);
+    const retained = await fixture
+      .client()
+      .file.findUniqueOrThrow({ where: { id: first.id } });
+    expect(retained.status).toBe('AVAILABLE');
+    expect(retained.deletedAt).toBeNull();
+    const events = await fixture.client().sessionAuditEvent.count({
+      where: { recordId: currentRecord.id, action: 'CAPTURE_DETACHED' },
+    });
+    expect(events).toBe(1);
+  });
 
   it('rechaza cambio de cuenta dentro del proceso antes de consultar, subir o asociar archivos', async () => {
     const uploaded = body(await upload().expect(201));
@@ -264,17 +345,21 @@ suite('Session files (PostgreSQL + fake GCS)', () => {
     ).toBe(before);
     expect(
       (
-        await fixture
-          .client()
-          .classSessionRecord.findUniqueOrThrow({
-            where: { id: currentRecord.id },
-          })
+        await fixture.client().classSessionRecord.findUniqueOrThrow({
+          where: { id: currentRecord.id },
+        })
       ).version,
     ).toBe(1);
     await content(uploaded.id, 'admin')
       .set('X-Class-Session-Account', fixture.principals.admin.userId)
       .expect(200);
-    await associate(uploaded.id, 1, 'initial', 'admin')
+    await associate(
+      uploaded.id,
+      1,
+      'initial',
+      'admin',
+      'Asociación motivada de cuenta administrativa confirmada',
+    )
       .set('X-Class-Session-Account', fixture.principals.admin.userId)
       .expect(201);
   });
@@ -290,8 +375,11 @@ suite('Session files (PostgreSQL + fake GCS)', () => {
       await upload(name).expect(401);
     }
     await upload('otherMonitor').expect(404);
-    await upload('supervisor').expect(401);
-    await associate(uploaded.id, 1, 'initial', 'supervisor').expect(401);
+    // P-02 permits own uploads, never attributing a monitor's upload to supervision.
+    const supervised = body(await upload('supervisor').expect(201));
+    await associate(uploaded.id, 1, 'initial', 'supervisor').expect(403);
+    await associate(supervised.id, 1, 'initial', 'supervisor').expect(201);
+    await upload('otherSupervisor').expect(404);
   });
   it('File sin parte sirve a otros módulos pero no puede leerse ni asociarse como evidencia', async () => {
     const file = await fixture.client().file.create({
@@ -336,7 +424,8 @@ suite('Session files (PostgreSQL + fake GCS)', () => {
       data: {
         ...source,
         supervisorId: null,
-        snapshot: {}, structuredObservations: [],
+        snapshot: {},
+        structuredObservations: [],
         effectiveSnapshot: {},
         timingPolicy: {},
         initialAssociatedBy: undefined,
@@ -348,7 +437,12 @@ suite('Session files (PostgreSQL + fake GCS)', () => {
       .client()
       .file.findUniqueOrThrow({ where: { id: fileId } });
     await other.file.create({
-      data: { ...stored, uploadedBy: {}, deletedBy: undefined },
+      data: {
+        ...stored,
+        uploadedBy: {},
+        deletedBy: undefined,
+        thumbnail: undefined,
+      },
     });
     await content(
       fileId,
@@ -424,7 +518,7 @@ suite('Session files (PostgreSQL + fake GCS)', () => {
     const closed = await fixture.client().classSessionRecord.findUniqueOrThrow({
       where: { id: currentRecord.id },
     });
-    await associate(first.id, 2, 'final', 'admin').expect(403);
+    await associate(first.id, 2, 'final', 'admin').expect(400);
     const correctionUpload = (name = 'admin', reason?: string) => {
       const req = request(server())
         .post(
@@ -491,9 +585,23 @@ suite('Session files (PostgreSQL + fake GCS)', () => {
     const uploaded = body(await upload().expect(201));
     await associate(uploaded.id, 99).expect(409);
     await associate(uploaded.id, 1, 'unexpected').expect(400);
-    const adminUploaded = body(await upload('admin').expect(201));
+    await upload('admin').expect(400);
+    const adminUploaded = body(
+      await upload(
+        'admin',
+        token('admin'),
+        'Carga administrativa motivada',
+      ).expect(201),
+    );
     await associate(adminUploaded.id, 1).expect(403);
-    await associate(adminUploaded.id, 1, 'initial', 'admin').expect(201);
+    await associate(adminUploaded.id, 1, 'initial', 'admin').expect(400);
+    await associate(
+      adminUploaded.id,
+      1,
+      'initial',
+      'admin',
+      'Asociación administrativa motivada',
+    ).expect(201);
     currentRecord = await fixture.record();
     await associate(uploaded.id, 1).expect(404);
   });
@@ -502,9 +610,19 @@ suite('Session files (PostgreSQL + fake GCS)', () => {
     const uploaded = body(await upload().expect(201));
     await fixture.closeRecord(currentRecord.id);
     await associate(uploaded.id, 1).expect(403);
-    await associate(uploaded.id, 1, 'initial', 'admin').expect(403);
+    await associate(
+      uploaded.id,
+      1,
+      'initial',
+      'admin',
+      'La ruta ordinaria no supera el cierre',
+    ).expect(403);
     await upload().expect(403);
-    await upload('admin').expect(403);
+    await upload(
+      'admin',
+      token('admin'),
+      'La ruta ordinaria no supera el cierre',
+    ).expect(403);
     const unchanged = await fixture
       .client()
       .classSessionRecord.findUniqueOrThrow({
@@ -532,6 +650,70 @@ suite('Session files (PostgreSQL + fake GCS)', () => {
       (await storage.bucket(bucket).file(failed.objectName).exists())[0],
     ).toBe(true);
     await content(failed.id).expect(404);
+  });
+  it('habilitación exige motivo en subida/asociación y revocación durante GCS impide la escritura final', async () => {
+    await fixture.closeRecord(currentRecord.id);
+    const journal = new SessionJournalService(records);
+    const grant = await als.run({ schema: fixture.schema, routing }, () =>
+      journal.grant(fixture.principals.admin, currentRecord.id, {
+        expectedVersion: 1,
+        accountId: fixture.principals.monitor.userId,
+        expiresAt: new Date(Date.now() + 60000).toISOString(),
+        reason: 'Habilitación de prueba explícita',
+      }),
+    );
+    await upload().expect(400);
+    const first = body(
+      await upload(
+        'monitor',
+        token('monitor'),
+        'Subir evidencia durante excepción',
+      ).expect(201),
+    );
+    await associate(first.id, 1).expect(400);
+    await associate(
+      first.id,
+      1,
+      'initial',
+      'monitor',
+      'Asociar evidencia durante excepción',
+    ).expect(201);
+    const original = objects.upload.bind(
+      objects,
+    ) as SessionObjectStorage['upload'];
+    jest.spyOn(objects, 'upload').mockImplementation(async (...args) => {
+      const generation = await original(...args);
+      await als.run({ schema: fixture.schema, routing }, () =>
+        journal.revokeGrant(fixture.principals.admin, grant.id, {
+          expectedVersion: 2,
+          reason: 'Revocación durante transferencia',
+        }),
+      );
+      return generation;
+    });
+    await upload(
+      'monitor',
+      token('monitor'),
+      'Nueva evidencia que será revocada',
+    ).expect(403);
+    const stored = await fixture.client().classSessionRecord.findUniqueOrThrow({
+      where: { id: currentRecord.id },
+    });
+    expect(stored.initialFileId).toBe(first.id);
+    expect(stored.version).toBe(2);
+    expect(
+      await fixture.client().file.count({
+        where: { recordId: currentRecord.id, status: 'FAILED' },
+      }),
+    ).toBe(1);
+    expect(
+      await fixture.client().sessionAuditEvent.count({
+        where: {
+          recordId: currentRecord.id,
+          reason: 'Subir evidencia durante excepción',
+        },
+      }),
+    ).toBe(2);
   });
 
   it('allows only admin to download files from logically cancelled records', async () => {

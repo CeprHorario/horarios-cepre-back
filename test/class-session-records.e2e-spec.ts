@@ -7,7 +7,9 @@ import { TokenRevocationService } from '../src/modules/auth/token-revocation.ser
 import type { Request, Response, NextFunction } from 'express';
 import { Pool } from 'pg';
 import { applyStructure } from '../src/database/prisma/structure';
-import { randomUUID } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { execFileSync } from 'child_process';
 import { Server } from 'http';
 import request from 'supertest';
@@ -32,6 +34,7 @@ import { SessionFollowupService } from '../src/modules/class-session-records/ses
 import { SessionReportsService } from '../src/modules/class-session-records/session-reports.service';
 import { SessionPrincipal } from '../src/modules/class-session-records/session.types';
 import { SessionFilesFixture } from './helpers/session-files-fixtures';
+import { installPartTestClock } from './helpers/part-test-clock';
 import { initialDataSchema } from '../src/database/prisma/data/seed';
 import { IncidencesController } from '../src/modules/incidences/incidences.controller';
 import { IncidencesService } from '../src/modules/incidences/incidences.service';
@@ -106,7 +109,21 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
     api('patch', `/${r.id}`, name).send({
       expectedVersion: r.version,
       ...data,
-      ...(typeof data.incidents==='string'?{incidents:undefined,structuredObservations:[{id:randomUUID(),target:'CLASSROOM',description:data.incidents.length<3?'Nota '+data.incidents:data.incidents}]}:{}),
+      ...(typeof data.incidents === 'string'
+        ? {
+            incidents: undefined,
+            structuredObservations: [
+              {
+                id: randomUUID(),
+                target: 'CLASSROOM',
+                description:
+                  data.incidents.length < 3
+                    ? 'Nota ' + data.incidents
+                    : data.incidents,
+              },
+            ],
+          }
+        : {}),
     });
 
   beforeAll(async () => {
@@ -164,6 +181,10 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
           jobStatus: 'PartTime',
         },
       });
+      // Synthetic availability, not an institutional rule or inferred free time.
+      await db()
+        .$executeRaw`INSERT INTO teacher_availabilities(teacher_id,weekday,start_minute,end_minute)
+        SELECT ${teacherIds[i]}::uuid,day,0,1440 FROM unnest(enum_range(NULL::"Weekday")) day`;
     }
     const config = new ConfigService({
       CORE_SCHEMA: fixture.coreSchema,
@@ -305,6 +326,533 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
         data: { isActive: true },
       });
     }
+  });
+  it('reloj SQL de pruebas avanza y comparte fronteras exactas con servicio y trigger, no con JWT', async () => {
+    const r = await fresh(),
+      clock = await installPartTestClock(db(), fixture.schema);
+    try {
+      await clock.set(new Date(+r.editDeadline - 1), 0);
+      const before = body<ClassSessionRecord>(
+        await patch(r, {
+          actualStart: new Date(+r.scheduledStart + 60000).toISOString(),
+        }).expect(200),
+      );
+      await clock.set(r.editDeadline, 0);
+      await patch(
+        before,
+        { actualEnd: new Date(+r.scheduledEnd - 60000).toISOString() },
+        'supervisor',
+      ).expect(403);
+      await expect(
+        records.transaction(db(), fixture.schema, async (tx) => {
+          await tx.$queryRaw`SELECT set_config('cepr.session_account',${actor().userId},true)`;
+          await tx.classSessionRecord.update({
+            where: { id: r.id },
+            data: { incidents: 'No pasar al llegar al cierre' },
+          });
+        }),
+      ).rejects.toThrow('SESSION_EDIT_CLOSED');
+      await clock.set(new Date('2030-01-07T12:00:00Z'), 1);
+      const start = await records.transaction(db(), fixture.schema, (tx) =>
+        records.now(tx),
+      );
+      await db().$queryRaw`SELECT pg_sleep(0.05)::text`;
+      const end = await records.transaction(db(), fixture.schema, (tx) =>
+        records.now(tx),
+      );
+      expect(+end - +start).toBeGreaterThanOrEqual(40);
+      await api('get', '/context').expect(200); // JWT remains valid against real security time.
+    } finally {
+      await clock.close();
+    }
+  });
+  it('workspace resuelve bootstrap y jornada sin detalles, preserva scope y rechaza roles ajenos', async () => {
+    const r = await fresh();
+    const response = await api('get', '/workspace')
+      .query({
+        date: r.date.toISOString().slice(0, 10),
+        classId: r.classId,
+        shiftId: r.shiftId,
+      })
+      .expect(200);
+    const workspace = body<{
+      context: { accountId: string; process: string; role: string };
+      selection: { blocks: number };
+      rows: (ClassSessionRecord & { policy: { canEdit: boolean } })[];
+      options: { courses: unknown[] };
+    }>(response);
+    expect(response.headers['cache-control']).toBe('private, no-store');
+    expect(workspace.context).toMatchObject({
+      accountId: actor().userId,
+      process: fixture.schema,
+      role: 'monitor',
+    });
+    expect(workspace.selection.blocks).toBe(workspace.rows.length);
+    expect(workspace.rows.map((row) => row.id)).toContain(r.id);
+    expect(workspace.rows.find((row) => row.id === r.id)?.policy.canEdit).toBe(
+      true,
+    );
+    expect(workspace).not.toHaveProperty('monitorFollowup');
+    expect(workspace.options.courses).toHaveLength(2);
+    for (const role of ['teacher', 'coordinator'])
+      await api('get', '/workspace', role).expect(401);
+    await api('get', '/workspace', 'otherMonitor')
+      .query({ date: r.date.toISOString().slice(0, 10), classId: r.classId })
+      .expect(404);
+    await api('get', '/workspace', 'otherSupervisor')
+      .query({ date: r.date.toISOString().slice(0, 10), classId: r.classId })
+      .expect(404);
+    await api('get', '/workspace').query({ date: 'no-fecha' }).expect(400);
+    await api('get', '/workspace')
+      .query({ schema: fixture.otherSchema })
+      .expect(400);
+    await api('get', '/workspace')
+      .set('X-Class-Session-Context', fixture.otherSchema)
+      .expect(409);
+  });
+  it('supervisor escribe con actor propio y efectivos del aula, nunca su cuenta como monitor', async () => {
+    const r = await fresh();
+    const response = await patch(
+      r,
+      {
+        actualStart: new Date(Date.now() - 120000).toISOString(),
+        classState: 'N',
+      },
+      'supervisor',
+    ).expect(200);
+    expect(body<ClassSessionRecord>(response)).toMatchObject({
+      effectiveMonitorId: monitorId,
+      effectiveTeacherId: teacherIds[0],
+      monitorAccountId: actor().userId,
+    });
+    const event = await db().sessionAuditEvent.findFirstOrThrow({
+      where: { recordId: r.id },
+    });
+    expect(event.actor).toMatchObject({
+      id: actor('supervisor').userId,
+      role: 'supervisor',
+    });
+  });
+  it('workspace no confunde una revisión histórica con revisión de la versión vigente', async () => {
+    const r = await fresh();
+    await api('post', `/${r.id}/reviews`, 'supervisor')
+      .send({ expectedVersion: 1, result: 'CONFORMING', confirmed: true })
+      .expect(201);
+    const changed = body<ClassSessionRecord>(
+      await patch(r, {
+        actualStart: new Date(Date.now() - 60000).toISOString(),
+      }).expect(200),
+    );
+    const workspace = body<{
+      rows: (ClassSessionRecord & {
+        reviewStatus: string;
+        reviews: unknown[];
+      })[];
+    }>(
+      await api('get', '/workspace')
+        .query({ date: r.date.toISOString().slice(0, 10), classId: r.classId })
+        .expect(200),
+    );
+    const current = workspace.rows.filter((row) => row.id === r.id);
+    expect(current).toHaveLength(1);
+    expect(current[0]).toMatchObject({
+      version: changed.version,
+      reviewStatus: 'PENDING',
+    });
+    expect(current[0].reviews).toEqual([]);
+  });
+  it('habilitación del supervisor exige motivo propio, se revoca y nunca amplía alcance', async () => {
+    const r = await fresh();
+    await fixture.closeRecord(r.id);
+    const closed = await db().classSessionRecord.findUniqueOrThrow({
+      where: { id: r.id },
+    });
+    for (const accountId of [
+      actor('otherSupervisor').userId,
+      actor('otherMonitor').userId,
+      actor('teacher').userId,
+    ]) {
+      await api('post', `/${r.id}/grants`, 'admin')
+        .send({
+          expectedVersion: 1,
+          accountId,
+          expiresAt: new Date(Date.now() + 60000).toISOString(),
+          reason: 'Beneficiario fuera de alcance',
+        })
+        .expect(400);
+    }
+    const grant = body<{ id: number }>(
+      await api('post', `/${r.id}/grants`, 'admin')
+        .send({
+          expectedVersion: 1,
+          accountId: actor('supervisor').userId,
+          expiresAt: new Date(Date.now() + 60000).toISOString(),
+          reason: 'Apertura excepcional',
+        })
+        .expect(201),
+    );
+    await patch(
+      closed,
+      { actualStart: new Date(Date.now() - 120000).toISOString() },
+      'supervisor',
+    ).expect(400);
+    const saved = body<ClassSessionRecord>(
+      await patch(
+        closed,
+        {
+          actualStart: new Date(Date.now() - 120000).toISOString(),
+          reason: 'Corrección concreta del inicio',
+        },
+        'supervisor',
+      ).expect(200),
+    );
+    expect(new Date(saved.editDeadline)).toEqual(closed.editDeadline);
+    await api('post', `/grants/${grant.id}/revoke`, 'admin')
+      .send({ expectedVersion: saved.version, reason: 'Finalizó la excepción' })
+      .expect(201);
+    await patch(
+      saved,
+      {
+        actualEnd: new Date(Date.now() - 60000).toISOString(),
+        reason: 'Nuevo cambio después de revocar',
+      },
+      'supervisor',
+    ).expect(403);
+  });
+  it('observaciones conservan autor/hora de creación y no inventan hora para notas antiguas', async () => {
+    const r = await fresh(),
+      id = randomUUID();
+    const first = body<ClassSessionRecord>(
+      await patch(r, {
+        structuredObservations: [
+          { id, target: 'CLASSROOM', description: 'Primera nota del aula' },
+        ],
+      }).expect(200),
+    );
+    const firstNote = (
+      first.structuredObservations as {
+        id: string;
+        createdAt: string;
+        author: { id: string };
+      }[]
+    )[0];
+    expect(firstNote.createdAt).toMatch(/^\d{4}-/);
+    expect(firstNote.author.id).toBe(actor().userId);
+    await patch(first, {
+      structuredObservations: [
+        {
+          id,
+          target: 'CLASSROOM',
+          description: 'Intento de autor falsificado',
+          author: { id: actor('admin').userId },
+          createdAt: '2000-01-01T00:00:00Z',
+        },
+      ],
+    }).expect(400);
+    const updated = body<ClassSessionRecord>(
+      await patch(
+        first,
+        {
+          structuredObservations: [
+            { id, target: 'CLASSROOM', description: 'Nota del aula corregida' },
+          ],
+        },
+        'supervisor',
+      ).expect(200),
+    );
+    expect((updated.structuredObservations as object[])[0]).toMatchObject({
+      createdAt: firstNote.createdAt,
+      author: firstNote.author,
+      updatedBy: { id: actor('supervisor').userId },
+    });
+    const unchanged = body<ClassSessionRecord>(
+      await patch(updated, {
+        structuredObservations: [
+          { id, target: 'CLASSROOM', description: 'Nota del aula corregida' },
+        ],
+      }).expect(200),
+    );
+    expect(unchanged.structuredObservations).toEqual(
+      updated.structuredObservations,
+    );
+  });
+  it('RN/RE por correo es propuesta idempotente: solo admin autoriza y la ejecución sigue separada', async () => {
+    const r = await fresh(),
+      operationId = randomUUID();
+    const proposal = {
+      classState: 'RE',
+      replacementEmail: 'replacement1@test.invalid',
+      operationId,
+    };
+    const proposed = body<ClassSessionRecord>(
+      await patch(r, proposal).expect(200),
+    );
+    expect(proposed.classState).toBeNull();
+    expect(proposed.teachingStatus).toBe('UNCONFIRMED');
+    expect(proposed.effectiveTeacherId).toBeNull();
+    const coverage = await db().sessionCoverage.findFirstOrThrow({
+      where: { recordId: r.id, operationId },
+    });
+    expect(coverage.status).toBe('PENDING');
+    expect(coverage.resolvedAt).toBeNull();
+    const partNotices = () =>
+      db().$queryRaw<
+        {
+          recipient_id: string;
+          recipient_origin: string;
+          kind: string;
+          dedupe_key: string;
+        }[]
+      >`SELECT recipient_id,recipient_origin,kind,dedupe_key FROM public.operation_notifications
+        WHERE process_schema=${fixture.schema} AND kind LIKE 'part.%' ORDER BY id`;
+    const proposedNotices = await partNotices();
+    expect(
+      proposedNotices.some(
+        (n) =>
+          n.recipient_id === actor('supervisor').userId &&
+          n.kind === 'part.replacement.proposed',
+      ),
+    ).toBe(true);
+    expect(
+      proposedNotices.some(
+        (n) =>
+          n.recipient_id === actor('admin').userId &&
+          n.recipient_origin === 'core_schema',
+      ),
+    ).toBe(true);
+    const proposedCount = proposedNotices.length;
+    await patch(r, proposal).expect(200);
+    expect(await db().sessionCoverage.count({ where: { operationId } })).toBe(
+      1,
+    );
+    expect(await partNotices()).toHaveLength(proposedCount);
+    await patch(r, { ...proposal, classState: 'RN' }).expect(409);
+    await api('post', `/replacements/${coverage.id}/resolve`, 'supervisor')
+      .send({
+        expectedVersion: proposed.version,
+        status: 'AUTHORIZED',
+        reason: 'Supervisión no decide',
+      })
+      .expect(401);
+    await api('post', `/replacements/${coverage.id}/resolve`, 'admin')
+      .send({
+        expectedVersion: proposed.version,
+        status: 'AUTHORIZED',
+        reason: 'Disponibilidad comprobada',
+      })
+      .expect(201);
+    const authorized = await db().classSessionRecord.findUniqueOrThrow({
+      where: { id: r.id },
+    });
+    expect(authorized.classState).toBe('RE');
+    expect(authorized.actualStart).toBeNull();
+    expect(authorized.effectiveTeacherId).toBeNull();
+    const resolvedNotices = await partNotices();
+    expect(
+      resolvedNotices.some(
+        (n) =>
+          n.recipient_id === actor().userId &&
+          n.kind === 'part.replacement.resolved',
+      ),
+    ).toBe(true);
+    expect(
+      resolvedNotices.some(
+        (n) =>
+          n.recipient_id === actor('supervisor').userId &&
+          n.kind === 'part.replacement.resolved',
+      ),
+    ).toBe(true);
+    await patch(
+      authorized,
+      { actualStart: new Date(Date.now() - 60000).toISOString() },
+      'supervisor',
+    ).expect(200);
+    expect(
+      (await db().classSessionRecord.findUniqueOrThrow({ where: { id: r.id } }))
+        .effectiveTeacherId,
+    ).toBe(teacherIds[1]);
+  });
+  it('rechaza correo desconocido y ausencia de disponibilidad sin crear propuesta', async () => {
+    const r = await fresh();
+    for (const email of [
+      'unknown@test.invalid',
+      actor('supervisor').email,
+      'replacement2@test.invalid',
+    ])
+      await patch(r, {
+        classState: 'RN',
+        replacementEmail: email,
+        operationId: randomUUID(),
+      }).expect(400);
+    await db()
+      .$executeRaw`DELETE FROM teacher_availabilities WHERE teacher_id=${teacherIds[1]}::uuid`;
+    try {
+      await patch(r, {
+        classState: 'RN',
+        replacementEmail: 'replacement1@test.invalid',
+        operationId: randomUUID(),
+      }).expect(400);
+    } finally {
+      await db()
+        .$executeRaw`INSERT INTO teacher_availabilities(teacher_id,weekday,start_minute,end_minute) SELECT ${teacherIds[1]}::uuid,day,0,1440 FROM unnest(enum_range(NULL::"Weekday")) day`;
+    }
+    expect(
+      await db().sessionCoverage.count({ where: { recordId: r.id } }),
+    ).toBe(0);
+  });
+  it('dos autorizaciones concurrentes de propuestas solapadas no ocupan dos aulas', async () => {
+    const first = await fresh(),
+      second = await fresh();
+    await db().classSessionRecord.update({
+      where: { id: second.id },
+      data: {
+        date: first.date,
+        classId: otherClass,
+        scheduledStart: first.scheduledStart,
+        scheduledEnd: first.scheduledEnd,
+      },
+    });
+    const proposed = await Promise.all(
+      [first, second].map((r) =>
+        patch(r, {
+          classState: 'RN',
+          replacementEmail: 'replacement1@test.invalid',
+          operationId: randomUUID(),
+        }).expect(200),
+      ),
+    );
+    const coverages = await db().sessionCoverage.findMany({
+      where: { recordId: { in: [first.id, second.id] }, status: 'PENDING' },
+    });
+    expect(coverages).toHaveLength(2);
+    const results = await Promise.all(
+      coverages.map((c) =>
+        api('post', `/replacements/${c.id}/resolve`, 'admin').send({
+          expectedVersion: 2,
+          status: 'AUTHORIZED',
+          reason: 'Autorización concurrente controlada',
+        }),
+      ),
+    );
+    expect(results.map((response) => response.status).sort()).toEqual([
+      201, 400,
+    ]);
+    expect(
+      proposed.map((response) => (response.body as ClassSessionRecord).version),
+    ).toEqual([2, 2]);
+    expect(
+      await db().sessionCoverage.count({
+        where: {
+          recordId: { in: [first.id, second.id] },
+          status: 'AUTHORIZED',
+        },
+      }),
+    ).toBe(1);
+  });
+  it('seguimiento del monitor es privado, versionado y no crea antecedentes personales', async () => {
+    const r = await fresh();
+    const context = {
+      date: r.date.toISOString().slice(0, 10),
+      classId: r.classId,
+      shiftId: r.shiftId,
+      monitorId,
+    };
+    const note = body<{ id: string; version: number }>(
+      await api('post', '/monitor-observations', 'supervisor')
+        .send({ ...context, text: 'Seguimiento privado de la jornada' })
+        .expect(201),
+    );
+    await api('get', '/monitor-observations', 'monitor')
+      .query(context)
+      .expect(403);
+    await api('get', '/monitor-observations', 'otherSupervisor')
+      .query(context)
+      .expect(400);
+    const monitor = await api('get', '/workspace')
+      .query({ date: context.date, classId: r.classId })
+      .expect(200);
+    expect(JSON.stringify(monitor.body)).not.toContain('Seguimiento privado');
+    expect(monitor.body).not.toHaveProperty('monitorFollowup');
+    const supervisor = await api('get', '/workspace', 'supervisor')
+      .query({ date: context.date, classId: r.classId })
+      .expect(200);
+    expect(JSON.stringify(supervisor.body)).toContain('Seguimiento privado');
+    await api('patch', `/monitor-observations/${note.id}`, 'admin')
+      .send({ ...context, expectedVersion: 1, text: 'Seguimiento corregido' })
+      .expect(200);
+    await api('patch', `/monitor-observations/${note.id}`, 'supervisor')
+      .send({ ...context, expectedVersion: 1, text: 'Intento obsoleto' })
+      .expect(409);
+    await api('post', `/monitor-observations/${note.id}/withdraw`, 'admin')
+      .send({ ...context, expectedVersion: 2, reason: 'Retirada explícita' })
+      .expect(201);
+    const list = await api('get', '/monitor-observations', 'supervisor')
+      .query(context)
+      .expect(200);
+    expect((list.body as { total: number }).total).toBe(0);
+    expect(
+      await db().sessionAuditEvent.count({
+        where: { action: { startsWith: 'MONITOR_NOTE_' } },
+      }),
+    ).toBe(3);
+    const noteNotices = await db().$queryRaw<
+      { recipient_id: string; kind: string }[]
+    >`SELECT recipient_id,kind FROM public.operation_notifications
+      WHERE process_schema=${fixture.schema} AND kind='part.monitor.note' ORDER BY id`;
+    expect(noteNotices).toHaveLength(3);
+    expect(noteNotices.every((n) => n.recipient_id !== actor().userId)).toBe(
+      true,
+    );
+    expect(
+      noteNotices.some((n) => n.recipient_id === actor('admin').userId),
+    ).toBe(true);
+    expect(
+      noteNotices.some((n) => n.recipient_id === actor('supervisor').userId),
+    ).toBe(true);
+  });
+  it('supervisión registra sustituto monitor sin cambiar cuenta/aula y ejecución lo declara aparte', async () => {
+    const r = await fresh();
+    const dto = {
+      targets: [{ recordId: r.id, expectedVersion: 1 }],
+      kind: 'MONITOR',
+      personId: otherMonitorId,
+      mode: 'PLANNED',
+      reason: 'Sustitución de monitor del bloque',
+    };
+    await api('post', '/replacements', 'otherSupervisor').send(dto).expect(404);
+    await api('post', '/replacements', 'supervisor')
+      .send({ ...dto, personId: teacherIds[1] })
+      .expect(400);
+    await api('post', '/replacements', 'supervisor').send(dto).expect(201);
+    const substitution = await db().$queryRaw<
+      { recipient_id: string; kind: string }[]
+    >`SELECT recipient_id,kind FROM public.operation_notifications
+      WHERE process_schema=${fixture.schema} AND kind='part.monitor.substitution'`;
+    expect(substitution).toHaveLength(1);
+    expect(substitution[0].recipient_id).toBe(actor('admin').userId);
+    expect(substitution[0].recipient_id).not.toBe(actor().userId);
+    const planned = await db().classSessionRecord.findUniqueOrThrow({
+      where: { id: r.id },
+    });
+    expect(planned.effectiveMonitorId).toBeNull();
+    expect(planned.monitorAccountId).toBe(actor().userId);
+    const executed = body<ClassSessionRecord>(
+      await patch(planned, {
+        actualStart: new Date(Date.now() - 60000).toISOString(),
+        classState: 'N',
+      }).expect(200),
+    );
+    expect(executed.effectiveMonitorId).toBe(otherMonitorId);
+    expect(executed.monitorAccountId).toBe(actor().userId);
+    expect(executed.classId).toBe(r.classId);
+    expect(
+      (await db().class.findUniqueOrThrow({ where: { id: r.classId } }))
+        .monitorId,
+    ).toBe(monitorId);
+    const event = await db().sessionAuditEvent.findFirstOrThrow({
+      where: { recordId: r.id, action: 'UPDATE' },
+    });
+    expect(event.actor).toMatchObject({ id: actor().userId });
   });
   it('trata X-Class-Session-Context como precondición opcional y exceptúa recuperar contexto', async () => {
     const r = await fresh();
@@ -586,7 +1134,9 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
     await api('get', `/${r.id}`)
       .set('x-schema', fixture.otherSchema)
       .expect(400);
-    await patch(r, { incidents: 'x' }, 'supervisor').expect(401);
+    // P-02: supervisión ahora edita sus recursos; el alcance ajeno sigue denegado.
+    await patch(r, { incidents: 'x' }, 'supervisor').expect(200);
+    await patch(r, { incidents: 'x' }, 'otherSupervisor').expect(404);
   });
   it('impide lectura/escritura con contexto admin obsoleto e IDs coincidentes; conserva clientes sin header', async () => {
     const r = await fresh();
@@ -606,7 +1156,8 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
         titularTeacherId: null,
         titularMonitorId: null,
         supervisorId: null,
-        snapshot: {}, structuredObservations: [],
+        snapshot: {},
+        structuredObservations: [],
         effectiveSnapshot: {},
         timingPolicy: {},
         initialAssociatedBy: Prisma.DbNull,
@@ -728,7 +1279,13 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
       run(() =>
         records.update(actor(), r.id, {
           expectedVersion: 1,
-          structuredObservations:[{id:randomUUID(),target:'CLASSROOM',description:'No persistir'}],
+          structuredObservations: [
+            {
+              id: randomUUID(),
+              target: 'CLASSROOM',
+              description: 'No persistir',
+            },
+          ],
         }),
       ),
     ).rejects.toThrow('audit unavailable');
@@ -799,7 +1356,7 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
       ).editDeadline,
     ).toEqual(first.editDeadline);
   });
-  it('cierra al límite exacto y no admite habilitaciones después del plazo', async () => {
+  it('cierra al límite exacto; P-03 admite excepción motivada sin desplazar el cierre', async () => {
     const r = await fresh();
     await patch(r, { incidents: 'Antes' }).expect(200);
     await fixture.closeRecord(r.id);
@@ -828,21 +1385,12 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
         expectedVersion: 2,
         accountId: actor().userId,
         expiresAt: new Date(Date.now() + 60000).toISOString(),
-        reason: 'No ampliar cierre',
+        reason: 'Habilitación excepcional aprobada P-03',
       })
-      .expect(400);
-    await db().sessionEditGrant.create({
-      data: {
-        recordId: r.id,
-        accountId: actor().userId,
-        expiresAt: new Date(Date.now() + 60000),
-        reason: 'Permiso histórico',
-        grantedBy: {},
-      },
-    });
+      .expect(201);
     await api('patch', `/${r.id}`)
       .send({ expectedVersion: 2, incidents: 'Fuera de plazo' })
-      .expect(403);
+      .expect(400);
     await expect(
       db().$transaction(async (tx) => {
         await tx.$queryRaw`SELECT set_config('cepr.session_account',${actor().userId},true)`;
@@ -851,7 +1399,7 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
           data: { incidents: 'Permiso antiguo' },
         });
       }),
-    ).rejects.toThrow('SESSION_EDIT_CLOSED');
+    ).rejects.toThrow('SESSION_EDIT_REASON_REQUIRED');
     await api('post', `/${r.id}/corrections`, 'admin')
       .send({
         expectedVersion: 2,
@@ -953,12 +1501,24 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
       })
       .expect(409);
   });
-  it('las rutas antiguas no permiten al monitor ni al supervisor saltarse la aprobación de reemplazos',async()=>{
-    const r=await fresh();const dto={targets:[{recordId:r.id,expectedVersion:1}],kind:'TEACHER',personId:teacherIds[1],mode:'EMERGENCY',reason:'Solicitud debe usar el flujo documentado'};
-    await api('post','/replacements').send(dto).expect(401);
-    await api('post','/replacements','supervisor').send(dto).expect(403);
-    expect(await db().sessionCoverage.count({where:{recordId:r.id}})).toBe(0);
-    expect((await db().classSessionRecord.findUniqueOrThrow({where:{id:r.id}})).version).toBe(1);
+  it('las rutas antiguas no permiten al monitor ni al supervisor saltarse la aprobación de reemplazos', async () => {
+    const r = await fresh();
+    const dto = {
+      targets: [{ recordId: r.id, expectedVersion: 1 }],
+      kind: 'TEACHER',
+      personId: teacherIds[1],
+      mode: 'EMERGENCY',
+      reason: 'Solicitud debe usar el flujo documentado',
+    };
+    await api('post', '/replacements').send(dto).expect(401);
+    await api('post', '/replacements', 'supervisor').send(dto).expect(403);
+    expect(
+      await db().sessionCoverage.count({ where: { recordId: r.id } }),
+    ).toBe(0);
+    expect(
+      (await db().classSessionRecord.findUniqueOrThrow({ where: { id: r.id } }))
+        .version,
+    ).toBe(1);
   });
   it('serializa coberturas concurrentes sin duplicación activa ni conflictos entre aulas', async () => {
     const r = await fresh();
@@ -1025,7 +1585,8 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
         data: {
           ...r,
           id: undefined,
-          snapshot: {}, structuredObservations: [],
+          snapshot: {},
+          structuredObservations: [],
           timingPolicy: {},
           effectiveSnapshot: {},
           initialAssociatedBy: Prisma.DbNull,
@@ -1255,7 +1816,8 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
           actualStart: i === 4 ? null : new Date(+s + 8 * 60000),
           actualEnd: i === 4 ? null : new Date(+s + 40 * 60000),
           teachingStatus: i === 4 ? 'UNCONFIRMED' : 'TAUGHT',
-          snapshot: {}, structuredObservations: [],
+          snapshot: {},
+          structuredObservations: [],
           timingPolicy: {
             version: 1,
             latenessToleranceMinutes: 5,
@@ -1430,6 +1992,7 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
         'session_edit_grants',
         'session_alerts',
         'session_operational_config',
+        'session_monitor_observations',
       ];
       const columns = async (s: string) =>
         (
@@ -1509,6 +2072,91 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
       await applyStructure(connection, schema);
       await connection.query('COMMIT');
       expect(await client.class.count()).toBe(1);
+    } finally {
+      await connection.query('ROLLBACK');
+      connection.release();
+      await pool.end();
+      await fixture.pg.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`);
+    }
+  });
+  it('actualiza historia anterior con checksums intactos y retiene datos, sin reescribir migraciones', async () => {
+    const schema = `session_upgrade_${randomUUID().replaceAll('-', '')}`;
+    const pool = new Pool({ connectionString: process.env.DATABASE_URL }),
+      connection = await pool.connect();
+    const directory = join(process.cwd(), 'src/database/prisma/migrations');
+    const previous = readdirSync(directory, { withFileTypes: true })
+      .filter(
+        (item) =>
+          item.isDirectory() && item.name < '202611030001_parts_workspace',
+      )
+      .map((item) => item.name)
+      .sort();
+    const fileId = randomUUID();
+    try {
+      await connection.query('BEGIN');
+      await connection.query(`CREATE SCHEMA "${schema}"`);
+      await connection.query(`SET LOCAL search_path TO "${schema}"`);
+      await connection.query(
+        'CREATE TABLE _structure_migrations(version varchar(64) PRIMARY KEY,checksum varchar(64) NOT NULL,applied_at timestamptz NOT NULL DEFAULT now())',
+      );
+      // Trusted repository DDL only: reproduce the previous deployed history, never a dump.
+      for (const version of previous) {
+        const sql = readFileSync(
+          join(directory, version, 'migration.sql'),
+          'utf8',
+        );
+        await connection.query(sql);
+        await connection.query(
+          'INSERT INTO _structure_migrations(version,checksum) VALUES($1,$2)',
+          [version, createHash('sha256').update(sql).digest('hex')],
+        );
+      }
+      await connection.query('UPDATE session_operational_config SET version=7');
+      await connection.query(
+        "INSERT INTO files(id,bucket,object_name,original_name,content_type,size,uploaded_by) VALUES($1,'synthetic','retained.png','retained.png','image/png',100,'{}')",
+        [fileId],
+      );
+      const before = (
+        await connection.query(
+          'SELECT version,checksum FROM _structure_migrations ORDER BY version',
+        )
+      ).rows as object[];
+      await connection.query('COMMIT');
+      await connection.query('BEGIN');
+      await applyStructure(connection, schema);
+      await connection.query('COMMIT');
+      const after = await connection.query(
+        `SELECT version,checksum FROM "${schema}"._structure_migrations WHERE version<'202611030001_parts_workspace' ORDER BY version`,
+      );
+      expect(after.rows).toEqual(before);
+      expect(
+        (
+          await connection.query(
+            `SELECT version FROM "${schema}".session_operational_config`,
+          )
+        ).rows,
+      ).toEqual([{ version: 7 }]);
+      expect(
+        (await connection.query(`SELECT id,thumbnail FROM "${schema}".files`))
+          .rows,
+      ).toEqual([{ id: fileId, thumbnail: null }]);
+      expect(
+        (
+          await connection.query(
+            `SELECT count(*)::int total FROM "${schema}".v_class_session_records_workspace`,
+          )
+        ).rows,
+      ).toEqual([{ total: 0 }]);
+      await connection.query('BEGIN');
+      await applyStructure(connection, schema);
+      await connection.query('COMMIT');
+      expect(
+        (
+          await connection.query(
+            `SELECT count(*)::int total FROM "${schema}".files`,
+          )
+        ).rows,
+      ).toEqual([{ total: 1 }]);
     } finally {
       await connection.query('ROLLBACK');
       connection.release();
@@ -1816,25 +2464,77 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
       },
       update: { dni },
     });
-  it('observaciones clasificadas separan alumno/aula del DNI docente y respetan cierre y alcance',async()=>{
-    const r=await fresh();await profile(teacherUsers[0],'91000001');
-    const dto={operationId:randomUUID(),subjectAccountId:teacherUsers[0],subjectRole:'profesor',recordId:r.id,title:'No usar ruta genérica',description:'Observación del bloque',occurredAt:new Date(+r.scheduledStart+1000).toISOString()};
-    await incidenceApi('post','','monitor').send(dto).expect(403);
-    const before=await db().$queryRaw<{total:number}[]>`SELECT count(*)::int total FROM public.person_incidences WHERE subject_dni='91000001'`;
-    const notes=[{id:randomUUID(),target:'STUDENT',firstName:'Alumno',lastName:'Prueba',description:'Observación de alumno'},{id:randomUUID(),target:'CLASSROOM',description:'Observación del aula'}];
-    await patch(r,{structuredObservations:notes}).expect(200);
-    expect(await db().$queryRaw`SELECT count(*)::int total FROM public.person_incidences WHERE subject_dni='91000001'`).toEqual(before);
-    const current=await db().classSessionRecord.findUniqueOrThrow({where:{id:r.id}});
-    expect(current.structuredObservations).toEqual(notes);
-    const teacherNotes=[{id:randomUUID(),target:'TEACHER',description:'Observación del docente de la hora'}];
-    await patch(current,{structuredObservations:teacherNotes}).expect(200);
-    expect((await db().$queryRaw<{total:number}[]>`SELECT count(*)::int total FROM public.person_incidences WHERE subject_dni='91000001'`)[0].total).toBe(before[0].total+1);
-    await patch(current,{structuredObservations:teacherNotes},'otherMonitor').expect(404);
-    await incidenceApi('get','?dni=91000001','monitor').expect(403);
-    await incidenceApi('get','','teacher').expect(401);
+  it('observaciones clasificadas separan alumno/aula del DNI docente y respetan cierre y alcance', async () => {
+    const r = await fresh();
+    await profile(teacherUsers[0], '91000001');
+    const dto = {
+      operationId: randomUUID(),
+      subjectAccountId: teacherUsers[0],
+      subjectRole: 'profesor',
+      recordId: r.id,
+      title: 'No usar ruta genérica',
+      description: 'Observación del bloque',
+      occurredAt: new Date(+r.scheduledStart + 1000).toISOString(),
+    };
+    await incidenceApi('post', '', 'monitor').send(dto).expect(403);
+    const before = await db().$queryRaw<
+      { total: number }[]
+    >`SELECT count(*)::int total FROM public.person_incidences WHERE subject_dni='91000001'`;
+    const notes = [
+      {
+        id: randomUUID(),
+        target: 'STUDENT',
+        firstName: 'Alumno',
+        lastName: 'Prueba',
+        description: 'Observación de alumno',
+      },
+      {
+        id: randomUUID(),
+        target: 'CLASSROOM',
+        description: 'Observación del aula',
+      },
+    ];
+    await patch(r, { structuredObservations: notes }).expect(200);
+    expect(
+      await db()
+        .$queryRaw`SELECT count(*)::int total FROM public.person_incidences WHERE subject_dni='91000001'`,
+    ).toEqual(before);
+    const current = await db().classSessionRecord.findUniqueOrThrow({
+      where: { id: r.id },
+    });
+    expect(current.structuredObservations).toHaveLength(notes.length);
+    expect(current.structuredObservations).toEqual(
+      expect.arrayContaining(
+        notes.map((note): unknown => expect.objectContaining(note)),
+      ),
+    );
+    const teacherNotes = [
+      {
+        id: randomUUID(),
+        target: 'TEACHER',
+        description: 'Observación del docente de la hora',
+      },
+    ];
+    await patch(current, { structuredObservations: teacherNotes }).expect(200);
+    expect(
+      (
+        await db().$queryRaw<
+          { total: number }[]
+        >`SELECT count(*)::int total FROM public.person_incidences WHERE subject_dni='91000001'`
+      )[0].total,
+    ).toBe(before[0].total + 1);
+    await patch(
+      current,
+      { structuredObservations: teacherNotes },
+      'otherMonitor',
+    ).expect(404);
+    await incidenceApi('get', '?dni=91000001', 'monitor').expect(403);
+    await incidenceApi('get', '', 'teacher').expect(401);
     await fixture.closeRecord(r.id);
-    const closed=await db().classSessionRecord.findUniqueOrThrow({where:{id:r.id}});
-    await patch(closed,{structuredObservations:notes}).expect(403);
+    const closed = await db().classSessionRecord.findUniqueOrThrow({
+      where: { id: r.id },
+    });
+    await patch(closed, { structuredObservations: notes }).expect(403);
   });
   it('incidencias: supervisor solo consulta sus monitores, nunca incidencias propias', async () => {
     await profile(actor().userId, '91000002');
@@ -2005,34 +2705,116 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
     const date = '2025-01-12';
     const base = await fixture.record();
     const data = {
-      date: new Date(date), classId: base.classId, shiftId: base.shiftId,
-      areaId: base.areaId, courseId: base.courseId, period: base.period,
-      pedagogicalMinutes: base.pedagogicalMinutes, scheduledStart: base.scheduledStart,
-      scheduledEnd: base.scheduledEnd, shiftEnd: base.shiftEnd, editDeadline: base.editDeadline,
-      monitorAccountId: base.monitorAccountId, supervisorId: base.supervisorId,
+      date: new Date(date),
+      classId: base.classId,
+      shiftId: base.shiftId,
+      areaId: base.areaId,
+      courseId: base.courseId,
+      period: base.period,
+      pedagogicalMinutes: base.pedagogicalMinutes,
+      scheduledStart: base.scheduledStart,
+      scheduledEnd: base.scheduledEnd,
+      shiftEnd: base.shiftEnd,
+      editDeadline: base.editDeadline,
+      monitorAccountId: base.monitorAccountId,
+      supervisorId: base.supervisorId,
     };
-    await db().hourSession.createMany({ data: Array.from({ length: 108 }, (_, index) => ({
-      id: 2000 + index, shiftId: 1, period: 2000 + index,
-      startTime: new Date('1970-01-01T08:00Z'), endTime: new Date('1970-01-01T08:40Z'),
-    })) });
-    await db().classSessionRecord.createMany({ data: Array.from({ length: 105 }, (_, index) => ({
-      ...data, snapshot: { className: 'Histórico intacto', shift: 'Turno histórico' },
-      effectiveSnapshot: {}, timingPolicy: {}, date: new Date(date), hourSessionId: 2000 + index,
-    })) });
-    await db().classSessionRecord.createMany({ data: [
-      { ...data, snapshot: {}, effectiveSnapshot: {}, timingPolicy: {}, date: new Date('2025-01-11'), hourSessionId: 2105 },
-      { ...data, snapshot: {}, effectiveSnapshot: {}, timingPolicy: {}, date: new Date('2025-01-11'), hourSessionId: 2106, classId: otherClass },
-      { ...data, snapshot: {}, effectiveSnapshot: {}, timingPolicy: {}, date: new Date(date), hourSessionId: 2107, classId: otherClass, monitorAccountId: actor('otherMonitor').userId },
-    ] });
+    await db().hourSession.createMany({
+      data: Array.from({ length: 108 }, (_, index) => ({
+        id: 2000 + index,
+        shiftId: 1,
+        period: 2000 + index,
+        startTime: new Date('1970-01-01T08:00Z'),
+        endTime: new Date('1970-01-01T08:40Z'),
+      })),
+    });
+    await db().classSessionRecord.createMany({
+      data: Array.from({ length: 105 }, (_, index) => ({
+        ...data,
+        snapshot: { className: 'Histórico intacto', shift: 'Turno histórico' },
+        effectiveSnapshot: {},
+        timingPolicy: {},
+        date: new Date(date),
+        hourSessionId: 2000 + index,
+      })),
+    });
+    await db().classSessionRecord.createMany({
+      data: [
+        {
+          ...data,
+          snapshot: {},
+          effectiveSnapshot: {},
+          timingPolicy: {},
+          date: new Date('2025-01-11'),
+          hourSessionId: 2105,
+        },
+        {
+          ...data,
+          snapshot: {},
+          effectiveSnapshot: {},
+          timingPolicy: {},
+          date: new Date('2025-01-11'),
+          hourSessionId: 2106,
+          classId: otherClass,
+        },
+        {
+          ...data,
+          snapshot: {},
+          effectiveSnapshot: {},
+          timingPolicy: {},
+          date: new Date(date),
+          hourSessionId: 2107,
+          classId: otherClass,
+          monitorAccountId: actor('otherMonitor').userId,
+        },
+      ],
+    });
     const path = '/journals?from=2025-01-01&to=2025-01-31&limit=1';
-    const first = body<{ data: { blocks: number; date: string; className: string }[]; total: number }>(await api('get', path).expect(200));
+    const first = body<{
+      data: { blocks: number; date: string; className: string }[];
+      total: number;
+    }>(await api('get', path).expect(200));
     expect(first.total).toBe(3);
-    expect(first.data).toEqual([expect.objectContaining({ date, blocks: 105, className: 'Histórico intacto' })]);
-    const second = body<{ data: unknown[]; total: number }>(await api('get', `${path}&page=2`).expect(200));
+    expect(first.data).toEqual([
+      expect.objectContaining({
+        date,
+        blocks: 105,
+        className: 'Histórico intacto',
+      }),
+    ]);
+    const second = body<{ data: unknown[]; total: number }>(
+      await api('get', `${path}&page=2`).expect(200),
+    );
     expect(second.data).toHaveLength(1);
     expect(second.total).toBe(3);
-    expect(body<{ total: number; data: unknown[] }>(await api('get', `${path}&page=4`).expect(200))).toMatchObject({ total: 3, data: [] });
-    expect(await db().classSessionRecord.count({ where: { date: new Date(date), monitorAccountId: actor().userId } })).toBe(105);
+    expect(
+      body<{ total: number; data: unknown[] }>(
+        await api('get', `${path}&page=4`).expect(200),
+      ),
+    ).toMatchObject({ total: 3, data: [] });
+    expect(
+      await db().classSessionRecord.count({
+        where: { date: new Date(date), monitorAccountId: actor().userId },
+      }),
+    ).toBe(105);
+    const workspace = body<{
+      rows: ClassSessionRecord[];
+      selection: { blocks: number };
+    }>(
+      await api('get', '/workspace')
+        .query({ date, classId: base.classId, shiftId: base.shiftId })
+        .expect(200),
+    );
+    expect(workspace.selection.blocks).toBe(105);
+    expect(workspace.rows).toHaveLength(105);
+    expect(new Set(workspace.rows.map((row) => row.id)).size).toBe(105);
+    expect(
+      workspace.rows.every(
+        (row) =>
+          (row.snapshot as { className: string }).className ===
+          'Histórico intacto',
+      ),
+    ).toBe(true);
   });
 
   it('jornadas rechaza otros roles, selectores y rangos inválidos sin ampliar acceso', async () => {

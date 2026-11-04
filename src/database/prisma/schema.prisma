@@ -110,6 +110,7 @@ model Monitor {
   titularSessions   ClassSessionRecord[] @relation("TitularMonitor")
   effectiveSessions ClassSessionRecord[] @relation("EffectiveMonitor")
   sessionCoverages  SessionCoverage[]
+  privateObservations SessionMonitorObservation[]
 
   @@index([supervisorId])
   @@map("monitors")
@@ -164,6 +165,7 @@ model Sede {
 }
 
 model Shift {
+  privateMonitorObservations SessionMonitorObservation[]
   id             Int                  @id @default(autoincrement()) @db.SmallInt
   name           String               @db.VarChar(48)
   startTime      DateTime?            @map("start_time") @db.Time(6)
@@ -178,6 +180,7 @@ model Shift {
 }
 
 model Class {
+  privateMonitorObservations SessionMonitorObservation[]
   id             String               @id @default(dbgenerated("uuidv7()")) @db.Uuid
   name           String               @db.VarChar(48)
   idSede         Int                  @map("id_sede") @db.SmallInt
@@ -343,6 +346,7 @@ model File {
   contentType    String               @map("content_type")
   size           Int
   checksum       String?
+  thumbnail      Json?
   uploadedBy     Json                 @map("uploaded_by")
   uploadedAt     DateTime             @default(now()) @map("uploaded_at") @db.Timestamptz(3)
   status         String               @default("PENDING") @db.VarChar(16)
@@ -357,6 +361,7 @@ model File {
 }
 
 model SessionCoverage {
+  proposalHash   String?            @map("proposal_hash") @db.VarChar(64)
   id             Int                @id @default(autoincrement())
   recordId       Int                @map("record_id")
   kind           String             @db.VarChar(16)
@@ -375,7 +380,32 @@ model SessionCoverage {
   teacher        Teacher?           @relation(fields: [teacherId], references: [id], onDelete: Restrict)
   monitor        Monitor?           @relation(fields: [monitorId], references: [id], onDelete: Restrict)
 
+  @@unique([operationId,recordId,kind],map:"session_coverage_operation_key")
   @@map("session_coverages")
+}
+
+model SessionMonitorObservation {
+  id String @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  date DateTime @db.Date
+  classId String @map("class_id") @db.Uuid
+  shiftId Int @map("shift_id") @db.SmallInt
+  monitorId String @map("monitor_id") @db.Uuid
+  monitorSnapshot Json @map("monitor_snapshot")
+  text String
+  author Json
+  updatedBy Json @map("updated_by")
+  createdAt DateTime @map("created_at") @db.Timestamptz
+  updatedAt DateTime @map("updated_at") @db.Timestamptz
+  version Int @default(1)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy Json? @map("deleted_by")
+  deletionReason String? @map("deletion_reason")
+  clas Class @relation(fields:[classId],references:[id],onDelete:NoAction,onUpdate:NoAction)
+  shift Shift @relation(fields:[shiftId],references:[id],onDelete:NoAction,onUpdate:NoAction)
+  monitor Monitor @relation(fields:[monitorId],references:[id],onDelete:NoAction,onUpdate:NoAction)
+
+  @@index([classId,date,shiftId,monitorId,createdAt(sort:Desc),id],map:"session_monitor_observations_journal_idx")
+  @@map("session_monitor_observations")
 }
 
 model SessionAuditEvent {
@@ -452,6 +482,7 @@ model SessionOperationalConfig {
   latenessToleranceMinutes Int?      @map("lateness_tolerance_minutes")
   replacementWaitMinutes   Int?      @map("replacement_wait_minutes")
   alertThresholdMinutes    Int?      @map("alert_threshold_minutes")
+  escalationDelayMinutes   Int?      @map("escalation_delay_minutes")
   continuityGapMinutes     Int?      @map("continuity_gap_minutes")
   version                  Int       @default(1)
   updatedBy                Json?     @map("updated_by")

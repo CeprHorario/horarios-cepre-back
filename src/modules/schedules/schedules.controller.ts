@@ -16,6 +16,7 @@ import {
   ForbiddenException,
   ParseUUIDPipe,
   GoneException,
+  UseFilters,
 } from '@nestjs/common';
 import { ScheduleService } from './schedules.service';
 import { ScheduleBaseDto, CreateScheduleDto, UpdateScheduleDto } from './dto';
@@ -24,13 +25,14 @@ import {
   Authorization,
   Role,
 } from '@modules/auth/decorators/authorization.decorator';
-import { LoadScheduleDto } from './dto';
 import { Weekday } from '../../generated/prisma/client';
 import { Unauthenticated } from '@modules/auth/decorators/unauthenticated.decorator';
 import { getCoordinatorCourseId } from '@modules/auth/utils/coordinator-role';
 import type { AuthenticatedRequest } from '@modules/auth/authenticated-request';
 import { ClearAvailabilityDto, SaveAvailabilityDto } from './dto/availability.dto';
 import { AssignTeacherDto } from './dto/assign-teacher.dto';
+import { ReplaceTeacherDto } from './dto/replace-teacher.dto';
+import { ReplaceTeacherAuthorizationFilter } from './replace-teacher-authorization.filter';
 
 @Controller('schedules')
 @ApiTags('Schedules')
@@ -55,14 +57,16 @@ export class ScheduleController {
     return this.scheduleService.saveAvailability(teacherId, data);
   }
 
-  @Post('load-with-courses')
-  @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({
-    summary: 'Cargar horarios con cursos',
-    description: 'Load schedules with courses',
+  @Patch('reemplazar/profesor')
+  @UseFilters(ReplaceTeacherAuthorizationFilter)
+  @Authorization({
+    adminOnly: true,
+    permission: 'schedule.replaceTeacher',
+    description: 'Sustituir el docente de un curso del salón de forma atómica',
   })
-  loadWithCourses(data: LoadScheduleDto) {
-    return this.scheduleService.loadWithCourses(data);
+  @ApiOperation({ summary: 'Sustituir docente con precondición de asignación' })
+  replaceTeacher(@Body() data: ReplaceTeacherDto) {
+    return this.scheduleService.replaceTeacher(data);
   }
 
   @Get('public/teachers')

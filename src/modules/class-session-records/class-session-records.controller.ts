@@ -7,6 +7,7 @@ import {
   Header,
   Param,
   ParseIntPipe,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -36,6 +37,11 @@ import {
   SessionPeopleQueryDto,
   SessionQueryDto,
   SessionJournalsQueryDto,
+  SessionWorkspaceQueryDto,
+  MonitorObservationQueryDto,
+  CreateMonitorObservationDto,
+  UpdateMonitorObservationDto,
+  WithdrawMonitorObservationDto,
   UpdateSessionDto,
 } from './session.dto';
 import { SessionPrincipal } from './session.types';
@@ -80,7 +86,11 @@ export class ClassSessionRecordsController {
     return {
       accountId: actor.id,
       process: actor.schema,
-      serverNow: (await this.records.now(client)).toISOString(),
+      serverNow: (
+        await this.records.transaction(client, actor.schema, (tx) =>
+          this.records.now(tx),
+        )
+      ).toISOString(),
     };
   }
   @Get('agenda')
@@ -91,6 +101,75 @@ export class ClassSessionRecordsController {
   agenda(@Req() req: AuthRequest, @Query() query: DateDto) {
     return this.journal.agenda(req.user, query.date);
   }
+  @Get('monitor-observations')
+  @Authorization({
+    roles: [Role.SUPERVISOR],
+    permission: 'class-session-records.monitor-notes',
+  })
+  @Header('Cache-Control', 'private, no-store')
+  monitorObservations(
+    @Req() req: AuthRequest,
+    @Query() query: MonitorObservationQueryDto,
+  ) {
+    return this.journal.monitorObservations(req.user, query);
+  }
+  @Post('monitor-observations')
+  @Authorization({
+    roles: [Role.SUPERVISOR],
+    permission: 'class-session-records.monitor-notes.create',
+  })
+  createMonitorObservation(
+    @Req() req: AuthRequest,
+    @Body() dto: CreateMonitorObservationDto,
+  ) {
+    return this.journal.saveMonitorObservation(req.user, dto);
+  }
+  @Patch('monitor-observations/:id')
+  @Authorization({
+    roles: [Role.SUPERVISOR],
+    permission: 'class-session-records.monitor-notes.update',
+  })
+  updateMonitorObservation(
+    @Req() req: AuthRequest,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateMonitorObservationDto,
+  ) {
+    return this.journal.saveMonitorObservation(req.user, dto, id);
+  }
+  @Post('monitor-observations/:id/withdraw')
+  @Authorization({
+    roles: [Role.SUPERVISOR],
+    permission: 'class-session-records.monitor-notes.withdraw',
+  })
+  withdrawMonitorObservation(
+    @Req() req: AuthRequest,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: WithdrawMonitorObservationDto,
+  ) {
+    return this.journal.saveMonitorObservation(req.user, dto, id, true);
+  }
+  @Get('workspace')
+  @Authorization({
+    roles: readers,
+    permission: 'class-session-records.workspace',
+  })
+  @Header('Cache-Control', 'private, no-store')
+  async workspace(
+    @Req() req: AuthRequest,
+    @Query() query: SessionWorkspaceQueryDto,
+  ) {
+    const { client, schema, actor } = await this.records.context(req.user);
+    const now = await this.records.transaction(client, schema, (tx) =>
+      this.records.now(tx),
+    );
+    const today = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Lima',
+    }).format(now);
+    // Existing exception: only today's journal is materialized, idempotently, never history.
+    if (!query.date || query.date === today)
+      await this.journal.materialize(client, schema, today, actor);
+    return this.records.workspace(req.user, query);
+  }
   @Get()
   @Authorization({ roles: readers, permission: 'class-session-records.list' })
   @ApiOperation({
@@ -100,9 +179,15 @@ export class ClassSessionRecordsController {
     return this.records.list(req.user, query);
   }
   @Get('journals')
-  @Authorization({ roles: [Role.MONITOR], permission: 'class-session-records.journals' })
+  @Authorization({
+    roles: [Role.MONITOR],
+    permission: 'class-session-records.journals',
+  })
   @Header('Cache-Control', 'private, no-store')
-  @ApiOperation({ summary: 'Jornadas del monitor agrupadas antes de paginar, sin reconstruir históricos' })
+  @ApiOperation({
+    summary:
+      'Jornadas del monitor agrupadas antes de paginar, sin reconstruir históricos',
+  })
   journals(@Req() req: AuthRequest, @Query() query: SessionJournalsQueryDto) {
     return this.records.journals(req.user, query);
   }
@@ -131,7 +216,7 @@ export class ClassSessionRecordsController {
   }
   @Post('replacements/:id/resolve')
   @Authorization({
-    adminOnly: true,
+    roles: [Role.SUPERVISOR],
     permission: 'class-session-records.replacements.resolve',
   })
   resolve(
@@ -241,7 +326,7 @@ export class ClassSessionRecordsController {
   }
   @Patch(':id')
   @Authorization({
-    roles: [Role.MONITOR],
+    roles: readers,
     permission: 'class-session-records.update',
   })
   @ApiOperation({

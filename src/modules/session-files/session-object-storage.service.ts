@@ -30,15 +30,18 @@ export class SessionObjectStorage {
     objectName: string,
     bytes: Buffer,
     checksum: string,
+    contentType = 'image/png',
+    timeout = 10000,
   ): Promise<string> {
     const object = this.storage.bucket(bucket).file(objectName);
     // SDK checksum-failure cleanup can delete objects. Verify MD5 ourselves; retain all objects on failure.
     await object.save(bytes, {
       resumable: false,
       validation: false,
+      timeout,
       preconditionOpts: { ifGenerationMatch: 0 },
       metadata: {
-        contentType: 'image/png',
+        contentType,
         cacheControl: 'private, no-store',
         metadata: { sha256: checksum },
       },
@@ -59,6 +62,7 @@ export class SessionObjectStorage {
     bucket: string,
     objectName: string,
     generation: string,
+    timeout = 10000,
   ): Promise<Buffer> {
     const stream = this.storage
       .bucket(bucket)
@@ -66,7 +70,9 @@ export class SessionObjectStorage {
       .createReadStream({ validation: false });
     const chunks: Buffer[] = [];
     let size = 0;
-    for await (const chunk of stream as AsyncIterable<unknown>) {
+    const timer = setTimeout(() => stream.destroy(new Error('Storage read timed out')), timeout);
+    timer.unref();
+    try { for await (const chunk of stream as AsyncIterable<unknown>) {
       if (!Buffer.isBuffer(chunk))
         throw new Error('Unexpected storage response');
       const bytes = chunk;
@@ -77,6 +83,7 @@ export class SessionObjectStorage {
       }
       chunks.push(bytes);
     }
-    return Buffer.concat(chunks);
+      return Buffer.concat(chunks);
+    } finally { clearTimeout(timer); }
   }
 }

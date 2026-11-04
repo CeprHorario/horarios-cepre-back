@@ -5,6 +5,7 @@ import {
   Logger,
   NotFoundException,
   OnModuleDestroy,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { FieldValue, Firestore, Timestamp } from '@google-cloud/firestore';
@@ -21,6 +22,7 @@ export class RuntimeConfigService implements OnModuleDestroy {
   private readonly logger = new Logger(RuntimeConfigService.name);
   private readonly runtimeDocument: FirebaseFirestore.DocumentReference;
   private readonly cacheTtlMs: number;
+  private readonly enabled: boolean;
   private cachedConfig: RuntimeConfig | null = null;
   private cacheExpiresAt = 0;
   private refreshPromise: Promise<RuntimeConfig | null> | null = null;
@@ -30,6 +32,11 @@ export class RuntimeConfigService implements OnModuleDestroy {
     @Inject(FIRESTORE_CLIENT) private readonly firestore: Firestore,
     configService: ConfigService,
   ) {
+    // ponytail: el modo sin Firestore es solo local; en producción usar Firestore.
+    this.enabled = !(
+      configService.get('NODE_ENV') === 'development' &&
+      configService.get('FIRESTORE_ENABLED') === 'false'
+    );
     this.runtimeDocument = firestore.collection('system_config').doc('runtime');
     this.cacheTtlMs = Math.max(
       Number(configService.get('RUNTIME_CONFIG_CACHE_TTL_MS', 15000)),
@@ -38,6 +45,7 @@ export class RuntimeConfigService implements OnModuleDestroy {
   }
 
   async getCurrent(forceRefresh = false): Promise<RuntimeConfig | null> {
+    if (!this.enabled) return null;
     if (!forceRefresh && Date.now() < this.cacheExpiresAt) {
       return this.cachedConfig;
     }
@@ -54,6 +62,7 @@ export class RuntimeConfigService implements OnModuleDestroy {
   }
 
   async getHistory(limit: number): Promise<RuntimeConfig[]> {
+    this.assertEnabled();
     const snapshot = await this.runtimeDocument
       .collection('history')
       .orderBy('version', 'desc')
@@ -67,6 +76,7 @@ export class RuntimeConfigService implements OnModuleDestroy {
     input: UpdateRuntimeConfigInput,
     actor: RuntimeActor,
   ): Promise<RuntimeConfig> {
+    this.assertEnabled();
     await this.firestore.runTransaction(async (transaction) => {
       const snapshot = await transaction.get(this.runtimeDocument);
       if (!snapshot.exists) {
@@ -124,6 +134,7 @@ export class RuntimeConfigService implements OnModuleDestroy {
   }
 
   async rollback(version: number, actor: RuntimeActor): Promise<RuntimeConfig> {
+    this.assertEnabled();
     const historyReference = this.runtimeDocument
       .collection('history')
       .doc(this.versionId(version));
@@ -185,6 +196,13 @@ export class RuntimeConfigService implements OnModuleDestroy {
     this.generation++;
     this.refreshPromise = null;
     this.cacheExpiresAt = 0;
+  }
+
+  private assertEnabled(): void {
+    if (!this.enabled)
+      throw new ServiceUnavailableException(
+        'Firestore está desactivado en desarrollo local',
+      );
   }
 
   private async reloadAfterWrite(action: string): Promise<RuntimeConfig> {

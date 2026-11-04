@@ -1,8 +1,15 @@
 # Backend CEPRE v1
 
-Base NestJS 12, Node.js 24 LTS y TypeScript 6. Incluye el Plan 1: modelos compatibles con v0, UUIDv7 generado por PostgreSQL, admisiones atómicas, autenticación, enrutamiento multiesquema y configuración operativa en Firestore. [Contrato, reconciliación e importación](docs/plan-1-compatibility.md).
+Base NestJS12, Node.js24 LTS, TypeScript6, Prisma7 y PostgreSQL18. Incluye UUIDv7,
+admisiones atómicas, autenticación, enrutamiento multiesquema, configuración
+operativa, catálogos, personal, disponibilidad, horarios, importaciones,
+solicitudes, incidencias, Partes y archivos privados.
 
-El [Plan 2](docs/plan-2-authentication.md) añade protección del popup OAuth, tokens vinculados al proceso y sincronización incremental de permisos. Incluye el procedimiento de administrador inicial y la [matriz de acceso](docs/authorization-matrix.md).
+OAuth protege popup/origen/ventana; la sesión HttpOnly se vincula al proceso y se
+revoca al salir. Permisos y ámbitos se verifican en servidor. Contratos actuales:
+[Partes](docs/partes-propuesta-oficial.md),
+[sustitución semanal](docs/schedule-replacement.md) y
+[verificación/entrega local](docs/entrega-local.md).
 
 ## Desarrollo con Docker
 
@@ -74,9 +81,16 @@ El comando académico usa el runner versionado compilado que también aprovision
 
 ## Compatibilidad HTTP
 
-Se conservan el prefijo `/api`, Swagger en `/swagger`, su JSON en `/swagger/json` y las opciones de `ValidationPipe` de v0: `whitelist`, `forbidNonWhitelisted` y `transform`, sin conversión implícita adicional. CORS admite `REDIRECT_FRONT` y `https://storage.googleapis.com`, con credenciales y `Authorization`.
+Se conservan el prefijo `/api`, Swagger en `/swagger`, su JSON en `/swagger/json` y
+`ValidationPipe`: `whitelist`, `forbidNonWhitelisted`, `transform`, sin conversión
+implícita adicional. CORS admite el origen exacto de `REDIRECT_FRONT`, credenciales
+y los headers autorizados; no permite seleccionar esquemas desde el navegador.
 
-Se migran `/api/admissions`, `/api/auth` y `/api/system`. JWT valida identidad y actividad en PostgreSQL; se mantienen mantenimiento, permisos y contratos de configuración. `/api/health` continúa independiente de las bases de datos. Los módulos académicos HTTP se migrarán por separado.
+Los módulos académicos HTTP están implementados; no son una migración pendiente.
+JWT valida identidad y actividad en PostgreSQL; mantenimiento, permisos y
+configuración siguen vigentes. `/api/health` comprueba vida HTTP, no salud de DB.
+`POST /schedules/load-with-courses` fue retirado por residual; los procesos y
+horarios base se crean mediante admisiones, sin depender de ese stub.
 
 ## Comprobaciones
 
@@ -91,8 +105,9 @@ La migración `202610220001_teacher_availability` se aplica con el runner acadé
 Las pruebas PostgreSQL de disponibilidad crean y eliminan únicamente dos esquemas temporales propios. Para ejecutarlas en el entorno local desde la raíz del workspace:
 
 ```bash
-docker compose exec -T back sh -c 'AVAILABILITY_TEST_DATABASE_URL="$DATABASE_URL" npm test -- --runInBand --runTestsByPath test/availability.e2e-spec.ts'
-docker compose exec -T front npm run test:availability
+docker compose -p cepr-finalizacion-local -f compose.records.yaml up -d db gcs
+docker compose -p cepr-finalizacion-local -f compose.records.yaml run --rm --no-deps backend node test/run-records-tests.cjs test/availability.e2e-spec.ts test/schedule-replacement.e2e-spec.ts
+npm --prefix ../frontend run test:availability
 ```
 
 Comprobaciones generales:

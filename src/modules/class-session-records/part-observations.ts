@@ -24,6 +24,7 @@ export async function syncPartObservations(
                 typeof o.description === 'string',
             )
             .map((o) => o.description.trim())
+            .sort()
             .join('\n')
         : '')
   )
