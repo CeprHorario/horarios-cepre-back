@@ -1,3 +1,4 @@
+import { signalNotificationRecipients } from '../operations/notification-signal';
 import {
   BadRequestException,
   ConflictException,
@@ -818,7 +819,7 @@ export class ClassSessionRecordsService {
     if (event === 'PROPOSED' && coverage.kind === 'TEACHER') {
       const minute = (d: Date) => new Date(+d - 5 * 3600000).getUTCHours() * 60 + new Date(+d - 5 * 3600000).getUTCMinutes();
       const blocks = [{ start: record.scheduledStart.toISOString(), end: record.scheduledEnd.toISOString(), startMinute: minute(record.scheduledStart), endMinute: minute(record.scheduledEnd) }];
-      const eligible = await tx.$queryRaw<{ id: string }[]>`SELECT u.id FROM teachers person JOIN users u ON u.id=person.user_id WHERE u.is_active AND u.role='profesor' AND person.id<>${record.titularTeacherId}::uuid ${teacherAvailabilitySql(record.date.toISOString().slice(0,10), blocks, record.courseId, [record.id])}`;
+      const eligible = await tx.$queryRaw<{ id: string }[]>`SELECT u.id FROM teachers person JOIN users u ON u.id=person.user_id WHERE u.is_active AND u.role='profesor' AND person.id IS DISTINCT FROM ${record.titularTeacherId}::uuid ${teacherAvailabilitySql(record.date.toISOString().slice(0,10), blocks, record.courseId, [record.id])}`;
       const coordinators = await tx.$queryRaw<{ id: string }[]>`SELECT u.id FROM users u LEFT JOIN teachers t ON t.user_id=u.id WHERE u.is_active AND (u.role='coordinador' OR u.role=${'coordinador-' + record.courseId} OR (t.is_coordinator AND t.course_id=${record.courseId}))`;
       recipients.push(...[...eligible, ...coordinators].map(({id}) => ({id, origin: schema})));
     }
@@ -863,7 +864,7 @@ export class ClassSessionRecordsService {
       SELECT x.id::uuid,x.origin,${schema},${kind},${title},${message},${dedupe}
       FROM jsonb_to_recordset(${JSON.stringify(unique)}::jsonb) x(id text,origin text)
       ON CONFLICT(recipient_id,recipient_origin,dedupe_key) DO NOTHING`;
-    await tx.$executeRaw`SELECT pg_notify('operations_changed',${JSON.stringify({ schema, recipients: unique })})`;
+    await signalNotificationRecipients(tx, schema, unique);
     return unique;
   }
 
@@ -938,7 +939,7 @@ export class ClassSessionRecordsService {
       SELECT x.id::uuid,x.origin,${schema},${kind},${title},${message},${dedupe}
       FROM jsonb_to_recordset(${JSON.stringify(unique)}::jsonb) x(id text,origin text)
       ON CONFLICT(recipient_id,recipient_origin,dedupe_key) DO NOTHING`;
-    await tx.$executeRaw`SELECT pg_notify('operations_changed',${JSON.stringify({ schema, recipients: unique })})`;
+    await signalNotificationRecipients(tx, schema, unique);
     return unique;
   }
 
@@ -956,7 +957,7 @@ export class ClassSessionRecordsService {
     const dedupe = `${actor.schema}:part:${record.id}:${stage}`;
     const message = `${record.date.toISOString().slice(0, 10)} · bloque ${record.period}. Consulta el estado vigente; el aviso no confirma ejecución ni incluye texto privado.`;
     await tx.$executeRaw`INSERT INTO public.operation_notifications(recipient_id,recipient_origin,process_schema,kind,title,message,dedupe_key) SELECT x.id::uuid,x.origin,${actor.schema},${'part.' + kind},${title},${message},${dedupe} FROM jsonb_to_recordset(${JSON.stringify(unique)}::jsonb) x(id text,origin text) ON CONFLICT(recipient_id,recipient_origin,dedupe_key) DO NOTHING`;
-    await tx.$executeRaw`SELECT pg_notify('operations_changed',${JSON.stringify({ schema: actor.schema, recipients: unique })})`;
+    await signalNotificationRecipients(tx, actor.schema, unique);
   }
 
   async person(tx: SessionTx, kind: string, id: string, courseId?: number) {

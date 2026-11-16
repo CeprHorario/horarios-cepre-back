@@ -1,3 +1,4 @@
+import { signalNotificationRecipients } from './notification-signal';
 import { applyApprovedReplacements } from './apply-approved-replacements';
 import { teacherAvailabilitySql } from './teacher-availability';
 import { isDeepStrictEqual } from 'node:util';
@@ -477,7 +478,7 @@ export class OperationsService implements OnModuleInit, OnModuleDestroy {
     ];
     if (!unique.length) return [];
     await tx.$executeRaw`INSERT INTO public.operation_notifications(recipient_id,recipient_origin,process_schema,kind,title,message,request_id,dedupe_key) SELECT x.id::uuid,x.origin,${ctx.schema},${kind},${title},${message},${requestId}::uuid,${ctx.schema + ':' + requestId + ':' + event} FROM jsonb_to_recordset(${JSON.stringify(unique)}::jsonb) x(id text,origin text) ON CONFLICT(recipient_id,recipient_origin,dedupe_key) DO NOTHING`;
-    await tx.$executeRaw`SELECT pg_notify('operations_changed',${JSON.stringify({ schema: ctx.schema, recipients: unique })})`;
+    await signalNotificationRecipients(tx, ctx.schema, unique);
     return unique;
   }
   private async approvers(tx: SessionTx, ctx: Context, w: Work) {
