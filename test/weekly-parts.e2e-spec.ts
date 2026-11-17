@@ -21,7 +21,7 @@ suite('Generación semanal de partes', () => {
     await db.shift.update({where:{id:1},data:{endTime:new Date('1970-01-01T08:40Z')}});
     await db.sessionOperationalConfig.update({where:{id:1},data:{enabled:true,startsOn:new Date('2026-11-01'),endsOn:new Date('2026-12-31')}});
     await db.schedule.createMany({data: (['Lunes','Martes','Miercoles','Jueves','Viernes','Sabado'] as const).map(weekday=>({classId:fixture.classId,courseId:1,hourSessionId:1,weekday}))});
-    records = new ClassSessionRecordsService(fixture.apiPrisma as unknown as PrismaService,fixture.context,{} as SchemaManagerService);
+    records = new ClassSessionRecordsService(fixture.apiPrisma as unknown as PrismaService,fixture.context,{assertAvailable:async()=>undefined} as unknown as SchemaManagerService);
     journal = new SessionJournalService(records);
   },60000);
   afterAll(()=>fixture.close());
@@ -42,8 +42,7 @@ suite('Generación semanal de partes', () => {
     await expect(journal.materialize(fixture.client(),fixture.schema,'2026-11-14')).rejects.toThrow('Solo se materializa');
   });
   it('el monitor abre su última jornada el domingo y el lunes abre la actual, con edición solo en plazo',async()=>{
-    const old=await fixture.record();
-    await fixture.client().classSessionRecord.update({where:{id:old.id},data:{date:new Date('2026-11-14'),scheduledStart:new Date('2026-11-14T13:00Z'),scheduledEnd:new Date('2026-11-14T13:40Z'),editOpensAt:new Date('2026-11-14T12:55Z'),editDeadline:new Date('2026-11-14T15:10Z')}});
+    await fixture.client().classSessionRecord.create({data:{date:new Date('2026-11-14'),classId:fixture.classId,hourSessionId:1,shiftId:1,areaId:1,courseId:1,period:1,pedagogicalMinutes:40,monitorAccountId:fixture.principals.monitor.userId,supervisorId:fixture.supervisorId,snapshot:{},timingPolicy:{},scheduledStart:new Date('2026-11-14T13:00Z'),scheduledEnd:new Date('2026-11-14T13:40Z'),shiftEnd:new Date('2026-11-14T13:40Z'),editOpensAt:new Date('2026-11-14T12:55Z'),editDeadline:new Date('2026-11-14T15:10Z')}});
     const workspace=()=>fixture.context.run({schema:fixture.schema,routing:{adminSchema:fixture.schema,userSchema:fixture.schema}},()=>records.workspace(fixture.principals.monitor,{}));
     const sunday=await workspace();expect(sunday.selection.date).toBe('2026-11-14');expect(sunday.rows).toHaveLength(1);expect(sunday.rows[0].policy.canEdit).toBe(false);
     await clock.set(new Date('2026-11-16T13:00Z'),0);
