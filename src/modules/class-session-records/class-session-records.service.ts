@@ -359,12 +359,10 @@ export class ClassSessionRecordsService {
 
   async journals(
     principal: SessionPrincipal,
-    query: Pick<SessionQueryDto, 'from' | 'to' | 'page' | 'limit'>,
+    query: Partial<Pick<SessionQueryDto, 'from' | 'to'>> & Pick<SessionQueryDto, 'page' | 'limit' | 'classId'>,
   ) {
     const { client, actor } = await this.context(principal);
-    if (actor.role !== Role.MONITOR)
-      throw new ForbiddenException('Listado de jornadas exclusivo del monitor');
-    const range = this.range(query);
+    if (query.from && query.to) this.range({ from: query.from, to: query.to });
     const [result] = await this.transaction(
       client,
       actor.schema,
@@ -372,10 +370,17 @@ export class ClassSessionRecordsService {
       WITH journals AS (
         SELECT date::text AS date, class_id AS "classId", shift_id AS "shiftId",
           min(snapshot->>'className') AS "className", min(snapshot->>'shift') AS shift,
-          min(scheduled_start) AS "scheduledStart", max(scheduled_end) AS "scheduledEnd", count(*)::int AS blocks
+          min(scheduled_start) AS "scheduledStart", max(scheduled_end) AS "scheduledEnd", count(*)::int AS blocks,
+          count(*) FILTER (WHERE teaching_status<>'UNCONFIRMED' AND effective_monitor_id IS NOT NULL
+            AND initial_file_id IS NOT NULL AND final_file_id IS NOT NULL
+            AND (teaching_status<>'TAUGHT' OR (actual_start IS NOT NULL AND actual_end IS NOT NULL AND effective_teacher_id IS NOT NULL)))::int AS "completeBlocks"
         FROM class_session_records
-        WHERE monitor_account_id=${actor.id}::uuid AND deleted_at IS NULL
-          AND date BETWEEN ${range.gte}::date AND ${range.lte}::date
+        WHERE deleted_at IS NULL
+          ${actor.role === Role.MONITOR ? Prisma.sql`AND monitor_account_id=${actor.id}::uuid` : Prisma.empty}
+          ${actor.role === Role.SUPERVISOR ? Prisma.sql`AND supervisor_id=(SELECT id FROM supervisors WHERE user_id=${actor.id}::uuid)` : Prisma.empty}
+          ${query.classId ? Prisma.sql`AND class_id=${query.classId}::uuid` : Prisma.empty}
+          ${query.from ? Prisma.sql`AND date>=${new Date(query.from)}::date` : Prisma.empty}
+          ${query.to ? Prisma.sql`AND date<=${new Date(query.to)}::date` : Prisma.empty}
         GROUP BY date, class_id, shift_id
       )
       SELECT (SELECT count(*)::int FROM journals) AS total,
@@ -437,11 +442,16 @@ export class ClassSessionRecordsService {
     const { client, actor } = await this.context(principal);
     return this.transaction(client, actor.schema, async (tx) => {
       const now = await this.now(tx);
-      const date =
+      let date =
         query.date ??
         new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(
           now,
         );
+      // On Sundays, a monitor lands on their latest recorded journal, never a future week.
+      if (!query.date && actor.role === Role.MONITOR && new Date(date + 'T12:00:00Z').getUTCDay() === 0) {
+        const [latest] = await tx.$queryRaw<{date:string|null}[]>`SELECT max(date)::text AS date FROM class_session_records WHERE monitor_account_id=${actor.id}::uuid AND deleted_at IS NULL AND date<=${new Date(date)}::date`;
+        date = latest?.date ?? date;
+      }
       const scope =
         actor.role === Role.MONITOR
           ? Prisma.sql`AND r.monitor_account_id=${actor.id}::uuid`

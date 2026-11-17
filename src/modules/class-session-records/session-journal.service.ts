@@ -193,13 +193,37 @@ export class SessionJournalService {
     date: string,
     actor = systemActor(schema),
   ) {
-    const now = await this.records.transaction(client, schema, (tx) =>
-      this.records.now(tx),
-    );
-    if (date !== limaDate(now))
-      throw new BadRequestException(
-        'Solo se materializa la jornada actual; no reconstruir historia con horario vigente',
-      );
+    const now = await this.records.transaction(client, schema, tx => this.records.now(tx));
+    if (date !== limaDate(now)) throw new BadRequestException('Solo se materializa la jornada actual; no reconstruir historia con horario vigente');
+    return this.materializeDate(client, schema, date, actor);
+  }
+
+  /** Explicit weekly generation: only the current operational week, never history. */
+  async materializeWeek(client: PrismaClient, schema: string, actor = systemActor(schema)) {
+    const now = await this.records.transaction(client, schema, tx => this.records.now(tx));
+    const monday = new Date(limaDate(now) + 'T12:00:00Z');
+    const weekday = monday.getUTCDay();
+    monday.setUTCDate(monday.getUTCDate() + (weekday === 0 ? 1 : 1 - weekday));
+    const from = monday.toISOString().slice(0, 10);
+    const days: { date: string; created: number }[] = [];
+    // Future blocks remain protected by their own editOpensAt/editDeadline.
+    // Dates before today are never reconstructed from the current timetable.
+    for (let i = 0; i < 6; i++) {
+      const day = new Date(monday); day.setUTCDate(day.getUTCDate() + i);
+      const date = day.toISOString().slice(0, 10);
+      if (date < limaDate(now)) { days.push({date, created: 0}); continue; }
+      const result = await this.materializeDate(client, schema, date, actor);
+      days.push({date, created: result.created});
+    }
+    return {from, to: days[5].date, created: days.reduce((n, d) => n + d.created, 0), days};
+  }
+
+  private async materializeDate(
+    client: PrismaClient,
+    schema: string,
+    date: string,
+    actor: SessionActor,
+  ) {
     return this.records.transaction(
       client,
       schema,

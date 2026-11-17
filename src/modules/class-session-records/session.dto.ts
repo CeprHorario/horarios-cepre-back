@@ -19,7 +19,7 @@ import {
   MinLength,
   ValidateNested,
 } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 
 export class VersionDto {
   @ApiProperty({ minimum: 1 }) @IsInt() @Min(1) expectedVersion: number;
@@ -120,6 +120,7 @@ export class WithdrawMonitorObservationDto extends MonitorJournalDto {
   @IsString() @MinLength(3) @MaxLength(2000) reason: string;
 }
 export class SessionJournalsQueryDto {
+  @ApiPropertyOptional() @IsOptional() @IsUUID() classId?: string;
   @ApiProperty() @Matches(/^\d{4}-\d{2}-\d{2}$/) @IsDateString() from: string;
   @ApiProperty() @Matches(/^\d{4}-\d{2}-\d{2}$/) @IsDateString() to: string;
   @ApiPropertyOptional({ default: 1 })
@@ -134,8 +135,11 @@ export class SessionJournalsQueryDto {
   @Max(100)
   limit = 25;
 }
+export class SessionJournalListQueryDto extends PartialType(SessionJournalsQueryDto) {
+  page = 1;
+  limit = 25;
+}
 export class SessionQueryDto extends SessionJournalsQueryDto {
-  @ApiPropertyOptional() @IsOptional() @IsUUID() classId?: string;
   @ApiPropertyOptional() @IsOptional() @IsUUID() teacherId?: string;
   @ApiPropertyOptional() @IsOptional() @IsUUID() monitorId?: string;
   @ApiPropertyOptional()

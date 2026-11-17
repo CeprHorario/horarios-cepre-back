@@ -2817,11 +2817,13 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
     ).toBe(true);
   });
 
-  it('jornadas rechaza otros roles, selectores y rangos inválidos sin ampliar acceso', async () => {
+  it('jornadas permite administración/supervisión y filtra salón dentro del alcance autorizado', async () => {
     const path = '/journals?from=2025-01-01&to=2025-01-31';
-    await api('get', path, 'supervisor').expect(403);
-    await api('get', path, 'admin').expect(403);
-    await api('get', `${path}&classId=${fixture.classId}`).expect(400);
+    await api('get', path, 'supervisor').expect(200);
+    await api('get', path, 'admin').expect(200);
+    const filtered = body<{data:{classId:string;completeBlocks:number;blocks:number}[]}>(await api('get', `${path}&classId=${fixture.classId}`).expect(200));
+    expect(filtered.data.every(j=>j.classId===fixture.classId&&j.completeBlocks>=0&&j.completeBlocks<=j.blocks)).toBe(true);
+    await api('get', `${path}&classId=invalid`).expect(400);
     await api('get', '/journals?from=2025-01-01&to=2025-12-31').expect(400);
     await api('get', `${path}&page=0`).expect(400);
   });

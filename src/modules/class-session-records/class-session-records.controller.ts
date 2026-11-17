@@ -36,7 +36,7 @@ import {
   ReviewDto,
   SessionPeopleQueryDto,
   SessionQueryDto,
-  SessionJournalsQueryDto,
+  SessionJournalListQueryDto,
   SessionWorkspaceQueryDto,
   MonitorObservationQueryDto,
   CreateMonitorObservationDto,
@@ -148,6 +148,13 @@ export class ClassSessionRecordsController {
   ) {
     return this.journal.saveMonitorObservation(req.user, dto, id, true);
   }
+  @Post('weeks/generate')
+  @Authorization({ adminOnly: true, permission: 'class-session-records.weeks.generate' })
+  async generateWeek(@Req() req: AuthRequest) {
+    const { client, schema, actor } = await this.records.context(req.user);
+    return this.journal.materializeWeek(client, schema, actor);
+  }
+
   @Get('workspace')
   @Authorization({
     roles: readers,
@@ -180,15 +187,15 @@ export class ClassSessionRecordsController {
   }
   @Get('journals')
   @Authorization({
-    roles: [Role.MONITOR],
+    roles: readers,
     permission: 'class-session-records.journals',
   })
   @Header('Cache-Control', 'private, no-store')
   @ApiOperation({
     summary:
-      'Jornadas del monitor agrupadas antes de paginar, sin reconstruir históricos',
+      'Jornadas autorizadas por fecha, salón y turno, agrupadas antes de paginar',
   })
-  journals(@Req() req: AuthRequest, @Query() query: SessionJournalsQueryDto) {
+  journals(@Req() req: AuthRequest, @Query() query: SessionJournalListQueryDto) {
     return this.records.journals(req.user, query);
   }
   @Post('recoveries')
