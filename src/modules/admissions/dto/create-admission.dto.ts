@@ -67,6 +67,7 @@ export class ShiftDetailDto {
 export class ConfigurationDto {
   @IsOptional() @IsInt() @Min(0) @Max(60)
   earlyEditMinutes?: number;
+  @IsOptional() @IsInt() @Min(0) @Max(60) latenessToleranceMinutes?: number;
   @IsOptional() @IsInt() @Min(0) @Max(720)
   editGraceMinutes?: number;
   @IsOptional()

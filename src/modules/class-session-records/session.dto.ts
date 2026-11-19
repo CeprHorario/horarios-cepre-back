@@ -1,5 +1,5 @@
 import { PartObservationDto } from '../operations/operations.dto';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 import {
   ArrayMaxSize,
   ArrayMinSize,
@@ -18,6 +18,7 @@ import {
   Min,
   MinLength,
   ValidateNested,
+  ValidateIf,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 
@@ -28,6 +29,11 @@ export class VersionDto {
   @IsString()
   @MaxLength(2000)
   reason?: string;
+}
+export class WeekAdvanceDto {
+  @Matches(/^\d{4}-\d{2}-\d{2}$/) @IsDateString() weekStart: string;
+  @IsInt() @Min(0) expectedVersion: number;
+  @ValidateIf((_object, value: unknown) => value !== null) @IsInt() @Min(1) @Max(6) weekday: number|null;
 }
 export class ReasonDto extends VersionDto {
   @ApiProperty()
@@ -46,8 +52,8 @@ export class UpdateSessionDto extends VersionDto {
   @Type(() => PartObservationDto)
   structuredObservations?: PartObservationDto[];
 
-  @ApiPropertyOptional({ nullable: true, enum: ['N', 'T', 'SD', 'RN', 'RE'] })
-  @IsOptional()
+  @ApiPropertyOptional({ enum: ['N', 'T', 'SD', 'RN', 'RE'] })
+  @ValidateIf((_object, value: unknown) => value !== undefined)
   @IsIn(['N', 'T', 'SD', 'RN', 'RE'])
   classState?: string | null;
   @ApiPropertyOptional({ nullable: true })
@@ -136,6 +142,12 @@ export class SessionJournalsQueryDto {
   limit = 25;
 }
 export class SessionJournalListQueryDto extends PartialType(SessionJournalsQueryDto) {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  shiftId?: number;
   page = 1;
   limit = 25;
 }
@@ -170,6 +182,8 @@ export class RecoveryDto extends DateDto {
   @ApiProperty() @IsString() @MinLength(3) @MaxLength(2000) reason: string;
 }
 export class SessionPeopleQueryDto {
+  @IsOptional() @Type(()=>Number) @IsInt() @Min(1) shiftId?:number;
+  @IsOptional() @IsBoolean() @Transform(({value}:{value:unknown})=>value==='true'?true:value==='false'?false:value) sameTurn?:boolean;
   @ApiProperty({ enum: ['TEACHER', 'MONITOR'] })
   @IsIn(['TEACHER', 'MONITOR'])
   kind: string;
@@ -194,6 +208,8 @@ export class CoverageTargetDto extends VersionDto {
   @ApiProperty() @IsInt() @Min(1) recordId: number;
 }
 export class CoverageDto {
+  @IsOptional() @IsBoolean() sameTurn?:boolean;
+  @IsOptional() @IsString() @MinLength(10) @MaxLength(2000) sameTurnReason?:string;
   @ApiPropertyOptional() @IsOptional() @IsUUID() operationId?: string;
   @ApiProperty({ type: [CoverageTargetDto], maxItems: 200 })
   @IsArray()

@@ -1,3 +1,9 @@
+import { coverageWork } from './coverage-work';
+import type { LetterData } from './request-letter';
+import { requestPeople } from './request-person';
+import { replacementDecision } from './replacement-workflow';
+import { availabilityWeekday, findWeekPlan, operationalMonday, weekDays } from '../class-session-records/session-week';
+import { getCoordinatorCourseId } from '../auth/utils/coordinator-role';
 import { signalNotificationRecipients } from './notification-signal';
 import { applyApprovedReplacements } from './apply-approved-replacements';
 import { teacherAvailabilitySql } from './teacher-availability';
@@ -14,7 +20,7 @@ import {
 } from '@nestjs/common';
 import { Client } from 'pg';
 import { parseCoordinatorRole } from '../auth/utils/coordinator-role';
-import { Prisma } from '../../generated/prisma/client';
+import { Prisma, type Weekday } from '../../generated/prisma/client';
 import { Role } from '../auth/decorators/authorization.decorator';
 import {
   SessionPrincipal,
@@ -30,6 +36,7 @@ import {
   ReplacementDraftDto,
   RequestContextDto,
   RequestDecisionDto,
+  TeachingReplacementQueryDto,
 } from './operations.dto';
 import { Subject } from 'rxjs';
 import { randomUUID, createHash } from 'node:crypto';
@@ -48,15 +55,32 @@ export interface WorkBlock {
   endMinute: number;
 }
 interface Work {
-  subjectRole: 'profesor' | 'monitor' | 'supervisor';
+  subjectRole: 'profesor' | 'monitor' | 'supervisor' | 'coordinador';
   subjectUserId: string | null;
   classId: string | null;
   courseId: number | null;
   shiftId: number | null;
   supervisorId: string | null;
+  sameTurn?: boolean;
+  coverageOperationId?:string;
+  recordIds?:number[];
+  fullCoverage?:boolean;
+  replacementUserId?:string;
+  areaId?: number|null;
+  candidateShiftId?: number;
   blocks: WorkBlock[];
 }
 export interface ReplacementRequest {
+  coverage_operation_id?:string|null;
+  approver_coordinator_id: string | null;
+  cancellation_stage: 'REVIEW' | 'ADMIN' | 'CHANGES' | null;
+  cancellation_reason: string | null;
+  revises_id: string | null;
+  same_turn_reason: string;
+  document_data: {label:string;value:string}[];
+  docx_object: string | null;
+  docx_generation: string | null;
+  docx_sha256: string | null;
   id: string;
   requester_user_id: string;
   requester_role: string;
@@ -86,15 +110,6 @@ export interface ReplacementRequest {
   decided_at: Date | null;
 }
 type Context = Awaited<ReturnType<OperationsContext['get']>>;
-const weekdays = [
-  'SUNDAY',
-  'MONDAY',
-  'TUESDAY',
-  'WEDNESDAY',
-  'THURSDAY',
-  'FRIDAY',
-  'SATURDAY',
-];
 @Injectable()
 export class OperationsService implements OnModuleInit, OnModuleDestroy {
   private listener?: Client;
@@ -173,10 +188,13 @@ export class OperationsService implements OnModuleInit, OnModuleDestroy {
     const config = await ctx.client.sessionOperationalConfig.findUniqueOrThrow({
       where: { id: 1 },
     });
+    const [profile]=await this.tx(ctx,tx=>requestPeople(tx,[ctx.user.id]));
+    const shifts=await ctx.client.shift.findMany({select:{id:true,name:true},orderBy:{id:'asc'}});
     return {
+      profile, shifts,
       accountId: ctx.user.id,
       process: ctx.schema,
-      role: ctx.user.role,
+      role: getCoordinatorCourseId(ctx.user.role) ? Role.COORDINATOR : ctx.user.role,
       serverNow: new Date().toISOString(),
       name:
         [ctx.user.userProfile?.firstName, ctx.user.userProfile?.lastName]
@@ -196,7 +214,7 @@ export class OperationsService implements OnModuleInit, OnModuleDestroy {
           ? { monitor: { userId: ctx.user.id } }
           : ctx.actor.role === Role.SUPERVISOR
             ? { monitor: { supervisors: { userId: ctx.user.id } } }
-            : { schedules: { some: { teacher: { userId: ctx.user.id } } } };
+            : getCoordinatorCourseId(ctx.user.role) ? { schedules: { some: { courseId: getCoordinatorCourseId(ctx.user.role) } } } : { schedules: { some: { teacher: { userId: ctx.user.id } } } };
     const where = {
       ...scope,
       ...(q.search
@@ -221,6 +239,7 @@ export class OperationsService implements OnModuleInit, OnModuleDestroy {
     q: RequestContextDto,
     hours?: number[],
   ): Promise<Work> {
+    if(q.coverageOperationId)return coverageWork(tx,ctx,q,hours);
     const process = (
       await tx.$queryRaw<
         { started: Date; finished: Date }[]
@@ -232,7 +251,7 @@ export class OperationsService implements OnModuleInit, OnModuleDestroy {
     const role = ctx.actor.role,
       emergency = q.kind === 'EMERGENCY';
     if (
-      ![Role.ADMIN, Role.TEACHER, Role.MONITOR, Role.SUPERVISOR].includes(role)
+      ![Role.ADMIN, Role.TEACHER, Role.MONITOR, Role.SUPERVISOR].includes(role) && !getCoordinatorCourseId(ctx.user.role)
     )
       throw new ForbiddenException('Rol sin solicitudes de reemplazo');
     if (
@@ -302,15 +321,21 @@ export class OperationsService implements OnModuleInit, OnModuleDestroy {
       'Jueves',
       'Viernes',
       'Sabado',
-    ][day.getUTCDay()] as Prisma.EnumWeekdayFilter['equals'];
+    ][day.getUTCDay()] as Weekday;
+    const selectedWeek=await findWeekPlan(tx,operationalMonday(q.date));
+    const executionWeekday=day.getUTCDay();
+    const movedAway=executionWeekday!==0&&selectedWeek?.advanced_weekday===executionWeekday;
+    const dutyDays: Weekday[]=[weekday];
+    if(executionWeekday===0&&selectedWeek?.advanced_weekday)dutyDays.push(weekDays[selectedWeek.advanced_weekday] as Weekday);
     const schedules =
-      role === Role.SUPERVISOR && !emergency
+      ((role === Role.SUPERVISOR && !emergency) || movedAway)
         ? []
         : await tx.schedule.findMany({
             where: {
-              weekday,
+              weekday: {in:dutyDays},
               ...(classId ? { classId } : {}),
               ...(teacher ? { teacherId: teacher.id } : {}),
+              ...(getCoordinatorCourseId(ctx.user.role) ? {courseId:getCoordinatorCourseId(ctx.user.role)} : {}),
             },
             include: {
               hourSession: true,
@@ -321,12 +346,12 @@ export class OperationsService implements OnModuleInit, OnModuleDestroy {
             orderBy: { hourSession: { startTime: 'asc' } },
           });
     const duties =
-      supervisor && !emergency
+      supervisor && !emergency && !movedAway
         ? await tx.hourSession.findMany({
             where: {
               ...(supervisor.shiftId
                 ? { shiftId: supervisor.shiftId }
-                : { shift: { supervisors: { some: { id: supervisor.id } } } }),
+                : { shift: { classes: { some: { monitor: { supervisorId: supervisor.id } } } } }),
             },
             orderBy: { startTime: 'asc' },
           })
@@ -394,11 +419,11 @@ export class OperationsService implements OnModuleInit, OnModuleDestroy {
         : null;
     return {
       subjectRole:
-        emergency || teacher ? 'profesor' : monitor ? 'monitor' : 'supervisor',
+        emergency || teacher ? 'profesor' : monitor ? 'monitor' : getCoordinatorCourseId(ctx.user.role) ? 'coordinador' : 'supervisor',
       subjectUserId: emergency ? (original?.userId ?? null) : ctx.user.id,
       classId,
       courseId:
-        teacher?.courseId ?? (emergency ? (blocks[0]?.courseId ?? null) : null),
+        teacher?.courseId ?? getCoordinatorCourseId(ctx.user.role) ?? (emergency ? (blocks[0]?.courseId ?? null) : null),
       shiftId: blocks[0]?.shiftId ?? classroom?.shiftId ?? null,
       supervisorId:
         classroom?.monitor?.supervisorId ??
@@ -406,13 +431,40 @@ export class OperationsService implements OnModuleInit, OnModuleDestroy {
         supervisor?.id ??
         null,
       blocks,
+      sameTurn:q.sameTurn ?? false,
+      areaId:classroom?.areaId??null, candidateShiftId:q.candidateShiftId,
     };
   }
   async options(principal: SessionPrincipal, q: RequestContextDto) {
     const ctx = await this.contexts.get(principal);
     return this.tx(ctx, async (tx) => {
       const w = await this.work(tx, ctx, q);
-      return { subjectRole: w.subjectRole, blocks: w.blocks };
+      const [profile]=await requestPeople(tx,[ctx.user.id]);
+      return { subjectRole: w.subjectRole, blocks: w.blocks, profile, classId:w.classId };
+    });
+  }
+  async pendingDocuments(principal:SessionPrincipal){
+    const ctx=await this.contexts.get(principal);
+    return this.tx(ctx,tx=>tx.$queryRaw`SELECT cv.operation_id AS "operationId",rec.date,min(rec.class_id::text) AS "classId",min(cl.name) AS classroom,cv.kind,cv.mode,array_agg(rec.hour_session_id ORDER BY rec.period) AS hours,
+      min(COALESCE(ct.user_id,cm.user_id)::text) AS "replacementUserId"
+      FROM session_coverages cv JOIN class_session_records rec ON rec.id=cv.record_id JOIN classes cl ON cl.id=rec.class_id
+      LEFT JOIN teachers t ON t.id=rec.titular_teacher_id LEFT JOIN monitors m ON m.id=rec.titular_monitor_id
+      LEFT JOIN teachers ct ON ct.id=cv.teacher_id LEFT JOIN monitors cm ON cm.id=cv.monitor_id
+      WHERE cv.status IN ('PENDING','AUTHORIZED') AND cv.operation_id IS NOT NULL AND
+      ((cv.kind='TEACHER' AND t.user_id=${ctx.user.id}::uuid) OR (cv.kind='MONITOR' AND m.user_id=${ctx.user.id}::uuid))
+      AND NOT EXISTS(SELECT 1 FROM session_coverage_document_links link WHERE link.operation_id=cv.operation_id)
+      AND NOT EXISTS(SELECT 1 FROM replacement_requests rr WHERE rr.id=cv.operation_id)
+      GROUP BY cv.operation_id,rec.date,cv.kind,cv.mode ORDER BY rec.date DESC LIMIT 100`);
+  }
+  async teachingReplacements(principal:SessionPrincipal,q:TeachingReplacementQueryDto) {
+    const ctx=await this.contexts.get(principal);
+    if(ctx.actor.role!==Role.TEACHER)throw new ForbiddenException('Solo el docente consulta sus coberturas');
+    this.records.range(q);
+    return this.tx(ctx,async tx=>{
+      const [data,total]=await Promise.all([
+        tx.$queryRaw`SELECT r.id,r.date,r.blocks,c.url_meet AS meet,c.url_classroom AS classroom FROM replacement_requests r JOIN classes c ON c.id=r.class_id WHERE r.status='APPROVED' AND r.subject_role='profesor' AND r.replacement_user_id=${ctx.user.id}::uuid AND r.date BETWEEN ${new Date(q.from)}::date AND ${new Date(q.to)}::date ORDER BY r.date,r.starts_at,r.id LIMIT ${q.limit} OFFSET ${(q.page-1)*q.limit}`,
+        tx.$queryRaw<{total:number}[]>`SELECT count(*)::int total FROM replacement_requests r WHERE r.status='APPROVED' AND r.subject_role='profesor' AND r.replacement_user_id=${ctx.user.id}::uuid AND r.date BETWEEN ${new Date(q.from)}::date AND ${new Date(q.to)}::date`,
+      ]);return {data,total:total[0].total,page:q.page,limit:q.limit};
     });
   }
   private candidateSql(
@@ -422,23 +474,26 @@ export class OperationsService implements OnModuleInit, OnModuleDestroy {
     search?: string,
     id?: string,
   ) {
-    const json = JSON.stringify(work.blocks),
-      weekday = weekdays[new Date(date).getUTCDay()];
+    if(work.coverageOperationId)return Prisma.sql`FROM users u LEFT JOIN user_profiles p ON p.user_id=u.id WHERE u.id=${work.replacementUserId}::uuid AND u.is_active`;
+    const json = JSON.stringify(work.blocks);
     const name = Prisma.sql`COALESCE(NULLIF(BTRIM(concat_ws(' ',p.first_name,p.last_name)),''),u.email)`;
     const specific =
       work.subjectRole === 'profesor'
         ? Prisma.sql`JOIN teachers person ON person.user_id=u.id`
         : work.subjectRole === 'monitor'
           ? Prisma.sql`JOIN monitors person ON person.user_id=u.id JOIN classes owned ON owned.monitor_id=person.id`
-          : Prisma.sql`JOIN supervisors person ON person.user_id=u.id`;
+          : work.subjectRole==='coordinador' ? Prisma.empty : Prisma.sql`JOIN supervisors person ON person.user_id=u.id`;
     const conflicts =
       work.subjectRole === 'profesor'
         ? teacherAvailabilitySql(date, work.blocks, work.courseId)
         : work.subjectRole === 'monitor'
-          ? Prisma.sql`AND owned.shift_id<>${work.shiftId}
-      AND NOT EXISTS(SELECT 1 FROM schedules s JOIN hour_sessions h ON h.id=s.hour_session_id CROSS JOIN jsonb_array_elements(${json}::jsonb) b WHERE s.class_id=owned.id AND s.weekday::text=${weekday} AND (EXTRACT(HOUR FROM h.start_time)*60+EXTRACT(MINUTE FROM h.start_time))<(b->>'endMinute')::int AND (EXTRACT(HOUR FROM h.end_time)*60+EXTRACT(MINUTE FROM h.end_time))>(b->>'startMinute')::int)`
-          : Prisma.empty;
-    return Prisma.sql`FROM users u ${specific} LEFT JOIN user_profiles p ON p.user_id=u.id WHERE u.is_active AND u.role=${work.subjectRole} AND u.id<>${ctx.user.id}::uuid ${work.subjectUserId ? Prisma.sql`AND u.id<>${work.subjectUserId}::uuid` : Prisma.empty} ${id ? Prisma.sql`AND u.id=${id}::uuid` : Prisma.empty} ${search ? Prisma.sql`AND (${name} ILIKE ${'%' + search + '%'} OR u.email ILIKE ${'%' + search + '%'})` : Prisma.empty} ${conflicts}
+          ? Prisma.sql`${work.sameTurn ? Prisma.empty : Prisma.sql`AND owned.shift_id<>${work.shiftId}`} AND owned.area_id=${work.areaId}
+      AND (${work.sameTurn ?? false} OR NOT EXISTS(SELECT 1 FROM schedules s JOIN hour_sessions h ON h.id=s.hour_session_id CROSS JOIN jsonb_array_elements(${json}::jsonb) b WHERE s.class_id=owned.id AND s.weekday::text IN (${['SUNDAY','MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY'][new Date(date).getUTCDay()]},${availabilityWeekday(date)}) AND (EXTRACT(HOUR FROM h.start_time)*60+EXTRACT(MINUTE FROM h.start_time))<(b->>'endMinute')::int AND (EXTRACT(HOUR FROM h.end_time)*60+EXTRACT(MINUTE FROM h.end_time))>(b->>'startMinute')::int))
+      AND NOT EXISTS(SELECT 1 FROM replacement_requests one WHERE one.status='APPROVED' AND one.subject_role='monitor' AND one.date=${new Date(date)}::date AND one.replacement_user_id=u.id AND one.class_id IS DISTINCT FROM ${work.classId}::uuid)
+      AND NOT EXISTS(SELECT 1 FROM session_coverages cv JOIN class_session_records rec ON rec.id=cv.record_id WHERE cv.kind='MONITOR' AND cv.monitor_id=person.id AND cv.status='AUTHORIZED' AND rec.date=${new Date(date)}::date AND rec.class_id IS DISTINCT FROM ${work.classId}::uuid)
+      AND NOT EXISTS(SELECT 1 FROM class_session_records rec WHERE rec.effective_monitor_id=person.id AND rec.titular_monitor_id IS DISTINCT FROM person.id AND rec.date=${new Date(date)}::date AND rec.class_id IS DISTINCT FROM ${work.classId}::uuid AND (rec.actual_start IS NOT NULL OR rec.actual_end IS NOT NULL))`
+          : work.subjectRole==='supervisor'&&!work.sameTurn ? Prisma.sql`AND (person.shift_id IS NULL OR person.shift_id<>${work.shiftId}) AND NOT EXISTS(SELECT 1 FROM monitors sm JOIN classes sc ON sc.monitor_id=sm.id WHERE sm.supervisor_id=person.id AND sc.shift_id=${work.shiftId})` : Prisma.empty;
+    return Prisma.sql`FROM users u ${specific} LEFT JOIN user_profiles p ON p.user_id=u.id WHERE u.is_active AND ${work.subjectRole==='coordinador' ? Prisma.sql`u.role ~ '^coordinador-[0-9]+$'` : Prisma.sql`u.role=${work.subjectRole}`} AND u.id<>${ctx.user.id}::uuid ${work.subjectUserId ? Prisma.sql`AND u.id<>${work.subjectUserId}::uuid` : Prisma.empty} ${id ? Prisma.sql`AND u.id=${id}::uuid` : Prisma.empty} ${search ? Prisma.sql`AND (${name} ILIKE ${'%' + search + '%'} OR u.email ILIKE ${'%' + search + '%'})` : Prisma.empty} ${conflicts} ${work.candidateShiftId ? (work.subjectRole==='monitor' ? Prisma.sql`AND owned.shift_id=${work.candidateShiftId}` : work.subjectRole==='supervisor' ? Prisma.sql`AND (person.shift_id=${work.candidateShiftId} OR EXISTS(SELECT 1 FROM monitors fm JOIN classes fc ON fc.monitor_id=fm.id WHERE fm.supervisor_id=person.id AND fc.shift_id=${work.candidateShiftId}))` : work.subjectRole==='coordinador'?Prisma.empty:Prisma.sql`AND EXISTS(SELECT 1 FROM teacher_availabilities fa JOIN shifts fs ON fs.id=${work.candidateShiftId} WHERE fa.teacher_id=person.id AND fa.weekday::text=${availabilityWeekday(date)} AND fa.start_minute<EXTRACT(HOUR FROM fs.end_time)*60+EXTRACT(MINUTE FROM fs.end_time) AND fa.end_minute>EXTRACT(HOUR FROM fs.start_time)*60+EXTRACT(MINUTE FROM fs.start_time))`) : Prisma.empty}
       AND NOT EXISTS(SELECT 1 FROM session_coverages c JOIN class_session_records rec ON rec.id=c.record_id LEFT JOIN teachers covered_teacher ON covered_teacher.id=c.teacher_id LEFT JOIN monitors covered_monitor ON covered_monitor.id=c.monitor_id CROSS JOIN jsonb_array_elements(${json}::jsonb) b WHERE c.status='AUTHORIZED' AND rec.deleted_at IS NULL AND (covered_teacher.user_id=u.id OR covered_monitor.user_id=u.id) AND rec.scheduled_start<(b->>'end')::timestamptz AND rec.scheduled_end>(b->>'start')::timestamptz)
       AND NOT EXISTS(SELECT 1 FROM replacement_requests r CROSS JOIN jsonb_array_elements(r.blocks) rb CROSS JOIN jsonb_array_elements(${json}::jsonb) b WHERE r.status='APPROVED' AND r.replacement_user_id=u.id AND r.date=${new Date(date)}::date AND (rb->>'start')::timestamptz<(b->>'end')::timestamptz AND (rb->>'end')::timestamptz>(b->>'start')::timestamptz)`;
   }
@@ -460,7 +515,8 @@ export class OperationsService implements OnModuleInit, OnModuleDestroy {
         >`SELECT u.id,COALESCE(NULLIF(BTRIM(concat_ws(' ',p.first_name,p.last_name)),''),u.email) AS name,u.email,p.dni ${where} ORDER BY u.email LIMIT 20 OFFSET ${(q.page - 1) * 20}`,
         tx.$queryRaw<{ total: number }[]>`SELECT count(*)::int total ${where}`,
       ]);
-      return { data, total: total[0].total, page: q.page, limit: 20 };
+      const people=await requestPeople(tx,data.map(p=>p.id));
+      return { data:data.map(p=>({...p,...people.find(person=>person.id===p.id)})), total: total[0].total, page: q.page, limit: 20 };
     });
   }
   private async notify(
@@ -498,18 +554,35 @@ export class OperationsService implements OnModuleInit, OnModuleDestroy {
       });
       if (s?.users.isActive) list.push({ id: s.userId, origin: ctx.schema });
     }
+    if(w.subjectRole==='profesor' && w.courseId){const coordinator=await tx.user.findMany({where:{role:'coordinador-'+w.courseId,isActive:true},select:{id:true}});list.push(...coordinator.map(c=>({id:c.id,origin:ctx.schema})));}
+    if(w.subjectRole==='monitor'||(w.subjectRole==='profesor'&&ctx.actor.role===Role.MONITOR))return list.filter(p=>p.origin!=='core_schema');
     return list;
   }
+  private async reviewerId(tx:SessionTx,r:ReplacementRequest) {
+    if(r.subject_role==='profesor'&&r.kind!=='EMERGENCY')return r.approver_coordinator_id;
+    if(r.subject_role==='monitor'||r.kind==='EMERGENCY')return (await tx.supervisor.findUnique({where:{id:r.approver_supervisor_id??'00000000-0000-0000-0000-000000000000'}}))?.userId??null;
+    return null;
+  }
+  private async coordinatorId(tx:SessionTx,work:Work,kind:string) {
+    if(work.subjectRole!=='profesor'||kind==='EMERGENCY')return null;
+    const coordinator=await tx.user.findFirst({where:{role:'coordinador-'+work.courseId,isActive:true},orderBy:{id:'asc'},select:{id:true}});
+    if(!coordinator)throw new BadRequestException('Registra un coordinador activo para este curso antes de solicitar el reemplazo');
+    return coordinator.id;
+  }
+  create(principal:SessionPrincipal,dto:ReplacementDraftDto,files:Express.Multer.File[]):Promise<ReplacementRequest>;
+  create(principal:SessionPrincipal,dto:ReplacementDraftDto,files:Express.Multer.File[],preview:true):Promise<Buffer>;
   async create(
     principal: SessionPrincipal,
     dto: ReplacementDraftDto,
     files: Express.Multer.File[],
-  ) {
+    preview = false,
+  ):Promise<ReplacementRequest|Buffer> {
     const ctx = await this.contexts.get(principal);
     if (ctx.actor.role === Role.ADMIN)
       throw new ForbiddenException(
         'Administración resuelve solicitudes; no suplanta al solicitante',
       );
+    if(dto.sameTurn && (dto.sameTurnReason?.trim().length??0)<10)throw new BadRequestException('Explica por qué no encontraste reemplazante de otro turno');
     const payloadHash = createHash('sha256')
       .update(
         JSON.stringify({
@@ -519,7 +592,7 @@ export class OperationsService implements OnModuleInit, OnModuleDestroy {
           hours: [...dto.hourSessionIds].sort((a, b) => a - b),
           replacement: dto.replacementUserId,
           reason: dto.reason.trim(),
-          compress: dto.compress,
+          compress: dto.compress, sameTurn:dto.sameTurn??false,sameTurnReason:dto.sameTurnReason??'',address:dto.address??'',district:dto.district??'',cui:dto.cui??'',revisesId:dto.revisesId??null,coverageOperationId:dto.coverageOperationId??null,
           evidence: files.map((f) =>
             createHash('sha256').update(f.buffer).digest('hex'),
           ),
@@ -533,7 +606,7 @@ export class OperationsService implements OnModuleInit, OnModuleDestroy {
           ReplacementRequest[]
         >`SELECT * FROM replacement_requests WHERE operation_id=${dto.operationId}::uuid`,
     );
-    if (existing.length) {
+    if (existing.length && !preview) {
       if (
         existing[0].requester_user_id !== ctx.user.id ||
         existing[0].payload_sha256 !== payloadHash
@@ -543,18 +616,23 @@ export class OperationsService implements OnModuleInit, OnModuleDestroy {
     }
     const snapshot = await this.tx(ctx, async (tx) => {
       const work = await this.work(tx, ctx, dto, dto.hourSessionIds);
-      if (work.blocks.some((b) => new Date(b.end) <= new Date()))
+      const coordinatorId=await this.coordinatorId(tx,work,dto.kind);
+      if((work.subjectRole==='monitor'||dto.kind==='EMERGENCY')&&!work.supervisorId)throw new BadRequestException('Asigna un supervisor antes de solicitar el reemplazo');
+      if (!dto.coverageOperationId && work.blocks.some((b) => new Date(b.end) <= new Date()))
         throw new BadRequestException(
           'No se solicita reemplazo de trabajo ya finalizado',
         );
       const eligible = await tx.$queryRaw<
-        { id: string; email: string; name: string }[]
-      >`SELECT u.id,u.email,COALESCE(NULLIF(BTRIM(concat_ws(' ',p.first_name,p.last_name)),''),u.email) AS name ${this.candidateSql(work, ctx, dto.date, undefined, dto.replacementUserId)}`;
+        { id: string; email: string; name: string; dni:string|null }[]
+      >`SELECT u.id,u.email,p.dni,COALESCE(NULLIF(BTRIM(concat_ws(' ',p.first_name,p.last_name)),''),u.email) AS name ${this.candidateSql(work, ctx, dto.date, undefined, dto.replacementUserId)}`;
       if (!eligible.length)
         throw new BadRequestException(
           'El reemplazante no es compatible con los bloques',
         );
-      return { work, replacement: eligible[0] };
+      const identities=await requestPeople(tx,[ctx.user.id,dto.replacementUserId]);
+      const all=await this.work(tx,ctx,dto);
+      const shift=await tx.shift.findUnique({where:{id:work.shiftId!}});
+      return { work, replacement: eligible[0],coordinatorId, identities, full:work.fullCoverage??(all.blocks.filter(b=>b.shiftId===work.shiftId).length===work.blocks.length), shift:shift?.name??'Turno' };
     });
     const id = randomUUID(),
       name =
@@ -563,7 +641,11 @@ export class OperationsService implements OnModuleInit, OnModuleDestroy {
           .join(' ') || ctx.user.email;
     const fields = [
       { label: 'Solicitud', value: id },
-      { label: 'Proceso y fecha', value: ctx.schema + ' / ' + dto.date },
+      { label: 'Proceso', value: ctx.schema },
+      {label:'Fecha de emisión',value:new Date().toLocaleDateString('es-PE',{timeZone:'America/Lima',day:'2-digit',month:'long',year:'numeric'})},
+      {label:'Fecha del reemplazo',value:dto.date},
+      {label:'Domicilio y distrito',value:[dto.address,dto.district].filter(Boolean).join(' / ')||'No declarado'},
+      {label:'CUI',value:dto.cui||'No declarado'},
       {
         label: 'Solicitante',
         value:
@@ -582,7 +664,7 @@ export class OperationsService implements OnModuleInit, OnModuleDestroy {
       },
       {
         label: 'Reemplazante propuesto',
-        value: snapshot.replacement.name + ' / ' + snapshot.replacement.email,
+        value: snapshot.replacement.name + ' / ' + snapshot.replacement.email + ' / DNI ' + (snapshot.replacement.dni??'No registrado'),
       },
       {
         label: 'Bloques',
@@ -594,11 +676,30 @@ export class OperationsService implements OnModuleInit, OnModuleDestroy {
           .join('\n'),
       },
       { label: 'Motivo', value: dto.reason },
+      ...(dto.sameTurn?[{label:'Excepción de mismo turno',value:'Declaro que no encontré reemplazante de otro turno. '+dto.sameTurnReason}]:[]),
     ];
-    const bytes = await this.documents.generate(fields, files, dto.compress),
-      document = await this.documents.upload(ctx.schema, id, bytes);
+    const time=(value:string)=>new Date(value).toLocaleTimeString('es-PE',{timeZone:'America/Lima',hour:'2-digit',minute:'2-digit',hour12:false});
+    const letter:LetterData={role:snapshot.work.subjectRole,process:ctx.schema,issued:fields.find(f=>f.label==='Fecha de emisión')!.value,date:dto.date.split('-').reverse().join('/'),
+      applicant:snapshot.identities.find(p=>p.id===ctx.user.id)!, replacement:snapshot.identities.find(p=>p.id===dto.replacementUserId)!,
+      address:dto.address??'',district:dto.district??'',cui:dto.cui??'',reason:dto.reason,
+      exception:fields.find(f=>f.label==='Excepción de mismo turno')?.value,
+      full:snapshot.full,classroom:snapshot.work.blocks[0].className,shift:snapshot.shift,course:snapshot.work.blocks[0].course,
+      start:time(snapshot.work.blocks[0].start),end:time(snapshot.work.blocks.at(-1)!.end),
+      hours:snapshot.work.blocks.map(b=>({classroom:b.className,start:time(b.start),end:time(b.end)}))};
+    fields.push({label:'Ficha institucional',value:JSON.stringify(letter)});
+    const bytes=await this.documents.generate(fields,files,dto.compress);
+    if(preview)return bytes;
+    const document=await this.documents.upload(ctx.schema,id,bytes);
+    const wordBytes=await this.documents.word(fields,files,snapshot.work.subjectRole==='profesor');
+    const wordDocument=await this.documents.upload(ctx.schema,id,wordBytes,'docx');
     let signals: { id: string; origin: string }[] = [];
     const saved = await this.tx(ctx, async (tx) => {
+      if(dto.coverageOperationId){
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${ctx.schema+':coverage-document:'+dto.coverageOperationId},0))::text`;
+        const [link]=await tx.$queryRaw<{request_id:string}[]>`SELECT request_id FROM session_coverage_document_links WHERE operation_id=${dto.coverageOperationId}::uuid FOR UPDATE`;
+        if(link&&link.request_id!==dto.revisesId)throw new ConflictException('Esta cobertura ya tiene un documento. Revisa la solicitud existente.');
+      }
+      if(dto.revisesId){const parent=await this.read(tx,ctx,dto.revisesId,true);if(parent.requester_user_id!==ctx.user.id||parent.status!=='CHANGES'||parent.cancellation_stage)throw new ConflictException('La solicitud no está disponible para corrección');await tx.$executeRaw`UPDATE replacement_requests SET status='SUPERSEDED',version=version+1,decided_by=${JSON.stringify(ctx.actor)}::jsonb,decided_at=clock_timestamp(),decision_reason='Documento corregido y reenviado' WHERE id=${parent.id}::uuid`;await tx.$executeRaw`INSERT INTO replacement_request_events(request_id,action,actor,reason) VALUES(${parent.id}::uuid,'RESUBMITTED',${JSON.stringify(ctx.actor)}::jsonb,${id})`;}
       const work = await this.work(tx, ctx, dto, dto.hourSessionIds);
       if (!isDeepStrictEqual(work.blocks, snapshot.work.blocks))
         throw new ConflictException('Cambió el horario; revisa los bloques');
@@ -609,7 +710,8 @@ export class OperationsService implements OnModuleInit, OnModuleDestroy {
         throw new ConflictException('El candidato dejó de estar disponible');
       const [r] = await tx.$queryRaw<
         ReplacementRequest[]
-      >`INSERT INTO replacement_requests(id,requester_user_id,requester_role,subject_user_id,subject_role,kind,replacement_user_id,class_id,course_id,date,starts_at,ends_at,blocks,reason,approver_supervisor_id,pdf_object,pdf_generation,pdf_sha256,pdf_size,evidence_count,operation_id,payload_sha256) VALUES(${id}::uuid,${ctx.user.id}::uuid,${ctx.user.role},${work.subjectUserId}::uuid,${work.subjectRole},${dto.kind},${dto.replacementUserId}::uuid,${work.classId}::uuid,${work.courseId},${new Date(dto.date)}::date,${new Date(work.blocks[0].start)},${new Date(work.blocks[work.blocks.length - 1].end)},${JSON.stringify(work.blocks)}::jsonb,${dto.reason.trim()},${work.supervisorId}::uuid,${document.key},${document.generation},${document.checksum},${document.size},${files.length},${dto.operationId}::uuid,${payloadHash}) RETURNING *`;
+      >`INSERT INTO replacement_requests(id,requester_user_id,requester_role,subject_user_id,subject_role,kind,replacement_user_id,class_id,course_id,date,starts_at,ends_at,blocks,reason,approver_supervisor_id,pdf_object,pdf_generation,pdf_sha256,pdf_size,evidence_count,operation_id,payload_sha256,status,approver_coordinator_id,revises_id,same_turn_reason,document_data,docx_object,docx_generation,docx_sha256,coverage_operation_id) VALUES(${id}::uuid,${ctx.user.id}::uuid,${ctx.user.role},${work.subjectUserId}::uuid,${work.subjectRole},${dto.kind},${dto.replacementUserId}::uuid,${work.classId}::uuid,${work.courseId},${new Date(dto.date)}::date,${new Date(work.blocks[0].start)},${new Date(work.blocks[work.blocks.length - 1].end)},${JSON.stringify(work.blocks)}::jsonb,${dto.reason.trim()},${work.supervisorId}::uuid,${document.key},${document.generation},${document.checksum},${document.size},${files.length},${dto.operationId}::uuid,${payloadHash},${(work.subjectRole==='monitor'||(dto.kind==='EMERGENCY'&&ctx.actor.role===Role.MONITOR)||snapshot.coordinatorId)?'PENDING':'ADMIN_PENDING'},${snapshot.coordinatorId}::uuid,${dto.revisesId??null}::uuid,${dto.sameTurn ? dto.sameTurnReason!.trim() : ''},${JSON.stringify(fields)}::jsonb,${wordDocument.key},${wordDocument.generation},${wordDocument.checksum},${dto.coverageOperationId??null}::uuid) RETURNING *`;
+      if(dto.coverageOperationId)await tx.$executeRaw`INSERT INTO session_coverage_document_links(operation_id,request_id) VALUES(${dto.coverageOperationId}::uuid,${r.id}::uuid) ON CONFLICT(operation_id) DO UPDATE SET request_id=EXCLUDED.request_id WHERE session_coverage_document_links.request_id=${dto.revisesId??null}::uuid`;
       await tx.$executeRaw`INSERT INTO replacement_request_events(request_id,action,actor,reason) VALUES(${r.id}::uuid,'REQUESTED',${JSON.stringify(ctx.actor)}::jsonb,${dto.reason.trim()})`;
       signals = await this.notify(
         tx,
@@ -635,13 +737,14 @@ export class OperationsService implements OnModuleInit, OnModuleDestroy {
     return saved;
   }
   private async scope(tx: SessionTx, ctx: Context) {
-    if (ctx.actor.role === Role.ADMIN) return Prisma.sql`true`;
+    if ([Role.ADMIN, Role.COORDINATOR].includes(ctx.actor.role)) return Prisma.sql`true`;
     if (ctx.actor.role === Role.SUPERVISOR) {
       const supervisor = await tx.supervisor.findUnique({
         where: { userId: ctx.user.id },
       });
-      return Prisma.sql`(r.requester_user_id=${ctx.user.id}::uuid OR r.replacement_user_id=${ctx.user.id}::uuid OR (r.approver_supervisor_id=${supervisor?.id ?? null}::uuid AND (r.subject_role='monitor' OR r.kind='EMERGENCY')))`;
+    return Prisma.sql`(r.requester_user_id=${ctx.user.id}::uuid OR r.replacement_user_id=${ctx.user.id}::uuid OR (r.approver_supervisor_id=${supervisor?.id ?? null}::uuid AND (r.subject_role='monitor' OR r.kind='EMERGENCY')))`;
     }
+    if(getCoordinatorCourseId(ctx.user.role))return Prisma.sql`(r.requester_user_id=${ctx.user.id}::uuid OR r.replacement_user_id=${ctx.user.id}::uuid OR (r.approver_coordinator_id=${ctx.user.id}::uuid AND r.course_id=${getCoordinatorCourseId(ctx.user.role)}))`;
     return Prisma.sql`(r.requester_user_id=${ctx.user.id}::uuid OR r.replacement_user_id=${ctx.user.id}::uuid)`;
   }
   async list(principal: SessionPrincipal, q: OperationPageDto) {
@@ -651,12 +754,23 @@ export class OperationsService implements OnModuleInit, OnModuleDestroy {
       const [data, total] = await Promise.all([
         tx.$queryRaw<
           ReplacementRequest[]
-        >`SELECT r.*,u.email AS requester_email,c.email AS replacement_email FROM replacement_requests r JOIN users u ON u.id=r.requester_user_id JOIN users c ON c.id=r.replacement_user_id WHERE ${where} ORDER BY r.created_at DESC,r.id DESC LIMIT ${q.limit} OFFSET ${(q.page - 1) * q.limit}`,
+        >`SELECT r.*,(SELECT reason FROM replacement_application_issues issue WHERE issue.request_id=r.id ORDER BY issue.created_at DESC LIMIT 1) AS application_issue,u.email AS requester_email,c.email AS replacement_email FROM replacement_requests r JOIN users u ON u.id=r.requester_user_id JOIN users c ON c.id=r.replacement_user_id WHERE ${where} ORDER BY r.created_at DESC,r.id DESC LIMIT ${q.limit} OFFSET ${(q.page - 1) * q.limit}`,
         tx.$queryRaw<
           { total: number }[]
         >`SELECT count(*)::int total FROM replacement_requests r WHERE ${where}`,
       ]);
-      return { data, total: total[0].total, page: q.page, limit: q.limit };
+      const supervisor=ctx.actor.role===Role.SUPERVISOR?await tx.supervisor.findUnique({where:{userId:ctx.user.id}}):null;
+      const legacy=data.filter(r=>!Array.isArray(r.document_data)||!r.document_data.some(f=>f.label==='Ficha institucional'));
+      const legacyPeople=legacy.length?await requestPeople(tx,[...new Set(legacy.flatMap(r=>[r.requester_user_id,r.replacement_user_id]))]):[];
+      const hourCounts=legacy.length?await tx.hourSession.groupBy({by:['shiftId'],_count:{id:true}}):[];
+      const time=(value:string|undefined)=>value?new Date(value).toLocaleTimeString('es-PE',{timeZone:'America/Lima',hour:'2-digit',minute:'2-digit',hour12:false}):'';
+      const oldSummary=(r:ReplacementRequest)=>{
+        const applicant=legacyPeople.find(p=>p.id===r.requester_user_id),replacement=legacyPeople.find(p=>p.id===r.replacement_user_id);
+        const first=r.blocks[0],last=r.blocks.at(-1);
+        return {applicant:applicant?{...applicant,...(r.subject_role==='monitor'?{classroom:first?.className}:{}),course:first?.course??applicant.course}:null,replacement,full:r.subject_role==='monitor'&&r.blocks.length===hourCounts.find(h=>h.shiftId===first?.shiftId)?._count.id,classroom:first?.className,course:first?.course,shift:applicant?.shift??'Turno registrado',start:time(first?.start),end:time(last?.end)};
+      };
+      const rows=data.map(r=>({...r,summary:(Array.isArray(r.document_data)?JSON.parse(r.document_data.find(f=>f.label==='Ficha institucional')?.value??'null'):null)??oldSummary(r),is_reviewer:(r.subject_role==='profesor'&&r.kind!=='EMERGENCY')?r.approver_coordinator_id===ctx.user.id:r.approver_supervisor_id===supervisor?.id}));
+      return { data:rows, total: total[0].total, page: q.page, limit: q.limit };
     });
   }
   private async read(tx: SessionTx, ctx: Context, id: string, lock = false) {
@@ -686,49 +800,26 @@ export class OperationsService implements OnModuleInit, OnModuleDestroy {
       r.pdf_sha256,
     );
   }
+  async word(principal:SessionPrincipal,id:string){const ctx=await this.contexts.get(principal);const r=await this.tx(ctx,tx=>this.read(tx,ctx,id));if(!r.docx_object||!r.docx_generation||!r.docx_sha256)throw new BadRequestException('Esta solicitud histórica solo contiene PDF');return this.documents.download(r.docx_object,r.docx_generation,r.docx_sha256,10*1024*1024);}
   async decide(
     principal: SessionPrincipal,
     id: string,
     dto: RequestDecisionDto,
   ) {
     const ctx = await this.contexts.get(principal);
+    if (ctx.user.role === Role.COORDINATOR)
+      throw new ForbiddenException('La coordinación general solo consulta solicitudes');
+    const reason=dto.reason?.trim() || (['APPROVED','APPROVE_CANCEL'].includes(dto.status)?'Conforme':'' );
+    if(reason.length<3)throw new BadRequestException('Indica el motivo del rechazo, corrección o cancelación');
     let signals: { id: string; origin: string }[] = [];
     const saved = await this.tx(ctx, async (tx) => {
       const r = await this.read(tx, ctx, id, true);
-      if (r.version !== dto.expectedVersion || r.status !== 'PENDING')
-        throw new ConflictException('La solicitud cambió o ya fue resuelta');
-      const cancel = dto.status === 'CANCELLED';
-      if (cancel) {
-        if (
-          ctx.user.id !== r.requester_user_id &&
-          ctx.actor.role !== Role.ADMIN
-        )
-          throw new ForbiddenException('Solo el solicitante puede cancelar');
-      } else {
-        if (
-          ctx.user.id === r.requester_user_id ||
-          ctx.user.id === r.replacement_user_id
-        )
-          throw new ForbiddenException(
-            'No puedes aprobar tu propia solicitud ni un reemplazo a tu favor',
-          );
-        if (ctx.actor.role !== Role.ADMIN) {
-          const s = await tx.supervisor.findUnique({
-            where: { userId: ctx.user.id },
-          });
-          if (
-            ctx.actor.role !== Role.SUPERVISOR ||
-            !s ||
-            s.id !== r.approver_supervisor_id ||
-            r.subject_role === 'supervisor' ||
-            (r.subject_role === 'profesor' && r.kind !== 'EMERGENCY')
-          )
-            throw new ForbiddenException(
-              'La decisión corresponde a administración',
-            );
-        }
-      }
-      if (dto.status === 'APPROVED') {
+      if(r.version!==dto.expectedVersion)throw new ConflictException('La solicitud cambió o ya fue resuelta');
+      const reviewerId=await this.reviewerId(tx,r);
+      const next=replacementDecision(r,dto.status,{id:ctx.user.id,admin:ctx.actor.role===Role.ADMIN,reviewer:reviewerId===ctx.user.id},Boolean(reviewerId));
+      if(next.revoke)await this.revokeReplacement(tx,ctx,r,reason);
+      if (next.apply && !r.coverage_operation_id) {
+        if(r.subject_role==='monitor')await tx.$queryRaw`SELECT id FROM monitors WHERE user_id=${r.replacement_user_id}::uuid FOR UPDATE`;
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(current_schema()),hashtext(${r.date.toISOString().slice(0, 10)}))`;
         await tx.$queryRaw`SELECT id FROM users WHERE id=${r.replacement_user_id}::uuid FOR UPDATE`;
         const occupied = await tx.$queryRaw<
@@ -738,9 +829,9 @@ export class OperationsService implements OnModuleInit, OnModuleDestroy {
           throw new ConflictException(
             'Ya existe un reemplazo aprobado para ese trabajo',
           );
-        const recorded = await tx.$queryRaw<
+        const recorded = ['profesor','monitor'].includes(r.subject_role) ? await tx.$queryRaw<
           { id: number }[]
-        >`SELECT rec.id FROM class_session_records rec WHERE rec.date=${r.date}::date AND EXISTS(SELECT 1 FROM jsonb_array_elements(${JSON.stringify(r.blocks)}::jsonb) b WHERE rec.hour_session_id=(b->>'hourSessionId')::int AND (rec.class_id=(b->>'classId')::uuid OR ${r.subject_role}='supervisor')) AND (rec.actual_start IS NOT NULL OR rec.actual_end IS NOT NULL OR EXISTS(SELECT 1 FROM session_coverages c WHERE c.record_id=rec.id AND c.status IN ('PENDING','AUTHORIZED') AND c.kind=CASE WHEN ${r.subject_role}='profesor' THEN 'TEACHER' ELSE 'MONITOR' END)) LIMIT 1`;
+        >`SELECT rec.id FROM class_session_records rec WHERE rec.date=${r.date}::date AND EXISTS(SELECT 1 FROM jsonb_array_elements(${JSON.stringify(r.blocks)}::jsonb) b WHERE rec.hour_session_id=(b->>'hourSessionId')::int AND rec.class_id=(b->>'classId')::uuid) AND (rec.actual_start IS NOT NULL OR rec.actual_end IS NOT NULL OR EXISTS(SELECT 1 FROM session_coverages c WHERE c.record_id=rec.id AND c.status IN ('PENDING','AUTHORIZED') AND c.kind=CASE WHEN ${r.subject_role}='profesor' THEN 'TEACHER' ELSE 'MONITOR' END)) LIMIT 1` : [];
         if (recorded.length)
           throw new ConflictException(
             'Un bloque ya tiene ejecución o cobertura; requiere revisión administrativa',
@@ -765,7 +856,7 @@ export class OperationsService implements OnModuleInit, OnModuleDestroy {
         const q = {
           date: r.date.toISOString().slice(0, 10),
           kind: r.kind,
-          classId: r.class_id ?? undefined,
+          classId: r.class_id ?? undefined, sameTurn:Boolean(r.same_turn_reason),
         };
         const w = await this.work(
           tx,
@@ -787,29 +878,35 @@ export class OperationsService implements OnModuleInit, OnModuleDestroy {
       }
       const [updated] = await tx.$queryRaw<
         ReplacementRequest[]
-      >`UPDATE replacement_requests SET status=${dto.status},version=version+1,decided_by=${JSON.stringify(ctx.actor)}::jsonb,decision_reason=${dto.reason.trim()},decided_at=clock_timestamp() WHERE id=${id}::uuid RETURNING *`;
-      await tx.$executeRaw`INSERT INTO replacement_request_events(request_id,action,actor,reason) VALUES(${id}::uuid,${dto.status},${JSON.stringify(ctx.actor)}::jsonb,${dto.reason.trim()})`;
-      if (dto.status === 'APPROVED') await this.applyApproved(tx);
+      >`UPDATE replacement_requests SET status=${next.status},cancellation_stage=${next.cancellationStage},cancellation_reason=CASE WHEN ${next.event}='CANCELLATION_REQUESTED' THEN ${reason} ELSE cancellation_reason END,reviewed_by=CASE WHEN ${next.event}='REVIEW_APPROVED' THEN ${JSON.stringify(ctx.actor)}::jsonb ELSE reviewed_by END,reviewed_at=CASE WHEN ${next.event}='REVIEW_APPROVED' THEN clock_timestamp() ELSE reviewed_at END,version=version+1,decided_by=${JSON.stringify(ctx.actor)}::jsonb,decision_reason=${reason},decided_at=clock_timestamp() WHERE id=${id}::uuid RETURNING *`;
+      await tx.$executeRaw`INSERT INTO replacement_request_events(request_id,action,actor,reason) VALUES(${id}::uuid,${next.event},${JSON.stringify(ctx.actor)}::jsonb,${reason})`;
+      if(next.apply&&r.coverage_operation_id){
+        await tx.$executeRaw`UPDATE session_coverages SET status='AUTHORIZED',resolved_by=${JSON.stringify(ctx.actor)}::jsonb,resolved_at=clock_timestamp() WHERE operation_id=${r.coverage_operation_id}::uuid AND status='PENDING'`;
+        await tx.$executeRaw`INSERT INTO session_audit_events(record_id,action,actor,after,reason) SELECT record_id,'DOCUMENT_APPROVED',${JSON.stringify(ctx.actor)}::jsonb,to_jsonb(c),'Documento posterior revisado y autorizado' FROM session_coverages c WHERE operation_id=${r.coverage_operation_id}::uuid`;
+      }
+      if (next.apply && !r.coverage_operation_id) await this.applyApproved(tx);
       const recipients = [
         { id: r.requester_user_id, origin: ctx.schema },
-        ...(dto.status === 'APPROVED'
+        ...(next.apply
           ? [{ id: r.replacement_user_id, origin: ctx.schema }]
           : []),
       ];
+      if(next.status==='ADMIN_PENDING'||next.cancellationStage==='ADMIN'){const admins=await tx.$queryRaw<{id:string}[]>`SELECT id FROM core_schema.users WHERE role='administrador' AND is_active`;recipients.push(...admins.map(a=>({id:a.id,origin:'core_schema'})));}
+      if(next.cancellationStage==='REVIEW'&&reviewerId)recipients.push({id:reviewerId,origin:ctx.schema});
       signals = await this.notify(
         tx,
         ctx,
         recipients,
-        'REPLACEMENT_' + dto.status,
+        'REPLACEMENT_' + next.event.replace('CANCELLATION_','CANCEL_'),
         'Solicitud ' +
           ({
             APPROVED: 'aprobada',
             REJECTED: 'rechazada',
             CANCELLED: 'cancelada',
-          }[dto.status] ?? dto.status),
-        `${r.date.toISOString().slice(0, 10)} · ${r.blocks.length} bloque(s). ${dto.reason.trim()}`,
+          }[next.event] ?? ({ADMIN_PENDING:'enviada a administración',REVIEW_APPROVED:'revisada; pendiente de permiso administrativo',CHANGES:'devuelta para corregir',CANCELLATION_REQUESTED:'con cancelación solicitada',CANCELLATION_REVIEWED:'con cancelación remitida al administrador',CANCELLATION_CHANGES:'con cancelación por corregir',CANCELLATION_REJECTED:'con cancelación rechazada'}[next.event]??next.event)),
+        `${r.date.toISOString().slice(0, 10)} · ${r.blocks.length} bloque(s). ${reason}`,
         id,
-        dto.status,
+        next.event+':'+updated.version,
       );
       return updated;
     });
@@ -820,6 +917,16 @@ export class OperationsService implements OnModuleInit, OnModuleDestroy {
         schema: ctx.schema,
       });
     return saved;
+  }
+  private async revokeReplacement(tx:SessionTx,ctx:Context,r:ReplacementRequest,reason:string) {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(current_schema()),hashtext(${r.date.toISOString().slice(0,10)}))`;
+    const blocked=await tx.$queryRaw<{id:number}[]>`SELECT rec.id FROM replacement_application_snapshots saved JOIN class_session_records rec ON rec.id=saved.record_id WHERE saved.request_id=${r.id}::uuid AND (rec.actual_start IS NOT NULL OR rec.actual_end IS NOT NULL OR rec.version<>saved.applied_version OR clock_timestamp()>=rec.scheduled_start) FOR UPDATE OF rec`;
+    if(blocked.length)throw new ConflictException('La cobertura ya comenzó o tiene cambios registrados. No se pueden borrar ni revertir sus hechos automáticamente.');
+    const missing=await tx.$queryRaw<{id:number}[]>`SELECT c.id FROM session_coverages c WHERE c.operation_id=${r.id}::uuid AND c.status='AUTHORIZED' AND NOT EXISTS(SELECT 1 FROM replacement_application_snapshots saved WHERE saved.request_id=${r.id}::uuid AND saved.record_id=c.record_id)`;
+    if(missing.length)throw new ConflictException('La cobertura histórica requiere revisión administrativa antes de cancelarse');
+    await tx.$queryRaw`SELECT set_config('cepr.session_override','true',true)`;
+    await tx.$executeRaw`UPDATE session_coverages SET status='REVOKED',resolved_by=${JSON.stringify(ctx.actor)}::jsonb,resolved_at=clock_timestamp() WHERE operation_id=${r.id}::uuid AND status='AUTHORIZED'`;
+    await tx.$executeRaw`WITH original AS MATERIALIZED(SELECT rec.id,to_jsonb(rec) before,saved.before_value FROM replacement_application_snapshots saved JOIN class_session_records rec ON rec.id=saved.record_id WHERE saved.request_id=${r.id}::uuid), changed AS(UPDATE class_session_records rec SET class_state=o.before_value->>'class_state',effective_teacher_id=(o.before_value->>'effective_teacher_id')::uuid,effective_monitor_id=(o.before_value->>'effective_monitor_id')::uuid,effective_snapshot=o.before_value->'effective_snapshot',monitor_account_id=(o.before_value->>'monitor_account_id')::uuid,version=rec.version+1,updated_at=clock_timestamp() FROM original o WHERE rec.id=o.id RETURNING rec.*) INSERT INTO session_audit_events(record_id,action,actor,before,after,reason) SELECT c.id,'CANCELLATION_APPLIED',${JSON.stringify(ctx.actor)}::jsonb,o.before,to_jsonb(c),${reason.trim()} FROM changed c JOIN original o ON o.id=c.id`;
   }
   /** Aplicación por conjuntos de excepciones diarias: jamás cambia el horario semanal. */
   async applyApproved(tx: SessionTx) {

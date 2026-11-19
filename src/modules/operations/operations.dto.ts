@@ -22,17 +22,25 @@ export class OperationPageDto {
   @Type(() => Number) @IsInt() @Min(1) page = 1;
   @Type(() => Number) @IsInt() @Min(1) @Max(100) limit = 20;
   @IsOptional()
-  @IsIn(['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED'])
+  @IsIn(['PENDING', 'ADMIN_PENDING', 'CHANGES', 'APPROVED', 'REJECTED', 'CANCELLED', 'SUPERSEDED'])
   status?: string;
   @IsOptional() @IsString() @MaxLength(100) search?: string;
 }
 export class RequestContextDto {
+  @IsOptional() @IsUUID('all') coverageOperationId?: string;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) candidateShiftId?: number;
+  @IsOptional() @IsBoolean() @Transform(({value}: {value:unknown}) => value === 'true' ? true : value === 'false' ? false : value) sameTurn?: boolean;
   @IsDateString({ strict: true }) @Matches(/^\d{4}-\d{2}-\d{2}$/) date: string;
   @IsOptional() @IsIn(['NORMAL', 'EMERGENCY']) kind: 'NORMAL' | 'EMERGENCY' =
     'NORMAL';
   @IsOptional() @IsUUID('all') classId?: string;
 }
 export class ReplacementDraftDto extends RequestContextDto {
+  @IsOptional() @IsString() @MaxLength(2000) sameTurnReason?: string;
+  @IsOptional() @IsString() @MaxLength(250) address?: string;
+  @IsOptional() @IsString() @MaxLength(100) district?: string;
+  @IsOptional() @IsString() @MaxLength(30) cui?: string;
+  @IsOptional() @IsUUID('all') revisesId?: string;
   @IsUUID('all') operationId: string;
   @IsUUID('all') replacementUserId: string;
   @IsArray()
@@ -58,14 +66,18 @@ export class ReplacementCandidateDto extends RequestContextDto {
 }
 export class RequestDecisionDto {
   @IsInt() @Min(1) expectedVersion: number;
-  @IsIn(['APPROVED', 'REJECTED', 'CANCELLED']) status: string;
+  @IsIn(['APPROVED', 'REJECTED', 'CHANGES', 'CANCELLED', 'REQUEST_CANCEL', 'APPROVE_CANCEL', 'REJECT_CANCEL']) status: string;
   @Transform(({ value }: { value: unknown }) =>
     typeof value === 'string' ? value.trim() : value,
   )
+  @IsOptional()
   @IsString()
-  @MinLength(3)
   @MaxLength(2000)
-  reason: string;
+  reason?: string;
+}
+export class TeachingReplacementQueryDto extends OperationPageDto {
+  @IsDateString({strict:true}) @Matches(/^\d{4}-\d{2}-\d{2}$/) from:string;
+  @IsDateString({strict:true}) @Matches(/^\d{4}-\d{2}-\d{2}$/) to:string;
 }
 export class PartObservationDto {
   @IsUUID('all') id: string;

@@ -33,6 +33,7 @@ export class AvailabilityWorkbook {
         ...(id === 'me' ? { userId: ctx.user.id } : { id }),
         user: { isActive: true },
       },
+      include: { user: { select: { email: true, userProfile: { select: { firstName: true, lastName: true } } } }, courses: { select: { name: true } } },
     });
     if (!t) throw new NotFoundException('Docente no encontrado');
     if (
@@ -43,21 +44,24 @@ export class AvailabilityWorkbook {
     return { ctx, t };
   }
   async template(principal: SessionPrincipal, id: string) {
-    const { ctx, t } = await this.teacher(principal, id);
-    const [hours, intervals] = await Promise.all([
-      ctx.client.hourSession.findMany({
+    const { ctx, t } = id === 'general'
+      ? { ctx: await this.contexts.get(principal), t: null }
+      : await this.teacher(principal, id);
+    if (!t && ctx.actor.role !== Role.ADMIN) throw new ForbiddenException('La plantilla general se descarga desde administración');
+    const hours = await ctx.client.hourSession.findMany({
         include: { shift: true },
         orderBy: [{ shiftId: 'asc' }, { period: 'asc' }],
-      }),
-      this.schedules.getAvailability(t.id),
-    ]);
+      });
     const book = new ExcelJS.Workbook();
     book.creator = 'CEPRUNSA';
     book.calcProperties.fullCalcOnLoad = true;
     const guide = book.addWorksheet('Guía');
     guide.columns = [{ width: 28 }, { width: 100 }];
     guide.addRow(['DISPONIBILIDAD DOCENTE', ctx.schema]);
-    guide.addRow(['Docente ID', t.id]);
+    const personal = !!t;
+    guide.addRow(['Docente (referencia)', personal ? [t.user.userProfile?.firstName, t.user.userProfile?.lastName].filter(Boolean).join(' ') || t.user.email : '']);
+    guide.addRow(['Curso (referencia)', personal ? t.courses.name : '']);
+    guide.addRow(['Destino', personal ? 'Completa tus bloques disponibles y sube este archivo en tu panel. Se guardará en tu cuenta. Tu nombre y curso son informativos.' : 'Esta plantilla puede distribuirse a todos los docentes del proceso. Nombres y curso son informativos; la carga se guarda en el docente seleccionado en el panel.']);
     guide.addRow([
       'Cómo llenar',
       'En Disponibilidad selecciona Disponible o No disponible por día y bloque. No cambies IDs, horas ni turnos.',
@@ -68,7 +72,7 @@ export class AvailabilityWorkbook {
     ]);
     guide.addRow([
       'Guardar',
-      'Carga el archivo desde el docente, revisa los errores y confirma. Reemplaza la disponibilidad anterior; conserva salones asignados.',
+      personal ? 'Sube este archivo en tu panel y revisa tus nombres, curso y proceso antes de confirmar. Se reemplaza tu disponibilidad anterior; tus salones asignados se conservan.' : 'Carga el archivo desde el docente, revisa su nombre, curso y proceso en la confirmación. Reemplaza la disponibilidad anterior; conserva salones asignados.',
     ]);
     guide.addRow([
       'Colores',
@@ -92,13 +96,7 @@ export class AvailabilityWorkbook {
         h.shift.name,
         start,
         end,
-        ...weekdays.map((day) =>
-          intervals.some(
-            (i) => i.weekday === day && i.start <= start && i.end >= end,
-          )
-            ? 'Disponible'
-            : 'No disponible',
-        ),
+        ...weekdays.map(() => 'No disponible'),
       ]);
       for (let c = 5; c <= 10; c++)
         row.getCell(c).dataValidation = {
@@ -169,12 +167,9 @@ export class AvailabilityWorkbook {
       throw new BadRequestException('No se pudo leer el Excel');
     }
     const guide = book.getWorksheet('Guía');
-    if (
-      guide?.getCell('B1').text !== ctx.schema ||
-      guide.getCell('B2').text !== t.id
-    )
+    if (guide?.getCell('B1').text !== ctx.schema)
       throw new BadRequestException(
-        'La plantilla corresponde a otro docente o proceso',
+        'La plantilla corresponde a otro proceso',
       );
     const sheet = book.getWorksheet('Disponibilidad');
     if (!sheet || sheet.rowCount > 2001)
@@ -253,6 +248,11 @@ export class AvailabilityWorkbook {
     return {
       process: ctx.schema,
       teacherId: t.id,
+      teacher: {
+        id: t.id,
+        name: [t.user.userProfile?.firstName, t.user.userProfile?.lastName].filter(Boolean).join(' ') || t.user.email,
+        course: t.courses.name,
+      },
       rows,
       intervals,
       valid: rows.every((r) => !r.errors.length),

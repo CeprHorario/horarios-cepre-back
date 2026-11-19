@@ -1,3 +1,5 @@
+import { availabilityWeekday } from './session-week';
+import { enforceBlockTimes, timingResult } from './session-timing';
 import { signalNotificationRecipients } from '../operations/notification-signal';
 import {
   BadRequestException,
@@ -359,7 +361,7 @@ export class ClassSessionRecordsService {
 
   async journals(
     principal: SessionPrincipal,
-    query: Partial<Pick<SessionQueryDto, 'from' | 'to'>> & Pick<SessionQueryDto, 'page' | 'limit' | 'classId'>,
+    query: Partial<Pick<SessionQueryDto, 'from' | 'to'>> & Pick<SessionQueryDto, 'page' | 'limit' | 'classId' | 'shiftId'>,
   ) {
     const { client, actor } = await this.context(principal);
     if (query.from && query.to) this.range({ from: query.from, to: query.to });
@@ -369,7 +371,7 @@ export class ClassSessionRecordsService {
       (tx) => tx.$queryRaw<{ data: unknown[]; total: number }[]>`
       WITH journals AS (
         SELECT date::text AS date, class_id AS "classId", shift_id AS "shiftId",
-          min(snapshot->>'className') AS "className", min(snapshot->>'shift') AS shift,
+          min(snapshot->>'className') AS "className", min(snapshot->>'shift') AS shift, min(academic_date)::text AS "academicDate",
           min(scheduled_start) AS "scheduledStart", max(scheduled_end) AS "scheduledEnd", count(*)::int AS blocks,
           count(*) FILTER (WHERE teaching_status<>'UNCONFIRMED' AND effective_monitor_id IS NOT NULL
             AND initial_file_id IS NOT NULL AND final_file_id IS NOT NULL
@@ -379,6 +381,7 @@ export class ClassSessionRecordsService {
           ${actor.role === Role.MONITOR ? Prisma.sql`AND monitor_account_id=${actor.id}::uuid` : Prisma.empty}
           ${actor.role === Role.SUPERVISOR ? Prisma.sql`AND supervisor_id=(SELECT id FROM supervisors WHERE user_id=${actor.id}::uuid)` : Prisma.empty}
           ${query.classId ? Prisma.sql`AND class_id=${query.classId}::uuid` : Prisma.empty}
+          ${query.shiftId ? Prisma.sql`AND shift_id=${query.shiftId}` : Prisma.empty}
           ${query.from ? Prisma.sql`AND date>=${new Date(query.from)}::date` : Prisma.empty}
           ${query.to ? Prisma.sql`AND date<=${new Date(query.to)}::date` : Prisma.empty}
         GROUP BY date, class_id, shift_id
@@ -534,7 +537,7 @@ export class ClassSessionRecordsService {
       const [raw, courses, shifts, config] = await Promise.all([
         tx.$queryRaw<
           Record<string, unknown>[]
-        >`SELECT r.* FROM v_class_session_records_workspace r
+        >`SELECT r.*,original.academic_date FROM v_class_session_records_workspace r JOIN class_session_records original ON original.id=r.id
           WHERE r.deleted_at IS NULL AND r.date=${new Date(date)}::date AND r.class_id=${selection.classId}::uuid
           AND r.shift_id=${selection.shiftId} ${scope} ORDER BY r.scheduled_start,r.period,r.id`,
         tx.course.findMany({
@@ -717,6 +720,19 @@ export class ClassSessionRecordsService {
     });
   }
 
+  async requestEmergency(principal:SessionPrincipal,id:number,dto:{expectedVersion:number;reason:string}) {
+    const {client,actor}=await this.context(principal);
+    if(actor.role!==Role.MONITOR)throw new ForbiddenException('El aviso de aula corresponde al monitor');
+    return this.transaction(client,actor.schema,async tx=>{
+      await this.lock(tx,id);const record=await this.authorizeRecord(tx,actor,id,true);
+      this.version(record,dto.expectedVersion);this.reason(dto.reason);
+      const description=`${record.snapshot && (record.snapshot as Prisma.JsonObject).className} · ${(record.snapshot as Prisma.JsonObject).course} · ${record.scheduledStart.toISOString()}–${record.scheduledEnd.toISOString()}. ${dto.reason}`;
+      await this.notifyRecord(tx,actor,record,'emergency.requested',`emergency:${record.version}`,description,false);
+      await this.audit(tx,actor,id,'EMERGENCY_REQUESTED',null,{reason:dto.reason},dto.reason);
+      return {recordId:id,requested:true};
+    });
+  }
+
   async people(
     principal: SessionPrincipal,
     id: number,
@@ -746,6 +762,17 @@ export class ClassSessionRecordsService {
             }
           : {}),
       };
+      const origin=await tx.class.findUniqueOrThrow({where:{id:record.classId}});
+      const minute=(value:Date)=>{const d=new Date(+value-5*3600000);return d.getUTCHours()*60+d.getUTCMinutes();};
+      const blocks=[{start:record.scheduledStart.toISOString(),end:record.scheduledEnd.toISOString(),startMinute:minute(record.scheduledStart),endMinute:minute(record.scheduledEnd)}];
+      const eligible=query.kind==='TEACHER'?await tx.$queryRaw<{id:string}[]>`SELECT person.id FROM teachers person JOIN users u ON u.id=person.user_id WHERE u.is_active AND person.id IS DISTINCT FROM ${record.titularTeacherId}::uuid ${teacherAvailabilitySql(record.date.toISOString().slice(0,10),blocks,record.courseId,[record.id])}`:null;
+      const shiftEligible=query.shiftId?await tx.$queryRaw<{id:string}[]>`SELECT fa.teacher_id AS id FROM teacher_availabilities fa JOIN shifts sh ON sh.id=${query.shiftId} WHERE fa.weekday::text=${availabilityWeekday(record.date.toISOString().slice(0,10))} AND fa.start_minute<EXTRACT(HOUR FROM sh.end_time)*60+EXTRACT(MINUTE FROM sh.end_time) AND fa.end_minute>EXTRACT(HOUR FROM sh.start_time)*60+EXTRACT(MINUTE FROM sh.start_time)`:null;
+      const teacherWhere={courseId:record.courseId,user,...(eligible?{id:{in:eligible.filter(p=>!shiftEligible||shiftEligible.some(s=>s.id===p.id)).map(p=>p.id)}}:{})};
+      const monitors=await tx.$queryRaw<{id:string}[]>`SELECT m.id FROM monitors m JOIN classes cl ON cl.monitor_id=m.id WHERE cl.area_id=${origin.areaId} AND m.id IS DISTINCT FROM ${record.titularMonitorId}::uuid
+        AND (${query.sameTurn??false} OR cl.shift_id<>${record.shiftId})
+        AND NOT EXISTS(SELECT 1 FROM replacement_requests rr WHERE rr.replacement_user_id=m.user_id AND rr.status='APPROVED' AND rr.subject_role='monitor' AND rr.date=${record.date}::date AND rr.class_id<>${record.classId}::uuid)
+        AND NOT EXISTS(SELECT 1 FROM session_coverages cv JOIN class_session_records cr ON cr.id=cv.record_id WHERE cv.monitor_id=m.id AND cv.status='AUTHORIZED' AND cr.date=${record.date}::date AND cr.class_id<>${record.classId}::uuid)`;
+      const monitorWhere={user,id:{in:monitors.map(m=>m.id)},classes:{areaId:origin.areaId,...(query.shiftId?{shiftId:query.shiftId}:{})}};
       const options = {
         skip: (query.page - 1) * query.limit,
         take: query.limit,
@@ -765,13 +792,13 @@ export class ClassSessionRecordsService {
           ? await Promise.all([
               tx.teacher.findMany({
                 ...options,
-                where: { courseId: record.courseId, user },
+                where: teacherWhere,
               }),
-              tx.teacher.count({ where: { courseId: record.courseId, user } }),
+              tx.teacher.count({ where: teacherWhere }),
             ])
           : await Promise.all([
-              tx.monitor.findMany({ ...options, where: { user } }),
-              tx.monitor.count({ where: { user } }),
+              tx.monitor.findMany({ ...options, where: monitorWhere }),
+              tx.monitor.count({ where: monitorWhere }),
             ]);
       return {
         data: data.map(({ id, user }) => ({
@@ -1132,6 +1159,7 @@ export class ClassSessionRecordsService {
             'PROPOSED',
             actor,
           );
+          if(dto.classState==='RN')return {classState:'RN',effectiveTeacherId:candidate.id,effectiveSnapshot:json({...record.effectiveSnapshot as Prisma.JsonObject,TEACHER:person})};
           return {};
         }
         if (
@@ -1143,6 +1171,8 @@ export class ClassSessionRecordsService {
             'Solo administración puede cambiar el docente o monitor del parte',
           );
         const data: Prisma.ClassSessionRecordUncheckedUpdateInput = {};
+        if (dto.classState !== undefined && !['N', 'T', 'SD', 'RN', 'RE'].includes(dto.classState as string))
+          throw new BadRequestException('Sin registrar es solo el estado inicial. Selecciona N, T, SD, RN o RE.');
         const state =
           dto.classState === undefined ? record.classState : dto.classState;
         if (dto.classState !== undefined) data.classState = dto.classState;
@@ -1222,7 +1252,7 @@ export class ClassSessionRecordsService {
                 recordId: id,
                 kind: 'TEACHER',
                 mode: state === 'RE' ? 'EMERGENCY' : 'PLANNED',
-                status: 'AUTHORIZED',
+                status: {in:state==='RN'?['AUTHORIZED','PENDING']:['AUTHORIZED']},
               },
             });
             if (!authorized)
@@ -1232,9 +1262,6 @@ export class ClassSessionRecordsService {
                   : 'Administración debe registrar el reemplazo normal',
               );
           }
-        } else if (dto.classState === null) {
-          data.teachingStatus = 'UNCONFIRMED';
-          data.titularOutcome = 'UNKNOWN';
         }
         const effectiveSnapshot = {
           ...(record.effectiveSnapshot as Prisma.JsonObject),
@@ -1290,7 +1317,7 @@ export class ClassSessionRecordsService {
               where: {
                 recordId: id,
                 kind,
-                status: 'AUTHORIZED',
+                status: {in:kind==='TEACHER'&&state==='RN'?['AUTHORIZED','PENDING']:['AUTHORIZED']},
                 ...(kind === 'TEACHER'
                   ? { teacherId: personId }
                   : { monitorId: personId }),
@@ -1326,17 +1353,19 @@ export class ClassSessionRecordsService {
         if (start && end && end < start)
           throw new BadRequestException('Intervalo real inválido');
         const now = await this.now(tx);
-        if ((start && start > now) || (end && end > now))
+        if ((start && start > now && (state!=='RE'||dto.actualStart!==undefined)) || (end && end > now && (state!=='RE'||dto.actualEnd!==undefined)))
           throw new BadRequestException(
             'No se pueden confirmar hechos futuros',
           );
+        enforceBlockTimes(record,start,end);
+        timingResult(record,data,start,now,actor);
         observationWarning = await syncPartObservations(
           tx,
           actor,
-          record,
-          dto.structuredObservations === undefined
+          {...record,effectiveTeacherId:typeof data.effectiveTeacherId==='string'?data.effectiveTeacherId:record.effectiveTeacherId},
+          data.structuredObservations === undefined
             ? undefined
-            : dto.structuredObservations
+            : (data.structuredObservations as unknown as {target:string;description:string}[])
                 .filter((o) => o.target === 'TEACHER')
                 .map((o) => o.description.trim())
                 .sort()

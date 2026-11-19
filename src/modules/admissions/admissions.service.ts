@@ -67,7 +67,7 @@ export class AdmissionsService {
         const version = await applyStructure(connection, name, true);
         if (body.configuration)
           await initialDataSchema(connection, body.configuration);
-        await connection.query('UPDATE session_operational_config SET early_edit_minutes=$1,edit_grace_minutes=$2 WHERE id=1', [body.configuration?.earlyEditMinutes ?? 5, body.configuration?.editGraceMinutes ?? 90]);
+        await connection.query('UPDATE session_operational_config SET early_edit_minutes=$1,edit_grace_minutes=$2,lateness_tolerance_minutes=$3 WHERE id=1', [body.configuration?.earlyEditMinutes ?? 5, body.configuration?.editGraceMinutes ?? 90,body.configuration?.latenessToleranceMinutes ?? 5]);
         await connection.query('SET LOCAL search_path TO public');
         const tx = drizzle(connection);
         await tx.update(admissionProcesses).set({ isCurrent: false });

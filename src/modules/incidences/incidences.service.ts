@@ -1,4 +1,5 @@
 import { limaDate } from '../class-session-records/session-journal.service';
+import { OperationsContext } from '../operations/operations-context.service';
 import {
   BadRequestException,
   ConflictException,
@@ -44,7 +45,20 @@ const fields = Prisma.sql`i.id,i.subject_dni,i.subject_role,i.subject_account_id
 
 @Injectable()
 export class IncidencesService {
-  constructor(private readonly records: ClassSessionRecordsService) {}
+  constructor(private readonly records: ClassSessionRecordsService, private readonly contexts: OperationsContext) {}
+
+  private context(principal: SessionPrincipal) {
+    return principal.role === Role.COORDINATOR
+      ? this.contexts.get(principal)
+      : this.records.context(principal);
+  }
+
+  async readContext(principal: SessionPrincipal) {
+    const { actor } = await this.context(principal);
+    if (![Role.ADMIN, Role.SUPERVISOR, Role.COORDINATOR].includes(actor.role as Role))
+      throw new ForbiddenException('Rol sin lectura de incidencias');
+    return { accountId: actor.id, process: actor.schema, role: actor.role, serverNow: new Date().toISOString() };
+  }
 
   async dniSummary(principal: SessionPrincipal, dnis: string[]) {
     const { client, actor } = await this.records.context(principal);
@@ -286,7 +300,9 @@ export class IncidencesService {
     query: IncidenceQuery,
   ) {
     const conditions: Prisma.Sql[] = [];
-    if (actor.role !== Role.ADMIN) {
+    if (actor.role === Role.COORDINATOR) {
+      conditions.push(Prisma.sql`i.process_schema=${actor.schema}`);
+    } else if (actor.role !== Role.ADMIN) {
       if (actor.role !== Role.SUPERVISOR)
         throw new ForbiddenException(
           'El monitor registra incidencias desde su parte; no consulta el historial',
@@ -303,7 +319,7 @@ export class IncidencesService {
         conditions.push(Prisma.sql`i.subject_dni<>${profile.dni}`);
     }
     if (query.dni) {
-      if (actor.role !== Role.ADMIN)
+      if (![Role.ADMIN, Role.COORDINATOR].includes(actor.role as Role))
         throw new ForbiddenException('El historial por DNI es administrativo');
       conditions.push(Prisma.sql`i.subject_dni=${query.dni}`);
     }
@@ -314,7 +330,7 @@ export class IncidencesService {
   }
 
   async list(principal: SessionPrincipal, query: IncidenceQuery) {
-    const { client, actor } = await this.records.context(principal);
+    const { client, actor } = await this.context(principal);
     return this.records.transaction(client, actor.schema, async (tx) => {
       const where = await this.where(tx, actor, query);
       const [data, count] = await Promise.all([
@@ -366,8 +382,11 @@ export class IncidencesService {
   }
 
   async history(principal: SessionPrincipal, id: string) {
-    const { client, actor } = await this.records.context(principal);
-    this.records.admin(actor);
+    const { client, actor } = await this.context(principal);
+    if (actor.role === Role.COORDINATOR) {
+      const [incident] = await client.$queryRaw<{id:string}[]>`SELECT id FROM public.person_incidences WHERE id=${id}::uuid AND process_schema=${actor.schema}`;
+      if (!incident) throw new NotFoundException('Incidencia no encontrada');
+    } else this.records.admin(actor);
     return client.$queryRaw`SELECT id,action,reason,created_at FROM public.person_incidence_events WHERE incidence_id=${id}::uuid ORDER BY id`;
   }
 }

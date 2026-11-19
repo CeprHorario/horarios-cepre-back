@@ -262,6 +262,7 @@ enum Weekday {
 }
 
 model ClassSessionRecord {
+  academicDate         DateTime? @map("academic_date") @db.Date
   id                  Int                  @id @default(autoincrement())
   date                DateTime             @db.Date
   classId             String               @map("class_id") @db.Uuid

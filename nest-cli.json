@@ -5,7 +5,7 @@
   "compilerOptions": {
     "deleteOutDir": true,
     "plugins": ["@nestjs/swagger"],
-    "assets": ["database/prisma/migrations/**/*.sql"],
+    "assets": ["database/prisma/migrations/**/*.sql", "modules/operations/templates/**/*"],
     "watchAssets": true
   }
 }

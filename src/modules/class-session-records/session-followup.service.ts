@@ -58,6 +58,13 @@ export class SessionFollowupService implements OnModuleInit, OnModuleDestroy {
           const now = await this.records.transaction(client, schema, (tx) =>
             this.records.now(tx),
           );
+          const routed = [runtime.schemaRouting?.adminSchema,runtime.schemaRouting?.userSchema].includes(schema);
+          // A saved advance must still execute if administration switches the visible process.
+          const planned = !routed && runtime.schemaRouting
+            ? await this.records.transaction(client, schema, tx => tx.$queryRaw<{present:boolean}[]>`SELECT EXISTS(SELECT 1 FROM session_week_plans WHERE advanced_weekday IS NOT NULL AND generated_at IS NULL AND week_start BETWEEN ${new Date(limaDate(now))}::date-6 AND ${new Date(limaDate(now))}::date+8) AS present`)
+            : [];
+          if (routed || planned[0]?.present)
+            await this.journal.ensureWeeklyGeneration(client, schema);
           await this.journal.materialize(client, schema, limaDate(now));
           await this.generate(schema);
         } catch (error) {
@@ -83,6 +90,9 @@ export class SessionFollowupService implements OnModuleInit, OnModuleDestroy {
         where: { id: 1 },
       });
       if (!config.enabled) return { created: 0 };
+      await tx.$executeRaw`WITH late AS MATERIALIZED(SELECT id,to_jsonb(r) before FROM class_session_records r WHERE deleted_at IS NULL AND actual_start IS NULL AND (class_state IS NULL OR class_state='N') AND date=${new Date(limaDate(now))}::date AND jsonb_typeof(timing_policy->'latenessToleranceMinutes')='number' AND scheduled_start+make_interval(mins=>(timing_policy->>'latenessToleranceMinutes')::int)<${now} AND NOT EXISTS(SELECT 1 FROM session_coverages c WHERE c.record_id=r.id AND c.status IN ('AUTHORIZED','PENDING') AND c.kind='TEACHER')),
+        changed AS(UPDATE class_session_records r SET class_state='T',timing_policy=r.timing_policy||'{"automaticLateness":true}'::jsonb,version=r.version+1,updated_at=${now} FROM late l WHERE r.id=l.id RETURNING r.*)
+        INSERT INTO session_audit_events(record_id,action,actor,before,after,reason) SELECT c.id,'AUTO_LATENESS',${JSON.stringify(actor)}::jsonb,l.before,to_jsonb(c),'Superó la tolerancia de ingreso configurada para el proceso' FROM changed c JOIN late l ON l.id=c.id`;
       const inserted = await tx.$queryRaw<{ id: number; record_id: number }[]>`
         INSERT INTO session_alerts(record_id,type,supervisor_id)
         SELECT r.id,'NO_START_CONFIRMATION',r.supervisor_id FROM class_session_records r

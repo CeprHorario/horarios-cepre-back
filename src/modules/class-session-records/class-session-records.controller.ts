@@ -37,6 +37,7 @@ import {
   SessionPeopleQueryDto,
   SessionQueryDto,
   SessionJournalListQueryDto,
+  WeekAdvanceDto,
   SessionWorkspaceQueryDto,
   MonitorObservationQueryDto,
   CreateMonitorObservationDto,
@@ -154,6 +155,13 @@ export class ClassSessionRecordsController {
     const { client, schema, actor } = await this.records.context(req.user);
     return this.journal.materializeWeek(client, schema, actor);
   }
+  @Get('weeks/planning')
+  @Authorization({adminOnly:true,permission:'class-session-records.weeks.planning'})
+  weeklyPlanning(@Req() req:AuthRequest) { return this.journal.weeklyPlanning(req.user); }
+
+  @Patch('weeks/advance')
+  @Authorization({adminOnly:true,permission:'class-session-records.weeks.advance'})
+  chooseWeekAdvance(@Req() req:AuthRequest,@Body() dto:WeekAdvanceDto) { return this.journal.chooseWeekAdvance(req.user,dto); }
 
   @Get('workspace')
   @Authorization({
@@ -221,6 +229,9 @@ export class ClassSessionRecordsController {
   cover(@Req() req: AuthRequest, @Body() dto: CoverageDto) {
     return this.journal.cover(req.user, dto);
   }
+  @Post(':id/emergency-request')
+  @Authorization({roles:[Role.MONITOR],permission:'class-session-records.emergency-request'})
+  requestEmergency(@Req() req:AuthRequest,@Param('id',ParseIntPipe) id:number,@Body() dto:ReasonDto){return this.records.requestEmergency(req.user,id,dto);}
   @Post('replacements/:id/resolve')
   @Authorization({
     roles: [Role.SUPERVISOR],

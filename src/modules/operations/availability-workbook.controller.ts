@@ -47,7 +47,7 @@ export class AvailabilityWorkbookController {
         'Content-Type':
           'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'Content-Disposition':
-          'attachment; filename="Disponibilidad-docente.xlsx"',
+          'attachment; filename="Disponibilidad-proceso.xlsx"',
         'Cache-Control': 'private, no-store',
       })
       .send(await this.service.template(req.user, id));

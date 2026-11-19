@@ -15,7 +15,7 @@ export class SessionReportsService {
     const { client, actor } = await this.records.context(principal);
     this.records.admin(actor);
     this.records.range(query);
-    const view = Prisma.raw(`"${actor.schema}".v_class_session_records_report`);
+    const view = Prisma.raw(`(SELECT v.*,COALESCE(r.academic_date,r.date) AS academic_date,r.date AS execution_date FROM "${actor.schema}".v_class_session_records_report v JOIN "${actor.schema}".class_session_records r ON r.id=v.id) report`);
     const filters = Prisma.sql`date BETWEEN ${new Date(query.from)}::date AND ${new Date(query.to)}::date
       ${query.includeDeleted === 'true' ? Prisma.empty : Prisma.sql`AND deleted_at IS NULL`}
       ${query.classId ? Prisma.sql`AND class_id=${query.classId}::uuid` : Prisma.empty}

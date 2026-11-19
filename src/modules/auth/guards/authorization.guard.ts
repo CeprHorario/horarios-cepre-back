@@ -54,6 +54,16 @@ export class AuthorizationGuard implements CanActivate {
       context.getHandler(),
     );
     if (!metadata) throw new UnauthorizedException();
+    // General coordination observes the process; it cannot review or mutate requests.
+    if (role === Role.COORDINATOR && ['GET', 'HEAD'].includes(request.method) && [
+      'operations.context', 'operations.requests.list', 'operations.requests.detail',
+      'operations.requests.pdf', 'operations.requests.docx',
+      'incidences.context', 'incidences.list', 'incidences.history',
+    ].includes(metadata.permission)) return true;
+    if (coordinatorScope.isCoordinator && coordinatorScope.courseId && !metadata.adminOnly && metadata.roles?.includes(Role.COORDINATOR) && [
+      'operations.context','operations.classes','operations.options','operations.candidates',
+      'operations.requests.list','operations.requests.create','operations.requests.preview','operations.requests.detail','operations.requests.pdf','operations.requests.docx','operations.requests.decide',
+    ].includes(metadata.permission)) return true;
     // Notification access is deliberately separate from documentary operations and Partes.
     if (coordinatorScope.isCoordinator && ['operations.notifications.context', 'operations.notifications.list', 'operations.notifications.stream', 'operations.notifications.resolve', 'operations.notifications.resolve-all'].includes(metadata.permission)) return true;
     if (metadata.permission.startsWith('operations.') &&

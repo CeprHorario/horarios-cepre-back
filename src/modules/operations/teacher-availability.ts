@@ -1,3 +1,4 @@
+import { availabilityWeekday } from '../class-session-records/session-week';
 import { BadRequestException } from '@nestjs/common';
 import { Prisma, type ClassSessionRecord } from '../../generated/prisma/client';
 import type { SessionTx } from '../class-session-records/session.types';
@@ -29,12 +30,12 @@ export function teacherAvailabilitySql(
     weekday = weekdays[new Date(date).getUTCDay()];
   return Prisma.sql`AND person.course_id=${courseId}
     AND NOT EXISTS(SELECT 1 FROM schedules s JOIN hour_sessions h ON h.id=s.hour_session_id CROSS JOIN jsonb_array_elements(${json}::jsonb) b
-      WHERE s.teacher_id=person.id AND s.weekday::text=${weekday}
+      WHERE s.teacher_id=person.id AND s.weekday::text IN (${weekday},${availabilityWeekday(date)})
       AND (EXTRACT(HOUR FROM h.start_time)*60+EXTRACT(MINUTE FROM h.start_time))<(b->>'endMinute')::int
       AND (EXTRACT(HOUR FROM h.end_time)*60+EXTRACT(MINUTE FROM h.end_time))>(b->>'startMinute')::int)
     AND NOT EXISTS(SELECT 1 FROM jsonb_array_elements(${json}::jsonb) b WHERE NOT COALESCE((
       SELECT range_agg(int4range(a.start_minute,a.end_minute,'[)')) @> int4range((b->>'startMinute')::int,(b->>'endMinute')::int,'[)')
-      FROM teacher_availabilities a WHERE a.teacher_id=person.id AND a.weekday::text=${weekday}),false))
+      FROM teacher_availabilities a WHERE a.teacher_id=person.id AND a.weekday::text=${availabilityWeekday(date)}),false))
     AND NOT EXISTS(SELECT 1 FROM session_coverages c JOIN class_session_records r ON r.id=c.record_id CROSS JOIN jsonb_array_elements(${json}::jsonb) b
       WHERE c.teacher_id=person.id AND c.status='AUTHORIZED' AND r.deleted_at IS NULL AND r.date=${new Date(date)}::date AND NOT(r.id=ANY(${excludeRecords}::int[]))
       AND r.scheduled_start<(b->>'end')::timestamptz AND r.scheduled_end>(b->>'start')::timestamptz)

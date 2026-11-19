@@ -1,13 +1,15 @@
+import { drawReplacementLetter } from './request-letter';
 import {
   BadRequestException,
   Injectable,
   PayloadTooLargeException,
 } from '@nestjs/common';
-import { PDFDocument, PDFDict, PDFName, StandardFonts, rgb } from 'pdf-lib';
+import { PDFDocument, PDFDict, PDFName } from 'pdf-lib';
 import sharp, { type Metadata } from 'sharp';
 import { ConfigService } from '@nestjs/config';
 import { Storage } from '@google-cloud/storage';
 import { createHash } from 'node:crypto';
+import { replacementWord } from './request-word';
 export const MAX_REQUEST_PDF = 2 * 1024 * 1024;
 @Injectable()
 export class RequestDocuments {
@@ -36,41 +38,8 @@ export class RequestDocuments {
       throw new PayloadTooLargeException(
         'Las evidencias de entrada superan 10 MB',
       );
-    const doc = await PDFDocument.create(),
-      font = await doc.embedFont(StandardFonts.Helvetica),
-      bold = await doc.embedFont(StandardFonts.HelveticaBold);
-    let page = doc.addPage([595, 842]),
-      y = 770;
-    const safe = (s: string) =>
-      s.normalize('NFC').replace(/[^\x20-\x7e\xa0-\xff\n]/g, ' ');
-    const line = (text: string, heading = false) => {
-      if (y < 70) {
-        page = doc.addPage([595, 842]);
-        y = 780;
-      }
-      page.drawText(safe(text), {
-        x: 45,
-        y,
-        size: heading ? 13 : 10,
-        font: heading ? bold : font,
-        color: rgb(0.12, 0.14, 0.25),
-      });
-      y -= heading ? 25 : 16;
-    };
-    line('CEPRUNSA - SOLICITUD DE REEMPLAZO', true);
-    for (const field of fields) {
-      line(field.label.toUpperCase(), true);
-      const words = safe(field.value).split(/\s+/);
-      let text = '';
-      for (const w of words) {
-        if (font.widthOfTextAtSize(text + ' ' + w, 10) > 495) {
-          line(text);
-          text = w;
-        } else text += (text ? ' ' : '') + w;
-      }
-      if (text) line(text);
-      y -= 6;
-    }
+    const doc=await PDFDocument.create();
+    const {font,safe}=await drawReplacementLetter(doc,fields,evidence.map(file=>file.originalname));
     for (const file of evidence) {
       const bytes = file.buffer;
       if (bytes.subarray(0, 5).toString() === '%PDF-') {
@@ -170,8 +139,11 @@ export class RequestDocuments {
       );
     return bytes;
   }
-  async upload(schema: string, id: string, bytes: Buffer) {
-    const key = `operations/${schema}/${id}.pdf`,
+  word(fields:{label:string;value:string}[], evidence:Express.Multer.File[], teacher:boolean) {
+    return replacementWord(fields,evidence,teacher);
+  }
+  async upload(schema: string, id: string, bytes: Buffer, format:'pdf'|'docx'='pdf') {
+    const key = `operations/${schema}/${id}.${format}`,
       checksum = createHash('sha256').update(bytes).digest('hex');
     const object = this.storage
       .bucket(this.config.getOrThrow<string>('GCS_BUCKET'))
@@ -181,7 +153,7 @@ export class RequestDocuments {
       validation: false,
       preconditionOpts: { ifGenerationMatch: 0 },
       metadata: {
-        contentType: 'application/pdf',
+        contentType: format==='pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         cacheControl: 'private, no-store',
         metadata: { sha256: checksum },
       },
@@ -200,7 +172,7 @@ export class RequestDocuments {
       size: bytes.length,
     };
   }
-  async download(key: string, generation: string, checksum: string) {
+  async download(key: string, generation: string, checksum: string, maxBytes=MAX_REQUEST_PDF) {
     const file = this.storage
       .bucket(this.config.getOrThrow<string>('GCS_BUCKET'))
       .file(key, { generation });
@@ -209,7 +181,7 @@ export class RequestDocuments {
     for await (const chunk of file.createReadStream()) {
       const data = Buffer.from(chunk as Uint8Array);
       size += data.length;
-      if (size > MAX_REQUEST_PDF)
+      if (size > maxBytes)
         throw new PayloadTooLargeException('Documento inválido');
       chunks.push(data);
     }

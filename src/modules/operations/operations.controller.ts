@@ -40,9 +40,10 @@ import {
   ReplacementDraftDto,
   RequestContextDto,
   RequestDecisionDto,
+  TeachingReplacementQueryDto,
 } from './operations.dto';
 import { OperationsService } from './operations.service';
-const roles = [Role.ADMIN, Role.TEACHER, Role.MONITOR, Role.SUPERVISOR];
+const roles = [Role.ADMIN, Role.TEACHER, Role.MONITOR, Role.SUPERVISOR, Role.COORDINATOR];
 const notificationRoles = [...roles, Role.COORDINATOR];
 @Controller('operations')
 @UseGuards(ClassSessionContextGuard)
@@ -76,6 +77,12 @@ export class OperationsController {
   options(@Req() req: AuthenticatedRequest, @Query() q: RequestContextDto) {
     return this.service.options(req.user, q);
   }
+  @Get('teaching-replacements')
+  @Authorization({roles:[Role.TEACHER],permission:'operations.teaching-replacements'})
+  teachingReplacements(@Req() req:AuthenticatedRequest,@Query() q:TeachingReplacementQueryDto) {return this.service.teachingReplacements(req.user,q);}
+  @Get('document-pending')
+  @Authorization({roles:[Role.TEACHER,Role.MONITOR],permission:'operations.requests.pending-documents'})
+  pendingDocuments(@Req() req:AuthenticatedRequest){return this.service.pendingDocuments(req.user);}
   @Get('candidates')
   @Authorization({ roles, permission: 'operations.candidates' })
   candidates(
@@ -91,7 +98,7 @@ export class OperationsController {
   }
   @Post('requests')
   @Authorization({
-    roles: [Role.TEACHER, Role.MONITOR, Role.SUPERVISOR],
+    roles: [Role.TEACHER, Role.MONITOR, Role.SUPERVISOR, Role.COORDINATOR],
     permission: 'operations.requests.create',
   })
   @UseInterceptors(
@@ -132,6 +139,17 @@ export class OperationsController {
       );
     return this.service.create(req.user, dto, files ?? []);
   }
+  @Post('requests/preview')
+  @Authorization({roles:[Role.TEACHER,Role.MONITOR,Role.SUPERVISOR,Role.COORDINATOR],permission:'operations.requests.preview'})
+  @UseInterceptors(FilesInterceptor('evidence',5,{limits:{files:5,fileSize:8*1024*1024,fields:1,fieldSize:32*1024}}))
+  async preview(@Req() req:AuthenticatedRequest,@Body('data') data:string,@UploadedFiles() files:Express.Multer.File[],@Res() res:Response) {
+    let body:unknown;try{body=JSON.parse(data);}catch{throw new BadRequestException('Formulario inválido');}
+    if(!body||typeof body!=='object'||Array.isArray(body))throw new BadRequestException('Formulario inválido');
+    const dto=plainToInstance(ReplacementDraftDto,body),errors=await validate(dto,{whitelist:true,forbidNonWhitelisted:true});
+    if(errors.length)throw new BadRequestException(errors.flatMap(e=>Object.values(e.constraints??{})).join('; '));
+    const bytes=await this.service.create(req.user,dto,files??[],true);
+    res.set({'Content-Type':'application/pdf','Content-Disposition':'inline; filename="Vista-previa-solicitud.pdf"','Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}).send(bytes);
+  }
   @Get('requests/:id')
   @Authorization({ roles, permission: 'operations.requests.detail' })
   detail(
@@ -156,6 +174,12 @@ export class OperationsController {
         'X-Content-Type-Options': 'nosniff',
       })
       .send(bytes);
+  }
+  @Get('requests/:id/docx')
+  @Authorization({roles,permission:'operations.requests.docx'})
+  async word(@Req() req:AuthenticatedRequest,@Param('id',ParseUUIDPipe) id:string,@Res() res:Response) {
+    const bytes=await this.service.word(req.user,id);
+    res.set({'Content-Type':'application/vnd.openxmlformats-officedocument.wordprocessingml.document','Content-Disposition':`attachment; filename="solicitud-${id}.docx"`,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}).send(bytes);
   }
   @Patch('requests/:id')
   @Authorization({ roles, permission: 'operations.requests.decide' })

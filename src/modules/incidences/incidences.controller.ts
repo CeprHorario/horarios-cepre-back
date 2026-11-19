@@ -39,6 +39,11 @@ const roles = [Role.ADMIN, Role.MONITOR, Role.SUPERVISOR];
 )
 export class IncidencesController {
   constructor(private readonly service: IncidencesService) {}
+  @Get('context')
+  @Authorization({roles:[Role.ADMIN, Role.SUPERVISOR, Role.COORDINATOR], permission:'incidences.context'})
+  context(@Req() req: AuthenticatedRequest) {
+    return this.service.readContext(req.user);
+  }
   @Post('dni-summary')
   @Authorization({ adminOnly: true, permission: 'incidences.dni-summary' })
   dniSummary(
@@ -62,7 +67,7 @@ export class IncidencesController {
   }
   @Get()
   @Authorization({
-    roles: [Role.ADMIN, Role.SUPERVISOR],
+    roles: [Role.ADMIN, Role.SUPERVISOR, Role.COORDINATOR],
     permission: 'incidences.list',
   })
   list(@Req() req: AuthenticatedRequest, @Query() query: IncidenceQuery) {
