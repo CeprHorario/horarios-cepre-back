@@ -37,6 +37,7 @@ import { SessionFilesFixture } from './helpers/session-files-fixtures';
 import { installPartTestClock } from './helpers/part-test-clock';
 import { initialDataSchema } from '../src/database/prisma/data/seed';
 import { IncidencesController } from '../src/modules/incidences/incidences.controller';
+import { OperationsContext } from '../src/modules/operations/operations-context.service';
 import { IncidencesService } from '../src/modules/incidences/incidences.service';
 
 const suite = process.env.TEST_DATABASE_URL ? describe : describe.skip;
@@ -217,6 +218,7 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
       providers: [
         ClassSessionRecordsService,
         IncidencesService,
+        OperationsContext,
         SessionJournalService,
         SessionFollowupService,
         SessionReportsService,
@@ -415,7 +417,7 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
     const response = await patch(
       r,
       {
-        actualStart: new Date(Date.now() - 120000).toISOString(),
+        actualStart: new Date(+r.scheduledStart + 60000).toISOString(),
         classState: 'N',
       },
       'supervisor',
@@ -440,7 +442,7 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
       .expect(201);
     const changed = body<ClassSessionRecord>(
       await patch(r, {
-        actualStart: new Date(Date.now() - 60000).toISOString(),
+        actualStart: new Date(+r.scheduledStart + 60000).toISOString(),
       }).expect(200),
     );
     const workspace = body<{
@@ -493,14 +495,14 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
     );
     await patch(
       closed,
-      { actualStart: new Date(Date.now() - 120000).toISOString() },
+      { actualStart: new Date(+closed.scheduledStart + 60000).toISOString() },
       'supervisor',
     ).expect(400);
     const saved = body<ClassSessionRecord>(
       await patch(
         closed,
         {
-          actualStart: new Date(Date.now() - 120000).toISOString(),
+          actualStart: new Date(+closed.scheduledStart + 60000).toISOString(),
           reason: 'Corrección concreta del inicio',
         },
         'supervisor',
@@ -513,7 +515,7 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
     await patch(
       saved,
       {
-        actualEnd: new Date(Date.now() - 60000).toISOString(),
+        actualEnd: new Date(+closed.scheduledEnd - 60000).toISOString(),
         reason: 'Nuevo cambio después de revocar',
       },
       'supervisor',
@@ -633,7 +635,7 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
         status: 'AUTHORIZED',
         reason: 'Supervisión no decide',
       })
-      .expect(401);
+      .expect(403);
     await api('post', `/replacements/${coverage.id}/resolve`, 'admin')
       .send({
         expectedVersion: proposed.version,
@@ -645,8 +647,9 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
       where: { id: r.id },
     });
     expect(authorized.classState).toBe('RE');
-    expect(authorized.actualStart).toBeNull();
-    expect(authorized.effectiveTeacherId).toBeNull();
+    expect(authorized.actualStart).toEqual(r.scheduledStart);
+    expect(authorized.actualEnd).toEqual(r.scheduledEnd);
+    expect(authorized.effectiveTeacherId).toBe(teacherIds[1]);
     const resolvedNotices = await partNotices();
     expect(
       resolvedNotices.some(
@@ -664,7 +667,7 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
     ).toBe(true);
     await patch(
       authorized,
-      { actualStart: new Date(Date.now() - 60000).toISOString() },
+      { actualStart: new Date(+r.scheduledStart + 60000).toISOString() },
       'supervisor',
     ).expect(200);
     expect(
@@ -700,54 +703,14 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
       await db().sessionCoverage.count({ where: { recordId: r.id } }),
     ).toBe(0);
   });
-  it('dos autorizaciones concurrentes de propuestas solapadas no ocupan dos aulas', async () => {
-    const first = await fresh(),
-      second = await fresh();
-    await db().classSessionRecord.update({
-      where: { id: second.id },
-      data: {
-        date: first.date,
-        classId: otherClass,
-        scheduledStart: first.scheduledStart,
-        scheduledEnd: first.scheduledEnd,
-      },
-    });
-    const proposed = await Promise.all(
-      [first, second].map((r) =>
-        patch(r, {
-          classState: 'RN',
-          replacementEmail: 'replacement1@test.invalid',
-          operationId: randomUUID(),
-        }).expect(200),
-      ),
-    );
-    const coverages = await db().sessionCoverage.findMany({
-      where: { recordId: { in: [first.id, second.id] }, status: 'PENDING' },
-    });
-    expect(coverages).toHaveLength(2);
-    const results = await Promise.all(
-      coverages.map((c) =>
-        api('post', `/replacements/${c.id}/resolve`, 'admin').send({
-          expectedVersion: 2,
-          status: 'AUTHORIZED',
-          reason: 'Autorización concurrente controlada',
-        }),
-      ),
-    );
-    expect(results.map((response) => response.status).sort()).toEqual([
-      201, 400,
-    ]);
-    expect(
-      proposed.map((response) => (response.body as ClassSessionRecord).version),
-    ).toEqual([2, 2]);
-    expect(
-      await db().sessionCoverage.count({
-        where: {
-          recordId: { in: [first.id, second.id] },
-          status: 'AUTHORIZED',
-        },
-      }),
-    ).toBe(1);
+  it('dos RN provisionales concurrentes no ocupan al mismo docente en dos aulas', async () => {
+    const first=await fresh(),second=await fresh();
+    await db().classSessionRecord.update({where:{id:second.id},data:{date:first.date,classId:otherClass,scheduledStart:first.scheduledStart,scheduledEnd:first.scheduledEnd}});
+    const responses=await Promise.all([first,second].map(r=>patch(r,{classState:'RN',replacementEmail:'replacement1@test.invalid',operationId:randomUUID()})));
+    expect(responses.map(r=>r.status).sort()).toEqual([200,400]);
+    const pending=await db().sessionCoverage.findMany({where:{recordId:{in:[first.id,second.id]},status:'PENDING'}});expect(pending).toHaveLength(1);
+    await api('post',`/replacements/${pending[0].id}/resolve`,'admin').send({expectedVersion:2,status:'AUTHORIZED',reason:'Autorización del respaldo'}).expect(201);
+    expect(await db().sessionCoverage.count({where:{recordId:{in:[first.id,second.id]},status:'AUTHORIZED'}})).toBe(1);
   });
   it('seguimiento del monitor es privado, versionado y no crea antecedentes personales', async () => {
     const r = await fresh();
@@ -810,7 +773,7 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
       noteNotices.some((n) => n.recipient_id === actor('supervisor').userId),
     ).toBe(true);
   });
-  it('supervisión registra sustituto monitor sin cambiar cuenta/aula y ejecución lo declara aparte', async () => {
+  it('solo administración registra sustituto monitor sin cambiar cuenta/aula y ejecución lo declara aparte', async () => {
     const r = await fresh();
     const dto = {
       targets: [{ recordId: r.id, expectedVersion: 1 }],
@@ -819,26 +782,25 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
       mode: 'PLANNED',
       reason: 'Sustitución de monitor del bloque',
     };
-    await api('post', '/replacements', 'otherSupervisor').send(dto).expect(404);
-    await api('post', '/replacements', 'supervisor')
-      .send({ ...dto, personId: teacherIds[1] })
-      .expect(400);
-    await api('post', '/replacements', 'supervisor').send(dto).expect(201);
+    await api('post', '/replacements', 'otherSupervisor').send(dto).expect(403);
+    await api('post', '/replacements', 'supervisor').send(dto).expect(403);
+    await api('post', '/replacements', 'admin').send({...dto,personId:teacherIds[1]}).expect(400);
+    await api('post', '/replacements', 'admin').send(dto).expect(201);
     const substitution = await db().$queryRaw<
       { recipient_id: string; kind: string }[]
     >`SELECT recipient_id,kind FROM public.operation_notifications
       WHERE process_schema=${fixture.schema} AND kind='part.monitor.substitution'`;
     expect(substitution).toHaveLength(1);
-    expect(substitution[0].recipient_id).toBe(actor('admin').userId);
+    expect(substitution[0].recipient_id).toBe(actor('supervisor').userId);
     expect(substitution[0].recipient_id).not.toBe(actor().userId);
     const planned = await db().classSessionRecord.findUniqueOrThrow({
       where: { id: r.id },
     });
-    expect(planned.effectiveMonitorId).toBeNull();
+    expect(planned.effectiveMonitorId).toBe(otherMonitorId);
     expect(planned.monitorAccountId).toBe(actor().userId);
     const executed = body<ClassSessionRecord>(
       await patch(planned, {
-        actualStart: new Date(Date.now() - 60000).toISOString(),
+        actualStart: new Date(+r.scheduledStart + 60000).toISOString(),
         classState: 'N',
       }).expect(200),
     );
@@ -1020,10 +982,8 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
       data: { id: string; name: string; email: string }[];
       total: number;
     }>(await api('get', `/${r.id}/people?kind=TEACHER`).expect(200));
-    expect(response.total).toBe(2);
-    expect(response.data.map((p) => p.id).sort()).toEqual(
-      teacherIds.slice(0, 2).sort(),
-    );
+    expect(response.total).toBe(1);
+    expect(response.data.map((p) => p.id).sort()).toEqual([teacherIds[1]]);
     for (const person of response.data)
       expect(Object.keys(person).sort()).toEqual(['email', 'id', 'name']);
     expect(
@@ -1246,6 +1206,20 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
         id: actor('admin').userId,
       }),
     );
+  });
+  it('sin registrar es solo inicial: permite estados y rechaza volver a null o vacío', async () => {
+    const r = await fresh();
+    const saved = body<ClassSessionRecord>(await patch(r, { classState: 'N' }).expect(200));
+    for (const name of ['monitor', 'admin']) {
+      for (const classState of [null, '']) {
+        await patch(saved, { classState, reason: 'Verificar protección del estado' }, name).expect(400);
+      }
+    }
+    await expect(run(() => records.update(actor('admin'), saved.id, {
+      expectedVersion: saved.version, classState: null, reason: 'Verificar protección del servicio',
+    }, true))).rejects.toMatchObject({ status: 400 });
+    expect((await db().classSessionRecord.findUniqueOrThrow({ where: { id: saved.id } })).classState).toBe(saved.classState);
+    await patch(saved, { classState: 'T' }).expect(200);
   });
   it('impide sobreescrituras concurrentes y audita antes/después en una transacción', async () => {
     const r = await fresh();
@@ -2464,6 +2438,27 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
       },
       update: { dni },
     });
+  it('coordinación general consulta incidencias del proceso e historial sin obtener escrituras ni partes', async () => {
+    await profile(teacherUsers[0], '91000001');
+    const report = body<{id:string;version:number}>(await incidenceApi('post').send({
+      operationId:randomUUID(), subjectAccountId:teacherUsers[0], subjectRole:'profesor',
+      title:'Consulta de coordinación', description:'Hecho registrado para comprobar lectura y permisos',
+      occurredAt:new Date(Date.now()-60000).toISOString(),
+    }).expect(201));
+    await incidenceApi('get','/context','coordinator').expect(200);
+    const list = body<{data:{id:string}[]}>(await incidenceApi('get','?dni=91000001','coordinator').expect(200));
+    expect(list.data.some(row=>row.id===report.id)).toBe(true);
+    await incidenceApi('get',`/${report.id}/history`,'coordinator').expect(200);
+    const otherId=randomUUID();
+    await db().$executeRaw`INSERT INTO public.person_incidences(id,subject_dni,subject_role,subject_account_id,subject_name,process_schema,title,description,occurred_at,actor,actor_id,actor_origin) SELECT ${otherId}::uuid,subject_dni,subject_role,subject_account_id,subject_name,${fixture.otherSchema},title,description,occurred_at,actor,actor_id,actor_origin FROM public.person_incidences WHERE id=${report.id}::uuid`;
+    const rows=body<{data:{process_schema:string}[]}>(await incidenceApi('get','?dni=91000001','coordinator').expect(200));
+    expect(rows.data.every(row=>row.process_schema===fixture.schema)).toBe(true);
+    await incidenceApi('get',`/${otherId}/history`,'coordinator').expect(404);
+    await incidenceApi('patch',`/${report.id}`,'coordinator').send({expectedVersion:report.version,status:'RESOLVED',reason:'No autorizado'}).expect(401);
+    await incidenceApi('post','','coordinator').send({}).expect(401);
+    await incidenceApi('get','/people?subjectRole=profesor','coordinator').expect(401);
+    await incidenceApi('get','/context','teacher').expect(401);
+  });
   it('observaciones clasificadas separan alumno/aula del DNI docente y respetan cierre y alcance', async () => {
     const r = await fresh();
     await profile(teacherUsers[0], '91000001');

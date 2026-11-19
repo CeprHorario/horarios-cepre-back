@@ -30,6 +30,8 @@ suite('Cierre funcional de Partes: avisos, tiempo, sustituciones y señales',()=
     monitorId=(await db.monitor.create({data:{userId:fixture.principals.monitor.userId,supervisorId:fixture.supervisorId}})).id;
     substituteId=(await db.monitor.create({data:{userId:fixture.principals.otherMonitor.userId}})).id;
     await db.class.update({where:{id:fixture.classId},data:{monitorId}});
+    await db.shift.create({data:{id:2,name:'Turno sustituto',startTime:new Date('1970-01-01T16:00Z'),endTime:new Date('1970-01-01T21:10Z')}});
+    await db.class.create({data:{name:'Salón del monitor sustituto',idSede:1,areaId:1,shiftId:2,monitorId:substituteId}});
     teacherId=(await db.teacher.create({data:{userId:fixture.principals.teacher.userId,courseId:1,jobStatus:'PartTime'}})).id;
     const user=await db.user.create({data:{email:'candidate-completion@test.invalid',role:'profesor'}});
     candidateId=(await db.teacher.create({data:{userId:user.id,courseId:1,jobStatus:'PartTime'}})).id;
@@ -61,27 +63,27 @@ suite('Cierre funcional de Partes: avisos, tiempo, sustituciones y señales',()=
     const dto={expectedVersion:record.version,classState:'RN',replacementEmail:'candidate-completion@test.invalid',operationId};
     const saved=await run(()=>records.update(fixture.principals.monitor,record.id,dto));
     const repeated=await run(()=>records.update(fixture.principals.monitor,record.id,dto));
-    expect(saved.version).toBe(repeated.version); expect(saved.effectiveTeacherId).toBeNull(); expect(saved.teachingStatus).toBe('UNCONFIRMED');
+    expect(saved.version).toBe(repeated.version); expect(saved.effectiveTeacherId).toBe(candidateId); expect(saved.teachingStatus).toBe('UNCONFIRMED');
     const candidate=await fixture.client().teacher.findUniqueOrThrow({where:{id:candidateId}});
     const recipients=await fixture.pg.query<{recipient_id:string;message:string}>(`SELECT recipient_id,message FROM public.operation_notifications WHERE process_schema=$1 AND dedupe_key LIKE $2`,[fixture.schema,`${fixture.schema}:part-coverage:%:proposed:%`]);
     expect(recipients.rows.map(row=>row.recipient_id)).toEqual(expect.arrayContaining([candidate.userId,fixture.principals.coordinator.userId]));
     const other=await fixture.client().user.findUniqueOrThrow({where:{email:'other-course-coordination@test.invalid'}});
     expect(recipients.rows.some(row=>row.recipient_id===other.id)).toBe(false);
     expect(recipients.rows.some(row=>/captura|DNI|contraseña|monitor@/i.test(row.message))).toBe(false);
-    await expect(run(()=>journal.resolve(fixture.principals.supervisor,saved.coverages[0].id,{expectedVersion:saved.version,status:'AUTHORIZED',reason:'No se autoriza desde supervisión'}))).rejects.toThrow('Solo administración');
+    await expect(run(()=>journal.resolve(fixture.principals.supervisor,saved.coverages[0].id,{expectedVersion:saved.version,status:'AUTHORIZED',reason:'No se autoriza desde supervisión'}))).rejects.toThrow('administrativa');
   });
-  it('sustitución masiva idempotente y revocación por supervisor no borran al efectivo ejecutado',async()=>{
+  it('sustitución masiva idempotente y revocación administrativa no borran al efectivo ejecutado',async()=>{
     const record=await fresh();
     const dto={targets:[{recordId:record.id,expectedVersion:record.version}],kind:'MONITOR',personId:substituteId,mode:'PLANNED',reason:'Sustitución sintética explícita',operationId:randomUUID()};
-    const result=await run(()=>journal.cover(fixture.principals.supervisor,dto));
-    const repeated=await run(()=>journal.cover(fixture.principals.supervisor,dto));
+    const result=await run(()=>journal.cover(fixture.principals.admin,dto));
+    const repeated=await run(()=>journal.cover(fixture.principals.admin,dto));
     expect(result.operationId).toBe(repeated.operationId);
-    await expect(run(()=>journal.cover(fixture.principals.supervisor,{...dto,reason:'Otra intención'}))).rejects.toThrow('otra intención');
+    await expect(run(()=>journal.cover(fixture.principals.admin,{...dto,reason:'Otra intención'}))).rejects.toThrow('otra intención');
     const current=await fixture.client().classSessionRecord.findUniqueOrThrow({where:{id:record.id}});
     const executed=await run(()=>records.update(fixture.principals.monitor,record.id,{expectedVersion:current.version,classState:'N',actualStart:'2026-11-03T13:01:00Z'}));
     expect(executed.effectiveMonitorId).toBe(substituteId);
     const coverage=await fixture.client().sessionCoverage.findFirstOrThrow({where:{recordId:record.id,kind:'MONITOR'}});
-    await run(()=>journal.resolve(fixture.principals.supervisor,coverage.id,{expectedVersion:executed.version,status:'REVOKED',reason:'Rectificación sin borrar la ejecución'}));
+    await run(()=>journal.resolve(fixture.principals.admin,coverage.id,{expectedVersion:executed.version,status:'REVOKED',reason:'Rectificación sin borrar la ejecución'}));
     expect((await fixture.client().classSessionRecord.findUniqueOrThrow({where:{id:record.id}})).effectiveMonitorId).toBe(substituteId);
   });
   it('LISTEN entre dos instancias: solo commit; reconexión señaliza resincronización',async()=>{

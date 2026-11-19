@@ -54,5 +54,8 @@ suite('Generación semanal de partes', () => {
     expect((await run('supervisor')).total).toBe(7);
     expect((await run('otherSupervisor')).total).toBe(0);
     expect((await run('admin')).total).toBe(7);
+    const byShift=(shiftId:number)=>fixture.context.run({schema:fixture.schema,routing:{adminSchema:fixture.schema,userSchema:fixture.schema}},()=>records.journals(fixture.principals.admin,{page:1,limit:25,classId:fixture.classId,shiftId}));
+    expect((await byShift(1)).total).toBe(7);
+    expect((await byShift(999)).total).toBe(0);
   });
 });

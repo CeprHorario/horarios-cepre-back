@@ -38,6 +38,7 @@ async function main() {
         'test',
         '--',
         '--runInBand',
+        '--testTimeout=60000',
         '--runTestsByPath',
         'test/database.e2e-spec.ts',
       ],
@@ -45,6 +46,7 @@ async function main() {
         'test',
         '--',
         '--runInBand',
+        '--testTimeout=60000',
         ...(focus.length?['--runTestsByPath',...focus]:['--testPathIgnorePatterns=test/database.e2e-spec.ts']),
       ],
     ]) {

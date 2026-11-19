@@ -16,6 +16,8 @@ suite('Solicitudes: aprobaciÃ³n, reservas y excepciones diarias', () => {
   let recordId: number;
   beforeAll(async () => {
     await fixture.initialize();
+    fixture.principals.coordinator.role="coordinador-1";
+    await fixture.client().user.update({where:{id:fixture.principals.coordinator.userId},data:{role:"coordinador-1"}});
     const db = fixture.client();
     const day = new Date();
     day.setUTCDate(day.getUTCDate() + 7);
@@ -142,6 +144,7 @@ suite('Solicitudes: aprobaciÃ³n, reservas y excepciones diarias', () => {
     );
     const documents = {
       generate: () => Promise.resolve(Buffer.from('test-pdf')),
+      word: () => Promise.resolve(Buffer.from('test-word')),
       upload: () =>
         Promise.resolve({
           key: 'test.pdf',
@@ -226,10 +229,11 @@ suite('Solicitudes: aprobaciÃ³n, reservas y excepciones diarias', () => {
       draft(candidate2),
       evidence(),
     );
+    await Promise.all([a,b].map(r=>service.decide(fixture.principals.supervisor,r.id,{expectedVersion:1,status:'APPROVED',reason:'Revisión favorable de supervisión'})));
     const decisions = await Promise.allSettled(
       [a, b].map((r) =>
-        service.decide(fixture.principals.supervisor, r.id, {
-          expectedVersion: 1,
+        service.decide(fixture.principals.admin, r.id, {
+          expectedVersion: 2,
           status: 'APPROVED',
           reason: 'Cobertura autorizada de prueba',
         }),
@@ -247,7 +251,7 @@ suite('Solicitudes: aprobaciÃ³n, reservas y excepciones diarias', () => {
       where: { id: recordId },
       include: { coverages: true },
     });
-    expect(record.monitorAccountId).not.toBe(fixture.principals.monitor.userId);
+    expect(record.monitorAccountId).toBe(fixture.principals.monitor.userId);
     expect(
       record.coverages.filter((c) => c.status === 'AUTHORIZED'),
     ).toHaveLength(1);
@@ -270,7 +274,7 @@ suite('Solicitudes: aprobaciÃ³n, reservas y excepciones diarias', () => {
     ).toBe(0);
     expect(
       (await service.detail(fixture.principals.monitor, a.id)).status,
-    ).toBe(decisions[0].status === 'fulfilled' ? 'APPROVED' : 'PENDING');
+    ).toBe(decisions[0].status === 'fulfilled' ? 'APPROVED' : 'ADMIN_PENDING');
   });
   it('docentes: solo administración aprueba y revalida la disponibilidad persistida', async () => {
     const db = fixture.client(),
@@ -312,12 +316,13 @@ suite('Solicitudes: aprobaciÃ³n, reservas y excepciones diarias', () => {
         reason: 'No autoaprobar docente',
       }),
     ).rejects.toThrow();
+    await service.decide(fixture.principals.coordinator,request.id,{expectedVersion:1,status:'APPROVED',reason:'Conformidad del coordinador de curso'});
     await db.teacherAvailability.deleteMany({
       where: { teacherId: teacher.id },
     });
     await expect(
       service.decide(fixture.principals.admin, request.id, {
-        expectedVersion: 1,
+        expectedVersion: 2,
         status: 'APPROVED',
         reason: 'Revalidar disponibilidad actual',
       }),
@@ -326,7 +331,7 @@ suite('Solicitudes: aprobaciÃ³n, reservas y excepciones diarias', () => {
     expect(
       (
         await service.decide(fixture.principals.admin, request.id, {
-          expectedVersion: 1,
+          expectedVersion: 2,
           status: 'APPROVED',
           reason: 'Reemplazo docente autorizado',
         })

@@ -9,7 +9,7 @@ describe('Disponibilidad por docente y proceso', () => {
     email: 'teacher@test.invalid',
     role: Role.TEACHER,
   };
-  const teacher = { id: 'teacher-id', userId: principal.userId };
+  const teacher = { id: 'teacher-id', userId: principal.userId, user: {email:principal.email,userProfile:{firstName:'Ana',lastName:'Prueba'}}, courses:{name:'Matemática'} };
   const hours = [
     {
       id: 1,
@@ -28,15 +28,15 @@ describe('Disponibilidad por docente y proceso', () => {
       shift: { name: 'Turno 02' },
     },
   ];
-  function service(userId = principal.userId) {
+  function service(userId = principal.userId, target = teacher, role = Role.TEACHER) {
     return new AvailabilityWorkbook(
       {
         get: () => Promise.resolve({
           schema: 'test_process',
           user: { id: userId },
-          actor: { role: Role.TEACHER },
+          actor: { role },
           client: {
-            teacher: { findFirst: () => Promise.resolve(teacher) },
+            teacher: { findFirst: () => Promise.resolve(target) },
             hourSession: { findMany: () => Promise.resolve(hours) },
           },
         }),
@@ -101,11 +101,35 @@ describe('Disponibilidad por docente y proceso', () => {
     b.getWorksheet('Guía')!.getCell('B1').value = 'otro_proceso';
     await expect(
       s.preview(principal, 'me', file(Buffer.from(await b.xlsx.writeBuffer()))),
-    ).rejects.toThrow('otro docente o proceso');
+    ).rejects.toThrow('otro proceso');
+  });
+  it('comparte la misma plantilla y muestra el destino real, sin usar nombres para vincular', async () => {
+    const {b}=await book();
+    const guide=b.getWorksheet('Guía')!;
+    expect(guide.getCell('A2').text).toBe('Docente (referencia)');
+    expect(guide.getCell('B2').text).toBe('Ana Prueba');
+    expect(guide.getCell('B3').text).toBe('Matemática');
+    guide.getCell('B2').value='Nombre de otra persona';
+    guide.getCell('B3').value='Curso informativo';
+    b.getWorksheet('Disponibilidad')!.getCell('E2').value='Disponible';
+    const target={...teacher,id:'other-teacher-id',userId:'other-account',user:{email:'other@test.invalid',userProfile:{firstName:'Luis',lastName:'Destino'}},courses:{name:'Física'}};
+    const result=await service(target.userId,target).preview({...principal,userId:target.userId},'me',file(Buffer.from(await b.xlsx.writeBuffer())));
+    expect(result.valid).toBe(true);
+    expect(result.teacherId).toBe(target.id);
+    expect(result.teacher).toEqual({id:target.id,name:'Luis Destino',course:'Física'});
+    expect(result.intervals).toEqual([{weekday:'Lunes',start:'08:00',end:'08:40'}]);
   });
   it('impide que un docente gestione a otro', async () => {
     await expect(
       service('another-account').template(principal, 'teacher-id'),
     ).rejects.toThrow('tu disponibilidad');
+  });
+  it('personaliza la ficha administrativa y conserva la plantilla general sin nombres', async () => {
+    const b=new ExcelJS.Workbook();
+    await b.xlsx.load(await service('admin',teacher,Role.ADMIN).template({...principal,userId:'admin',role:Role.ADMIN},teacher.id) as never);
+    expect(b.getWorksheet('Guía')!.getCell('B2').text).toBe('Ana Prueba');
+    expect(b.getWorksheet('Guía')!.getCell('B3').text).toBe('Matemática');
+    await b.xlsx.load(await service('admin',teacher,Role.ADMIN).template({...principal,userId:'admin',role:Role.ADMIN},'general') as never);
+    expect(b.getWorksheet('Guía')!.getCell('B2').text).toBe('');
   });
 });

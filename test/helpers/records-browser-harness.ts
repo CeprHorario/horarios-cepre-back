@@ -828,6 +828,28 @@ proc.onchange=show;show();setInterval(show,5000);
         if (key !== 'a' && key !== 'b')
           throw new BadRequestException('Proceso ficticio a/b');
         const entry = processes[key];
+        if (req.path === '/replacement-fixture') {
+          const db=fixture.client(entry.process);
+          const existing=await db.userProfile.findUnique({where:{dni:'90901234'},select:{userId:true}});
+          if(existing?.userId){res.json({candidate:existing.userId});return;}
+          const user=await db.user.create({data:{email:'wf-'+randomUUID().slice(0,8)+'@test.invalid',role:'profesor',userProfile:{create:{firstName:'Reemplazante',lastName:'Disponible',dni:'90901234'}},teacher:{create:{courseId:1,jobStatus:'FreeTime',maxHours:40}}},include:{teacher:true}});
+          await db.$executeRaw`INSERT INTO teacher_availabilities(teacher_id,weekday,start_minute,end_minute) SELECT ${user.teacher!.id}::uuid,day,0,1440 FROM unnest(enum_range(NULL::"Weekday")) day`;
+          res.json({candidate:user.id});return;
+        }
+        if (req.path === '/week-advance-fixture') {
+          const db = fixture.client(entry.process);
+          await clocks[key].set(new Date('2026-11-16T18:00:00Z'), 0);
+          await db.sessionOperationalConfig.update({ where: { id: 1 }, data: { enabled: true, startsOn: new Date('2026-11-01'), endsOn: new Date('2026-12-31') } });
+          await db.$executeRaw`INSERT INTO schedules(class_id,course_id,hour_session_id,teacher_id,weekday)
+            SELECT class_id,course_id,hour_session_id,teacher_id,d::"Weekday" FROM schedules CROSS JOIN unnest(ARRAY['TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY']) d WHERE weekday='MONDAY' ON CONFLICT DO NOTHING`;
+          res.json(await journal.materializeWeek(db, entry.process));
+          return;
+        }
+        if (req.path === '/weekly-generation') {
+          await journal.ensureWeeklyGeneration(fixture.client(entry.process), entry.process);
+          res.json({ generated: true });
+          return;
+        }
         if (req.path === '/clock' || req.path === '/clock/reset') {
           if (req.path === '/clock/reset') {
             await clocks[key].set(new Date(), 1);
