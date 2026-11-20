@@ -1,4 +1,5 @@
 import { coverageWork } from './coverage-work';
+import { describeEvidence } from './request-evidence';
 import type { LetterData } from './request-letter';
 import { requestPeople } from './request-person';
 import { replacementDecision } from './replacement-workflow';
@@ -582,6 +583,7 @@ export class OperationsService implements OnModuleInit, OnModuleDestroy {
       throw new ForbiddenException(
         'Administración resuelve solicitudes; no suplanta al solicitante',
       );
+    files=describeEvidence(files,dto.annexDescriptions);
     if(dto.sameTurn && (dto.sameTurnReason?.trim().length??0)<10)throw new BadRequestException('Explica por qué no encontraste reemplazante de otro turno');
     const payloadHash = createHash('sha256')
       .update(
@@ -592,7 +594,7 @@ export class OperationsService implements OnModuleInit, OnModuleDestroy {
           hours: [...dto.hourSessionIds].sort((a, b) => a - b),
           replacement: dto.replacementUserId,
           reason: dto.reason.trim(),
-          compress: dto.compress, sameTurn:dto.sameTurn??false,sameTurnReason:dto.sameTurnReason??'',address:dto.address??'',district:dto.district??'',cui:dto.cui??'',revisesId:dto.revisesId??null,coverageOperationId:dto.coverageOperationId??null,
+          compress: dto.compress, sameTurn:dto.sameTurn??false,sameTurnReason:dto.sameTurnReason??'',address:dto.address??'',district:dto.district??'',cui:dto.cui??'',revisesId:dto.revisesId??null,coverageOperationId:dto.coverageOperationId??null,...(dto.annexDescriptions?{annexDescriptions:dto.annexDescriptions.map(value=>value.trim())}:{}),
           evidence: files.map((f) =>
             createHash('sha256').update(f.buffer).digest('hex'),
           ),
@@ -676,6 +678,7 @@ export class OperationsService implements OnModuleInit, OnModuleDestroy {
           .join('\n'),
       },
       { label: 'Motivo', value: dto.reason },
+      ...(dto.annexDescriptions?[{label:'Anexos',value:files.map(file=>file.originalname).join('\n')}]:[]),
       ...(dto.sameTurn?[{label:'Excepción de mismo turno',value:'Declaro que no encontré reemplazante de otro turno. '+dto.sameTurnReason}]:[]),
     ];
     const time=(value:string)=>new Date(value).toLocaleTimeString('es-PE',{timeZone:'America/Lima',hour:'2-digit',minute:'2-digit',hour12:false});

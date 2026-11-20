@@ -40,7 +40,7 @@ export function letterBlocks(fields:{label:string;value:string}[], teacher=false
   b.push({text:'Por la atención brindada a la presente quedo de usted muy agradecido(a).',gap:18},
     {text:'Atentamente,',gap:12},
     {signature:true,text:d.applicant.name+'\nDNI N° '+(d.applicant.dni||'________________')+(teacher?'':'\nCUI N° '+(d.cui||'________________')),align:'center',gap:18},
-    {text:'Adjunto:',gap:5},...annexes.map((name,i)=>({text:`${i+1}. ${name}`,gap:3})));
+    {text:'Adjunto:',gap:5},...annexes.map((name,i)=>({text:`Anexo ${i+1}: ${name}`,gap:3})));
   return b;
 }
 

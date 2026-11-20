@@ -961,7 +961,7 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
     const r = await fresh();
     await db().userProfile.create({
       data: {
-        userId: teacherUsers[0],
+        userId: teacherUsers[1],
         firstName: 'Ana Catalogo',
         lastName: 'Prueba',
         dni: '12345678',
@@ -996,9 +996,9 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
     ).toEqual({
       data: [
         {
-          id: teacherIds[0],
+          id: teacherIds[1],
           name: 'Ana Catalogo Prueba',
-          email: 'replacement0@test.invalid',
+          email: 'replacement1@test.invalid',
         },
       ],
       total: 1,
@@ -1022,11 +1022,11 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
       },
     });
     const monitors = body<{ data: { id: string }[]; total: number }>(
-      await api('get', `/${r.id}/people?kind=MONITOR`).expect(200),
+      await api('get', `/${r.id}/people?kind=MONITOR&sameTurn=true`).expect(200),
     );
-    expect(monitors.total).toBe(2);
+    expect(monitors.total).toBe(1);
     expect(monitors.data.map((p) => p.id).sort()).toEqual(
-      [monitorId, otherMonitorId].sort(),
+      [otherMonitorId],
     );
   });
   it('limita el catálogo al recurso autorizado sin depender de permisos generales de personas', async () => {
@@ -1432,7 +1432,7 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
           ],
           kind: 'TEACHER',
           personId: teacherIds[1],
-          mode: 'EMERGENCY',
+          mode: 'PLANNED',
           reason: 'Inasistencia titular',
         })
         .expect(201),
@@ -1442,7 +1442,7 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
     const current = await db().classSessionRecord.findUniqueOrThrow({
       where: { id: r.id },
     });
-    expect(current.effectiveTeacherId).toBeNull();
+    expect(current.effectiveTeacherId).toBe(teacherIds[1]);
     expect(current.titularOutcome).toBe('UNKNOWN');
     await patch(current, {
       effectiveTeacherId: teacherIds[1],
@@ -1457,7 +1457,7 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
     const after = await db().classSessionRecord.findUniqueOrThrow({
       where: { id: r.id },
     });
-    expect(after.titularOutcome).toBe('ABSENT');
+    expect(after.titularOutcome).toBe('PLANNED_REPLACEMENT');
     expect(after.effectiveTeacherId).toBe(teacherIds[1]);
     expect(after.effectiveMonitorId).toBe(monitorId);
     expect(after.titularTeacherId).toBe(teacherIds[0]);
@@ -2383,7 +2383,7 @@ suite('Partes integrados (JWT + guards + PostgreSQL)', () => {
             targets: [{ recordId: r.id, expectedVersion: 1 }],
             kind,
             personId,
-            mode: 'EMERGENCY',
+            mode: 'PLANNED',
             reason: 'Ocurrido en aula original',
           })
           .expect(201),

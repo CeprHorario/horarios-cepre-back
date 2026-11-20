@@ -36,6 +36,9 @@ export class RequestContextDto {
   @IsOptional() @IsUUID('all') classId?: string;
 }
 export class ReplacementDraftDto extends RequestContextDto {
+  @IsOptional() @IsArray() @ArrayMinSize(1) @ArrayMaxSize(5)
+  @IsString({each:true}) @MinLength(3,{each:true}) @MaxLength(160,{each:true})
+  annexDescriptions?: string[];
   @IsOptional() @IsString() @MaxLength(2000) sameTurnReason?: string;
   @IsOptional() @IsString() @MaxLength(250) address?: string;
   @IsOptional() @IsString() @MaxLength(100) district?: string;

@@ -122,7 +122,7 @@ export class RequestDocuments {
         });
         p.drawImage(embedded, {
           x: (595 - embedded.width * scale) / 2,
-          y: 50,
+          y: 770 - embedded.height * scale,
           width: embedded.width * scale,
           height: embedded.height * scale,
         });
@@ -173,9 +173,22 @@ export class RequestDocuments {
     };
   }
   async download(key: string, generation: string, checksum: string, maxBytes=MAX_REQUEST_PDF) {
+    try {
+      return await this.readDocument(key, generation, checksum, maxBytes);
+    } catch (error) {
+      // A restored filesystem emulator can assign new generations to identical
+      // bytes. Never relax generation pinning against a real storage bucket.
+      const localEmulator = this.config.get<string>('STORAGE_EMULATOR_HOST') === 'http://gcs:4443'
+        && this.config.get<string>('GCS_BUCKET') === 'cepre-records-local'
+        && this.config.get<string>('NODE_ENV') !== 'production';
+      if (!localEmulator || Number((error as {code?:number})?.code) !== 404) throw error;
+      return this.readDocument(key, undefined, checksum, maxBytes);
+    }
+  }
+  private async readDocument(key: string, generation: string | undefined, checksum: string, maxBytes: number) {
     const file = this.storage
       .bucket(this.config.getOrThrow<string>('GCS_BUCKET'))
-      .file(key, { generation });
+      .file(key, generation ? { generation } : undefined);
     const chunks: Buffer[] = [];
     let size = 0;
     for await (const chunk of file.createReadStream()) {

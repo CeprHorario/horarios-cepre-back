@@ -1,8 +1,33 @@
 import { ConfigService } from '@nestjs/config';
 import { PDFDocument } from 'pdf-lib';
+import { createHash } from 'node:crypto';
 import { RequestDocuments, MAX_REQUEST_PDF } from './request-document.service';
 
 describe('Formulario y evidencias de reemplazo', () => {
+  it('recupera la generación restaurada solo en el emulador local y exige el mismo contenido', async () => {
+    const bytes = Buffer.from('%PDF-local');
+    const checksum = createHash('sha256').update(bytes).digest('hex');
+    const createService = (production = false) => {
+      const local = new RequestDocuments(new ConfigService({
+        STORAGE_EMULATOR_HOST: 'http://gcs:4443', GCS_BUCKET: 'cepre-records-local',
+        NODE_ENV: production ? 'production' : 'development',
+      }));
+      const file = jest.fn((_key: string, options?: unknown) => ({
+        async *createReadStream() {
+          if (options) throw Object.assign(new Error('Missing generation'), { code: 404 });
+          yield bytes;
+        },
+      }));
+      Object.defineProperty(local, 'storage', { value: { bucket: () => ({ file }) } });
+      return { local, file };
+    };
+    const { local } = createService();
+    await expect(local.download('document.pdf', 'old', checksum)).resolves.toEqual(bytes);
+    await expect(local.download('document.pdf', 'old', 'wrong')).rejects.toThrow('integridad');
+    const production = createService(true);
+    await expect(production.local.download('document.pdf', 'old', checksum)).rejects.toThrow('Missing generation');
+    expect(production.file).toHaveBeenCalledTimes(1);
+  });
   const service = new RequestDocuments(
     new ConfigService({
       GOOGLE_CLOUD_PROJECT: 'local-tests',

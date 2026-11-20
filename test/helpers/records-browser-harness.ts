@@ -828,12 +828,23 @@ proc.onchange=show;show();setInterval(show,5000);
         if (key !== 'a' && key !== 'b')
           throw new BadRequestException('Proceso ficticio a/b');
         const entry = processes[key];
+        if(req.path==='/corrections-fixture'){
+          const db=fixture.client(entry.process);
+          await db.sessionOperationalConfig.update({where:{id:1},data:{latenessToleranceMinutes:3}});
+          await db.class.update({where:{id:ids.emptyClass},data:{shiftId:2}});
+          await db.supervisor.update({where:{id:fixture.supervisorId},data:{shiftId:1}});
+          await db.supervisor.update({where:{userId:fixture.principals.otherSupervisor.userId},data:{shiftId:2}});
+          const outside=await db.user.create({data:{email:'area-'+randomUUID().slice(0,8)+'@test.invalid',role:'monitor',userProfile:{create:{firstName:'Monitor',lastName:'Otra área'}},monitor:{create:{supervisorId:fixture.supervisorId}}},include:{monitor:true}});
+          await db.class.create({data:{name:'Aula de área ajena '+randomUUID().slice(0,8),idSede:1,areaId:2,shiftId:2,monitorId:outside.monitor!.id}});
+          res.json({outsideMonitor:outside.id});return;
+        }
         if (req.path === '/replacement-fixture') {
           const db=fixture.client(entry.process);
           const existing=await db.userProfile.findUnique({where:{dni:'90901234'},select:{userId:true}});
-          if(existing?.userId){res.json({candidate:existing.userId});return;}
+          if(existing?.userId){const user=await db.user.findUniqueOrThrow({where:{id:existing.userId}});Object.assign(principals,{availableTeacher:{userId:user.id,email:user.email,role:user.role}});res.json({candidate:existing.userId});return;}
           const user=await db.user.create({data:{email:'wf-'+randomUUID().slice(0,8)+'@test.invalid',role:'profesor',userProfile:{create:{firstName:'Reemplazante',lastName:'Disponible',dni:'90901234'}},teacher:{create:{courseId:1,jobStatus:'FreeTime',maxHours:40}}},include:{teacher:true}});
           await db.$executeRaw`INSERT INTO teacher_availabilities(teacher_id,weekday,start_minute,end_minute) SELECT ${user.teacher!.id}::uuid,day,0,1440 FROM unnest(enum_range(NULL::"Weekday")) day`;
+          Object.assign(principals,{availableTeacher:{userId:user.id,email:user.email,role:user.role}});
           res.json({candidate:user.id});return;
         }
         if (req.path === '/week-advance-fixture') {
